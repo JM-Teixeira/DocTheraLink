@@ -1,0 +1,150 @@
+# Frontend deployment for DocTheraLink
+# React application served by Nginx with horizontal scaling
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: doctheralink
+  labels:
+    app: doctheralink
+    component: frontend
+spec:
+  replicas: 2 # Horizontal scaling
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: doctheralink
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: doctheralink
+        component: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: doctheralink/frontend:latest # Replace with your registry
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: REACT_CARE_API_URL
+          value: "https://api.doctheralink.com" # Adjust for your domain
+        - name: REACT_CUSTOM_DESCRIPTION
+          valueFrom:
+            configMapKeyRef:
+              name: doctheralink-config
+              key: REACT_CUSTOM_DESCRIPTION
+        
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 101 # nginx user
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - CHOWN
+            - SETGID
+            - SETUID
+        
+        # Volume mounts for nginx
+        volumeMounts:
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        - name: nginx-run
+          mountPath: /var/run
+        - name: tmp
+          mountPath: /tmp
+      
+      volumes:
+      - name: nginx-cache
+        emptyDir: {}
+      - name: nginx-run
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+
+---
+# Service for frontend
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: doctheralink
+  labels:
+    app: doctheralink
+    component: frontend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  selector:
+    app: doctheralink
+    component: frontend
+
+---
+# Horizontal Pod Autoscaler for frontend
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: frontend-hpa
+  namespace: doctheralink
+  labels:
+    app: doctheralink
+    component: frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frontend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

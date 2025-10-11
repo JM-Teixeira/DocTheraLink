@@ -1,0 +1,149 @@
+# PostgreSQL database deployment for DocTheraLink
+# Includes persistent storage and service configuration
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: doctheralink
+  labels:
+    app: doctheralink
+    component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard # Adjust based on your cluster
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: doctheralink
+  labels:
+    app: doctheralink
+    component: database
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # Important for databases with persistent storage
+  selector:
+    matchLabels:
+      app: doctheralink
+      component: database
+  template:
+    metadata:
+      labels:
+        app: doctheralink
+        component: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: doctheralink-config
+              key: DB_NAME
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: doctheralink-config
+              key: DB_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: doctheralink-secrets
+              key: DB_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - care
+            - -d
+            - care
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - care
+            - -d
+            - care
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+      - name: init-scripts
+        configMap:
+          name: postgres-init-scripts
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: doctheralink
+  labels:
+    app: doctheralink
+    component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgres
+  selector:
+    app: doctheralink
+    component: database
+
+---
+# ConfigMap for PostgreSQL initialization scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: doctheralink
+  labels:
+    app: doctheralink
+    component: database
+data:
+  init.sql: |
+    -- Initialize DocTheraLink database with required extensions and basic setup
+    
+    -- Enable UUID extension
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    
+    -- Set timezone
+    SET timezone = 'UTC';
+    
+    -- Grant necessary permissions
+    GRANT ALL PRIVILEGES ON DATABASE care TO care;
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO care;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO care;

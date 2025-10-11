@@ -1,0 +1,627 @@
+package handlers
+
+import (
+	"net/http"
+
+	"care-backend/internal/config"
+	"care-backend/internal/database"
+	"care-backend/internal/models"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+type FacilityHandler struct {
+	config *config.Config
+}
+
+func NewFacilityHandler(cfg *config.Config) *FacilityHandler {
+	return &FacilityHandler{
+		config: cfg,
+	}
+}
+
+// ListFacilities godoc
+// @Summary List facilities
+// @Description Get paginated list of facilities
+// @Tags facilities
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param limit query int false "Number of results per page"
+// @Param offset query int false "Number of results to skip"
+// @Param search query string false "Search term"
+// @Success 200 {object} models.PaginatedResponse
+// @Router /facility/ [get]
+func (h *FacilityHandler) ListFacilities(c *gin.Context) {
+	var params models.QueryParams
+	if err := c.ShouldBindQuery(&params); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid query parameters",
+		})
+		return
+	}
+
+	if params.Limit == 0 {
+		params.Limit = 20
+	}
+
+	db := database.GetDB()
+	query := db.Model(&models.Facility{}).
+		Preload("State").
+		Preload("District").
+		Preload("LocalBody").
+		Preload("Ward")
+
+	if params.Search != "" {
+		query = query.Where("name ILIKE ?", "%"+params.Search+"%")
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var facilities []models.Facility
+	if err := query.Limit(params.Limit).Offset(params.Offset).Find(&facilities).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to fetch facilities",
+		})
+		return
+	}
+
+	response := models.PaginatedResponse{
+		Count:   int(total),
+		Results: facilities,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// CreateFacility godoc
+// @Summary Create facility
+// @Description Create a new facility
+// @Tags facilities
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param facility body models.FacilityRequest true "Facility data"
+// @Success 201 {object} models.Facility
+// @Router /facility/ [post]
+func (h *FacilityHandler) CreateFacility(c *gin.Context) {
+	var req models.FacilityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid request body",
+		})
+		return
+	}
+
+	facility := models.Facility{
+		Name:              req.Name,
+		FacilityType:      req.FacilityType,
+		Address:           req.Address,
+		PhoneNumber:       req.PhoneNumber,
+		MiddlewareAddress: req.MiddlewareAddress,
+		Pincode:           req.Pincode,
+		Latitude:          req.Latitude,
+		Longitude:         req.Longitude,
+		StateID:           req.StateID,
+		DistrictID:        req.DistrictID,
+		LocalBodyID:       req.LocalBodyID,
+		WardID:            req.WardID,
+		KaspEmpanelled:    req.KaspEmpanelled,
+	}
+
+	db := database.GetDB()
+	if err := db.Create(&facility).Error; err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Failed to create facility",
+		})
+		return
+	}
+
+	// Load relationships
+	db.Preload("State").
+		Preload("District").
+		Preload("LocalBody").
+		Preload("Ward").
+		First(&facility, "id = ?", facility.ID)
+
+	c.JSON(http.StatusCreated, facility)
+}
+
+// GetFacility godoc
+// @Summary Get facility
+// @Description Get facility by ID
+// @Tags facilities
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Facility ID"
+// @Success 200 {object} models.Facility
+// @Router /facility/{id}/ [get]
+func (h *FacilityHandler) GetFacility(c *gin.Context) {
+	id := c.Param("id")
+
+	var facility models.Facility
+	db := database.GetDB()
+	if err := db.Preload("State").
+		Preload("District").
+		Preload("LocalBody").
+		Preload("Ward").
+		Where("id = ?", id).
+		First(&facility).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error:   "not_found",
+				Message: "Facility not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Database error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, facility)
+}
+
+// UpdateFacility godoc
+// @Summary Update facility
+// @Description Update facility details
+// @Tags facilities
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Facility ID"
+// @Param facility body models.FacilityRequest true "Facility data"
+// @Success 200 {object} models.Facility
+// @Router /facility/{id}/ [put]
+func (h *FacilityHandler) UpdateFacility(c *gin.Context) {
+	id := c.Param("id")
+
+	var facility models.Facility
+	db := database.GetDB()
+	if err := db.Where("id = ?", id).First(&facility).Error; err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error:   "not_found",
+			Message: "Facility not found",
+		})
+		return
+	}
+
+	var req models.FacilityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid request body",
+		})
+		return
+	}
+
+	// Update facility
+	facility.Name = req.Name
+	facility.FacilityType = req.FacilityType
+	facility.Address = req.Address
+	facility.PhoneNumber = req.PhoneNumber
+	facility.MiddlewareAddress = req.MiddlewareAddress
+	facility.Pincode = req.Pincode
+	facility.Latitude = req.Latitude
+	facility.Longitude = req.Longitude
+	facility.StateID = req.StateID
+	facility.DistrictID = req.DistrictID
+	facility.LocalBodyID = req.LocalBodyID
+	facility.WardID = req.WardID
+	facility.KaspEmpanelled = req.KaspEmpanelled
+
+	if err := db.Save(&facility).Error; err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Failed to update facility",
+		})
+		return
+	}
+
+	// Load relationships
+	db.Preload("State").
+		Preload("District").
+		Preload("LocalBody").
+		Preload("Ward").
+		First(&facility, "id = ?", facility.ID)
+
+	c.JSON(http.StatusOK, facility)
+}
+
+// PartialUpdateFacility godoc
+// @Summary Partially update facility
+// @Description Partially update facility details
+// @Tags facilities
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Facility ID"
+// @Param facility body object true "Partial facility data"
+// @Success 200 {object} models.Facility
+// @Router /facility/{id}/ [patch]
+func (h *FacilityHandler) PartialUpdateFacility(c *gin.Context) {
+	id := c.Param("id")
+
+	var facility models.Facility
+	db := database.GetDB()
+	if err := db.Where("id = ?", id).First(&facility).Error; err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error:   "not_found",
+			Message: "Facility not found",
+		})
+		return
+	}
+
+	var updateData map[string]interface{}
+	if err := c.ShouldBindJSON(&updateData); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid request body",
+		})
+		return
+	}
+
+	if err := db.Model(&facility).Updates(updateData).Error; err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Failed to update facility",
+		})
+		return
+	}
+
+	// Load relationships
+	db.Preload("State").
+		Preload("District").
+		Preload("LocalBody").
+		Preload("Ward").
+		First(&facility, "id = ?", facility.ID)
+
+	c.JSON(http.StatusOK, facility)
+}
+
+// DeleteFacility godoc
+// @Summary Delete facility
+// @Description Delete facility
+// @Tags facilities
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Facility ID"
+// @Success 200 {object} models.SuccessResponse
+// @Router /facility/{id}/ [delete]
+func (h *FacilityHandler) DeleteFacility(c *gin.Context) {
+	id := c.Param("id")
+
+	db := database.GetDB()
+	result := db.Where("id = ?", id).Delete(&models.Facility{})
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to delete facility",
+		})
+		return
+	}
+
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error:   "not_found",
+			Message: "Facility not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse{
+		Message: "Facility deleted successfully",
+	})
+}
+
+// ListAllFacilities - Public endpoint for all facilities
+func (h *FacilityHandler) ListAllFacilities(c *gin.Context) {
+	h.ListFacilities(c)
+}
+
+// GetAnyFacility - Public endpoint for any facility
+func (h *FacilityHandler) GetAnyFacility(c *gin.Context) {
+	h.GetFacility(c)
+}
+
+// ListStates godoc
+// @Summary List states
+// @Description Get all states
+// @Tags geographic
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.PaginatedResponse
+// @Router /state/ [get]
+func (h *FacilityHandler) ListStates(c *gin.Context) {
+	var states []models.State
+	db := database.GetDB()
+	if err := db.Find(&states).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to fetch states",
+		})
+		return
+	}
+
+	response := models.PaginatedResponse{
+		Count:   len(states),
+		Results: states,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// GetState godoc
+// @Summary Get state
+// @Description Get state by ID
+// @Tags geographic
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "State ID"
+// @Success 200 {object} models.State
+// @Router /state/{id}/ [get]
+func (h *FacilityHandler) GetState(c *gin.Context) {
+	id := c.Param("id")
+
+	var state models.State
+	db := database.GetDB()
+	if err := db.Where("id = ?", id).First(&state).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error:   "not_found",
+				Message: "State not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Database error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, state)
+}
+
+// Placeholder implementations for other endpoints
+func (h *FacilityHandler) GetFacilityUsers(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
+		Error:   "not_implemented",
+		Message: "Endpoint not implemented yet",
+	})
+}
+
+func (h *FacilityHandler) GetFacilityHubs(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
+		Error:   "not_implemented",
+		Message: "Endpoint not implemented yet",
+	})
+}
+
+func (h *FacilityHandler) GetFacilitySpokes(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
+		Error:   "not_implemented",
+		Message: "Endpoint not implemented yet",
+	})
+}
+
+func (h *FacilityHandler) CreateFacilitySpoke(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
+		Error:   "not_implemented",
+		Message: "Endpoint not implemented yet",
+	})
+}
+
+func (h *FacilityHandler) GetFacilitySpoke(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
+		Error:   "not_implemented",
+		Message: "Endpoint not implemented yet",
+	})
+}
+
+func (h *FacilityHandler) UpdateFacilitySpoke(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
+		Error:   "not_implemented",
+		Message: "Endpoint not implemented yet",
+	})
+}
+
+func (h *FacilityHandler) DeleteFacilitySpoke(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
+		Error:   "not_implemented",
+		Message: "Endpoint not implemented yet",
+	})
+}
+
+// Add more placeholder implementations for other facility-related endpoints
+func (h *FacilityHandler) ListAssetLocations(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) CreateAssetLocation(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetAssetLocation(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) UpdateAssetLocation(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) PartialUpdateAssetLocation(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) DeleteAssetLocation(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetInventoryLog(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) CreateInventory(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetMinQuantity(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) SetMinQuantity(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetMinQuantityItem(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) UpdateMinQuantity(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetInventorySummary(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) FlagInventoryItem(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) DeleteLastInventoryLog(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) ListDischargedPatients(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) ListPatientAssetBeds(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) ListFacilityBeds(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) CreateFacilityBed(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetFacilityBed(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) UpdateFacilityBed(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) DeleteFacilityBed(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetDistrictsByState(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetDistrictByName(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetDistrict(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetAllLocalBodyByDistrict(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetLocalBodyByDistrict(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetAllLocalBody(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetLocalBody(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetWards(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetWard(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetItems(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) ViewUpload(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) CreateUpload(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) RetrieveUpload(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) EditUpload(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) ListShiftRequests(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) CreateShift(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetShiftDetails(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) UpdateShift(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) CompleteTransfer(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) GetShiftComments(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) AddShiftComments(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) DownloadFacility(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+func (h *FacilityHandler) DownloadShiftRequests(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}

@@ -1,0 +1,215 @@
+# ============================================
+# DocTheraLink - Git Ignore Configuration
+# ============================================
+
+# ============================================
+# IDE & Editor Files
+# ============================================
+.vscode/
+.idea/
+.kiro/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============================================
+# Environment & Secrets
+# ============================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.crt
+secrets/
+.secrets
+
+# ============================================
+# Node.js / Frontend
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.npm/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Test coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Lock files (optional - uncomment if you want to ignore)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ============================================
+# Go / Backend
+# ============================================
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# Vendor directory
+vendor/
+
+# Go build cache
+.cache/
+
+# ============================================
+# Docker
+# ============================================
+# Don't ignore Dockerfiles and docker-compose
+# But ignore runtime files
+.docker/
+docker-compose.override.yml
+
+# ============================================
+# Database
+# ============================================
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+backups/
+dumps/
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+log/
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============================================
+# Temporary Files
+# ============================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# ============================================
+# Documentation (Keep these!)
+# ============================================
+# All markdown files in docs/ should be committed
+# !docs/**/*.md
+# !README.md
+
+# But ignore generated docs
+docs/generated/
+docs/api/generated/
+
+# ============================================
+# Testing
+# ============================================
+.nyc_output/
+coverage/
+*.lcov
+test-results/
+cypress/videos/
+cypress/screenshots/
+
+# ============================================
+# Build Artifacts
+# ============================================
+*.tar
+*.tar.gz
+*.zip
+*.rar
+
+# ============================================
+# Uploads & User Content (Development)
+# ============================================
+uploads/
+public/uploads/
+storage/
+
+# ============================================
+# What SHOULD be committed:
+# ============================================
+# ✅ Source code (fe/src/, be/internal/, be/cmd/)
+# ✅ Configuration files (docker-compose.yml, Dockerfile, etc.)
+# ✅ Documentation (README.md, docs/*.md)
+# ✅ Package files (package.json, go.mod, go.sum)
+# ✅ Scripts (be/scripts/*.sql, fe/scripts/*.js)
+# ✅ Static assets (fe/public/images/, etc.)
+# ✅ Nginx configs (fe/nginx.conf)
+# ✅ Example env files (.env.example)
+# ✅ Git files (.gitignore, .gitattributes)
+# ✅ CI/CD configs (.github/, .gitlab-ci.yml)
+# ✅ License and legal (LICENSE, NOTICE)
+
+# ============================================
+# Project Specific
+# ============================================
+# Frontend build output (will be built in Docker)
+fe/build/
+fe/dist/
+
+# Backend binary (will be built in Docker)
+be/main
+be/care-backend
+
+# Plugin apps (if dynamically loaded)
+fe/apps/*/node_modules/
+
+# Generated files
+fe/src/pluginMap.ts
+fe/src/generated/
+
+# Temporary fix files (already moved to docs/)
+*_FIX*.md
+*_STATUS*.md
+*_FIXED*.md
