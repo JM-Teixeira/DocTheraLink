@@ -80,6 +80,12 @@ main
 *.test
 *.out
 
+# Go installation files (should not be in repo!)
+*.tar.gz
+go*.linux-*.tar.gz
+go*.darwin-*.tar.gz
+go*.windows-*.zip
+
 # Go workspace
 go.work
 go.work.sum
