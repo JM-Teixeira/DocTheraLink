@@ -401,73 +401,6 @@ func (h *FacilityHandler) GetFacilityUsers(c *gin.Context) {
 	})
 }
 
-func (h *FacilityHandler) GetFacilityHubs(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-func (h *FacilityHandler) GetFacilitySpokes(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-func (h *FacilityHandler) CreateFacilitySpoke(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-func (h *FacilityHandler) GetFacilitySpoke(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-func (h *FacilityHandler) UpdateFacilitySpoke(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-func (h *FacilityHandler) DeleteFacilitySpoke(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-// Add more placeholder implementations for other facility-related endpoints
-func (h *FacilityHandler) ListAssetLocations(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) CreateAssetLocation(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetAssetLocation(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) UpdateAssetLocation(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) PartialUpdateAssetLocation(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) DeleteAssetLocation(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
 func (h *FacilityHandler) GetInventoryLog(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
 }
@@ -501,34 +434,6 @@ func (h *FacilityHandler) FlagInventoryItem(c *gin.Context) {
 }
 
 func (h *FacilityHandler) DeleteLastInventoryLog(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) ListDischargedPatients(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) ListPatientAssetBeds(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) ListFacilityBeds(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) CreateFacilityBed(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetFacilityBed(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) UpdateFacilityBed(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) DeleteFacilityBed(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
 }
 
@@ -627,38 +532,6 @@ func (h *FacilityHandler) EditUpload(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
 }
 
-func (h *FacilityHandler) ListShiftRequests(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) CreateShift(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetShiftDetails(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) UpdateShift(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) CompleteTransfer(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetShiftComments(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) AddShiftComments(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
 func (h *FacilityHandler) DownloadFacility(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) DownloadShiftRequests(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
 }

@@ -28,10 +28,4 @@ func notImplemented(c *gin.Context) {
 	})
 }
 
-func (h *PatientHandler) TransferPatient(c *gin.Context)           { notImplemented(c) }
-func (h *PatientHandler) GetPatientNotes(c *gin.Context)           { notImplemented(c) }
-func (h *PatientHandler) AddPatientNote(c *gin.Context)            { notImplemented(c) }
-func (h *PatientHandler) UpdatePatientNote(c *gin.Context)         { notImplemented(c) }
-func (h *PatientHandler) GetPatientNoteEditHistory(c *gin.Context) { notImplemented(c) }
-func (h *PatientHandler) GetPatientInvestigation(c *gin.Context)   { notImplemented(c) }
-func (h *PatientHandler) DownloadPatients(c *gin.Context)          { notImplemented(c) }
+func (h *PatientHandler) DownloadPatients(c *gin.Context) { notImplemented(c) }

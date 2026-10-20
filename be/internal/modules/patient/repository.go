@@ -23,9 +23,9 @@ var ErrNotFound = errors.New("patient not found")
 
 // Scope restricts which patients a query may return.
 type Scope struct {
-	All            bool    // admins: no restriction
-	UserID         uint    // the requesting user
-	HomeFacilityID *string // the user's home facility, if any
+	All      bool    // admins: no restriction
+	UserID   uint    // the requesting user
+	ClinicID *string // the user's clinic (see internal/clinic), if any
 }
 
 // ListQuery holds the list/search parameters.
@@ -44,7 +44,6 @@ type Repository interface {
 	Get(ctx context.Context, s Scope, id string) (*models.Patient, error)
 	Create(ctx context.Context, p *models.Patient) error
 	Update(ctx context.Context, id string, fields map[string]any) error
-	HomeFacility(ctx context.Context, userID uint) (*string, error)
 }
 
 // GormRepository implements Repository on PostgreSQL via GORM.
@@ -53,8 +52,8 @@ type GormRepository struct{ db *gorm.DB }
 // NewGormRepository builds a repository on the given connection.
 func NewGormRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
-// scoped applies the visibility rules: a non-admin sees patients of their home
-// facility, patients they created or are assigned to, and patients linked to
+// scoped applies the visibility rules: a non-admin sees patients of their
+// clinic, patients they created or are assigned to, and patients linked to
 // them through a referral (as referring doctor or treating therapist).
 func scoped(db *gorm.DB, s Scope) *gorm.DB {
 	if s.All {
@@ -67,8 +66,8 @@ func scoped(db *gorm.DB, s Scope) *gorm.DB {
 		Or("patients.id IN (?)", fresh.Table("referrals").
 			Select("patient_id").
 			Where("deleted_at IS NULL AND (doctor_id = ? OR therapist_id = ?)", s.UserID, s.UserID))
-	if s.HomeFacilityID != nil {
-		cond = cond.Or("patients.facility_id = ?", *s.HomeFacilityID)
+	if s.ClinicID != nil {
+		cond = cond.Or("patients.facility_id = ?", *s.ClinicID)
 	}
 	return db.Where(cond)
 }
@@ -123,16 +122,6 @@ func (g *GormRepository) Update(ctx context.Context, id string, fields map[strin
 		return ErrNotFound
 	}
 	return nil
-}
-
-func (g *GormRepository) HomeFacility(ctx context.Context, userID uint) (*string, error) {
-	var u struct{ HomeFacilityID *string }
-	err := g.db.WithContext(ctx).Table("users").Select("home_facility_id").
-		Where("id = ?", userID).Take(&u).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	return u.HomeFacilityID, err
 }
 
 // escapeLike escapes LIKE wildcards so user input is matched literally.

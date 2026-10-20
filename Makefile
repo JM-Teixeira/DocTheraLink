@@ -38,7 +38,7 @@ test-fe: ## Frontend unit tests
 check: ## Everything CI runs (except image builds)
 	cd be && test -z "$$(gofmt -l .)" && go vet ./... && go vet -tags integration ./... && go vet -tags e2e ./...
 	$(MAKE) test test-be-integration
-	cd fe && npm run typecheck && npx eslint --max-warnings=0 src/components/Referral src/test
+	cd fe && npm run typecheck && npm run lint:strict
 
 k8s-up: ## Local Kubernetes (k3d): create cluster, build, deploy → http://localhost:8088
 	scripts/k8s-local.sh up

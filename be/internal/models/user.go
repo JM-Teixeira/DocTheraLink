@@ -14,6 +14,7 @@ const (
 	RoleVolunteer             UserRole = "Volunteer"
 	RoleStaffReadOnly         UserRole = "StaffReadOnly"
 	RoleStaff                 UserRole = "Staff"
+	RoleReceptionist          UserRole = "Receptionist" // front desk: patients and appointments, no clinical notes
 	RoleNurse                 UserRole = "Nurse"
 	RolePhysioTherapist       UserRole = "PhysioTherapist"
 	RoleDoctor                UserRole = "Doctor"

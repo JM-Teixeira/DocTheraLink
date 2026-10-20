@@ -130,48 +130,10 @@ type Patient struct {
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
-// PatientNote model temporarily moved to notes_disabled.go due to GORM constraint conflicts
-
-type PatientTransfer struct {
-	ID             string  `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	PatientID      string  `json:"-"`
-	FromFacilityID string  `json:"-"`
-	ToFacilityID   string  `json:"-"`
-	TransferReason string  `json:"transfer_reason"`
-	TransferNotes  *string `json:"transfer_notes"`
-	InitiatedByID  uint    `json:"-"`
-
-	Patient      Patient  `json:"patient" gorm:"foreignKey:PatientID"`
-	FromFacility Facility `json:"from_facility" gorm:"foreignKey:FromFacilityID"`
-	ToFacility   Facility `json:"to_facility" gorm:"foreignKey:ToFacilityID"`
-	InitiatedBy  User     `json:"initiated_by" gorm:"foreignKey:InitiatedByID"`
-
-	CreatedAt time.Time `json:"created_date"`
-	UpdatedAt time.Time `json:"modified_date"`
-}
-
-// Request/Response types
-type PatientTransferRequest struct {
-	FacilityID     string  `json:"facility" binding:"required"`
-	TransferReason string  `json:"transfer_reason" binding:"required"`
-	TransferNotes  *string `json:"transfer_notes"`
-}
-
-// PatientNoteRequest temporarily disabled - see notes_disabled.go
-
-// BeforeCreate hooks
+// BeforeCreate assigns a UUID so the ID is known before the insert returns.
 func (p *Patient) BeforeCreate(tx *gorm.DB) error {
 	if p.ID == "" {
 		p.ID = uuid.New().String()
-	}
-	return nil
-}
-
-// PatientNote BeforeCreate hook temporarily disabled - see notes_disabled.go
-
-func (pt *PatientTransfer) BeforeCreate(tx *gorm.DB) error {
-	if pt.ID == "" {
-		pt.ID = uuid.New().String()
 	}
 	return nil
 }

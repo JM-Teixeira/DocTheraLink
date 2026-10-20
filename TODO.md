@@ -50,19 +50,17 @@ Open testing work:
 
 ## 2. Engineering (P1/P2)
 
-- [ ] P1 **Versioned SQL migrations** (goose/Atlas) run as a k8s Job instead of AutoMigrate at startup — prerequisite for >1 backend replica.
-- [ ] P1 **Remove inherited CARE modules we don't need** (frontend screens + backend 501 stubs): see decision D1 below.
+- [ ] P1 **Versioned SQL migrations** (goose/Atlas) run as a k8s Job instead of AutoMigrate at startup — prerequisite for >1 backend replica. Also drop the tables of removed CARE modules (beds, locations, consultations, daily_rounds, assets…) that existing databases still contain.
 - [ ] P2 Structured logging (`log/slog`, JSON), request IDs, no patient data in logs.
-- [ ] P2 Frontend formatting pass (Prettier/ESLint `--fix`, LF endings) on `fe/src` (~4.5k mostly-formatting errors), then lint all of `src/` in CI.
+- [ ] P2 Frontend formatting pass (Prettier/ESLint `--fix`, LF endings) on `fe/src`, then lint all of `src/` in CI (today `npm run lint:strict` covers new code only).
 - [ ] P2 Frontend upgrades: React 19, Tailwind 4, ESLint 9 flat config; replace deprecated `useTanStackQueryInstead`.
+- [ ] P2 Remove remaining ICU-era constants/types (`common/constants.tsx`, `Patient/models.tsx` daily-round types, COVID fields on the patient model).
 - [ ] P2 Swagger/OpenAPI regeneration (`make -C be swagger`) and frontend types from it.
 - [ ] P2 Legacy models use `UserBareMinimum` relations without a table name (GORM may create `user_bare_minimums`); audit.
-- [ ] P2 Seeded doctor's first name is `"Dr. John"` — fix seed data.
 - [ ] P3 Fold `be/scripts/portugal_data.sql` (full district list) into seeding or delete it.
 
 ## 3. Deployment & operations (P2/P3)
 
-- [x] Local Kubernetes (k3d) — see Completed.md.
 - [ ] P2 Container registry + CD: GitHub Actions → GHCR tagged by git SHA, pin tags in `k8s/overlays/production`.
 - [ ] P2 Uploads to S3-compatible storage (needed for >1 backend replica).
 - [ ] P3 Managed PostgreSQL or CloudNativePG with PITR backups.
@@ -72,46 +70,54 @@ Open testing work:
 
 ---
 
-## 4. Product roadmap **[proposed — please review]**
+## 4. Product roadmap (approved 2026-10-21)
 
-Each milestone is shippable on its own and comes with the tests from §0.
+Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the tests from §0.
 
-### M1 — Close the referral loop (P1)
-- [ ] "Refer to physiotherapy" button on the patient page (`/referrals/new?patient=<id>` already works).
+### Decisions (product owner, 2026-10-21)
+- **D1** Remove the inherited CARE ICU modules (assets, beds/locations, consultations/daily rounds, prescriptions, shifting, resource requests, TeleICU/camera, HCX insurance, death report, external results) — **done**. **Keep inventory**: therapists must track consumables (masks, gloves, gels, tape…) → rebuilt in M5.
+- **D2** One clinic for now, but **modular for many**: a clinic = a facility; users work in their `home_facility`; new modules scope data through `internal/clinic` — **foundation done**.
+- **D3** Add a **Receptionist** role — **done** (patients yes, referrals no; appointments in M3).
+- **D4** Billing **not** in the first stages (M6 stays parked).
+
+### M1 — Close the referral loop (P1) ← current
+- [x] "Refer to physiotherapy" button on the patient page.
 - [ ] Notifications: in-app bell + e-mail on new referral (therapists), accepted/declined/completed (doctor), new message.
-- [ ] Attachments on referrals and messages (imaging, reports, PDFs) with access control.
+- [ ] Attachments on referrals and messages (imaging, reports, PDFs) with access control (replaces the `/files` stubs).
 - [ ] Re-assign / hand-over to another therapist; re-open a declined referral to another therapist.
 - [ ] Filters & search on the referral list (patient, priority, date, therapist) and counts per status tab.
 - [ ] ICD-10 code picker; referral templates for common conditions (ACL rehab, low back pain, frozen shoulder…).
 - [ ] Printable referral / discharge letter (PDF).
 
+### M4 — Patients (P1)
+- [x] New Klyniva patient pages: list/search, detail, create/edit (replace CARE's 3k-line pages).
+- [ ] Rest of the old "centralized patient creation" spec (from `.kiro`): **duplicate detection with confirmation** (reuse `Facility/DuplicatePatientDialog`), draft auto-save, retry on network errors, accessibility checks, browser E2E of the flow, ≥80 % coverage. Backend model grows to match: emergency contact (name/relationship), address parts, insurance, structured allergies/medications/conditions.
+- [ ] Portuguese identifiers: NIF and SNS number with validation.
+- [ ] Patient timeline: referrals, sessions, notes and documents in one view.
+- [ ] Consent records (GDPR) per patient.
+
+### M3 — Scheduling (P1)
+- [ ] Appointments linked to referrals; book the whole series of N sessions at once; receptionists manage them.
+- [ ] Therapist availability from the timetable; room/section capacity; conflict checks.
+- [ ] Wire the existing (unrouted) WIP screens: `Facility/TimetableGrid`, `Therapy/*` (timetables, section manager) — rebuild on the module pattern where needed.
+- [ ] Day/week calendar per therapist and per section; drag to reschedule.
+- [ ] Waiting list, cancellations, no-show tracking.
+- [ ] SMS/e-mail reminders to patients.
+
 ### M2 — Physiotherapy clinical record (P1)
-- [ ] Treatment plan per referral: goals, planned sessions, frequency, modalities (electrotherapy, hydrotherapy, massage, gym — the facility "sections").
+- [ ] Treatment plan per referral: goals, planned sessions, frequency, modalities (electrotherapy, hydrotherapy, massage, gym — the clinic "sections").
 - [ ] Session notes in SOAP format; pain scales (VAS/NRS); ROM and strength measurements.
 - [ ] Standardised outcome questionnaires (e.g. Oswestry, DASH, KOOS, NDI) with progress charts.
 - [ ] Home exercise programmes from an exercise library (images/video), printable or sent to the patient.
 - [ ] Discharge summary generated from the record and sent to the referring doctor automatically.
 
-### M3 — Scheduling (P1)
-- [ ] Appointments linked to referrals; book the whole series of N sessions at once.
-- [ ] Therapist availability from the existing timetable; room/section capacity; conflict checks.
-- [ ] Day/week calendar per therapist and per section; drag to reschedule.
-- [ ] Waiting list, cancellations, no-show tracking.
-- [ ] SMS/e-mail reminders to patients.
-
-### M4 — Patients (P1)
-- [ ] Finish the "centralized patient creation" spec (from the old `.kiro` folder): reusable patient form (create/edit), debounced search, **duplicate detection with confirmation**, draft auto-save, field-level errors with retry, accessibility (WCAG), E2E test of the flow. Backend model must grow to match the form (emergency contact, address parts, insurance, structured allergies/medications/conditions).
-- [ ] Portuguese identifiers: NIF and SNS number with validation.
-- [ ] Patient timeline: referrals, sessions, notes and documents in one view.
-- [ ] Consent records (GDPR) per patient.
-
 ### M5 — Clinic administration (P2)
-- [ ] Organisations with several clinics (multi-tenant data separation).
-- [ ] Staff management with roles incl. a new **Receptionist** role (scheduling, check-in, no clinical notes).
-- [ ] Time-tracking reports and exports (clock in/out already works).
+- [ ] **Inventory of consumables** (D1): catalogue (seeded: masks, gloves, gels, tape, electrodes…), stock in/out per clinic, minimum levels with low-stock alerts, usage per session (link to M2). Replaces the CARE inventory screens and `/facility/:id/inventory` stubs.
+- [ ] Wire the existing clock in/out button and time-log history (`Users/ClockInOutButton`, `Users/TimeLogHistory` — built but never shown); time-tracking reports and exports.
+- [ ] Organisations with several clinics (switch clinic, per-clinic admins) on top of `internal/clinic`.
 - [ ] Dashboards: referrals by status, waiting time to first session, therapist load, outcomes.
 
-### M6 — Billing (P3)
+### M6 — Billing (parked, D4)
 - [ ] Price lists per act, invoices, payments; insurers (ADSE, SNS agreements, private insurers, self-pay).
 - [ ] Portuguese certified invoicing / SAF-T compliance (likely via an integration — legal requirement).
 
@@ -119,10 +125,3 @@ Each milestone is shippable on its own and comes with the tests from §0.
 - [ ] Patient portal / app: appointments, exercise programme, messages, documents.
 - [ ] Video teleconsultation sessions.
 - [ ] Interoperability: HL7 FHIR export/import.
-
-### Decisions needed from the product owner
-- **D1** Which inherited CARE modules stay? Candidates to **remove**: assets, inventory, beds, shifting, resource requests, consultations/daily rounds, TeleICU/camera feed, HCX, medicine/prescriptions, death report, external results. Candidates to **keep**: facilities, users, patients, time log, timetable, notifications.
-- **D2** Single clinic or multi-clinic organisations from the start (affects M5 and every query)?
-- **D3** Add a Receptionist role now?
-- **D4** Billing in scope this year, or rely on existing invoicing software?
-- **D5** Order of milestones (suggested: M1 → M4 → M3 → M2 → M5).

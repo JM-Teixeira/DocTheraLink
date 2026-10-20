@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"klyniva/internal/clinic"
 	"klyniva/internal/models"
 
 	"github.com/google/uuid"
@@ -15,14 +16,13 @@ import (
 // with; visibility itself is enforced in SQL and covered by integration tests.
 type fakeRepo struct {
 	patients  map[string]models.Patient
-	homes     map[uint]*string
 	lastScope Scope
 	lastQuery ListQuery
 	updates   map[string]any
 }
 
 func newFakeRepo() *fakeRepo {
-	return &fakeRepo{patients: map[string]models.Patient{}, homes: map[uint]*string{}}
+	return &fakeRepo{patients: map[string]models.Patient{}}
 }
 
 func (f *fakeRepo) List(_ context.Context, s Scope, q ListQuery) ([]models.Patient, int64, error) {
@@ -57,28 +57,56 @@ func (f *fakeRepo) Update(_ context.Context, id string, fields map[string]any) e
 	return nil
 }
 
-func (f *fakeRepo) HomeFacility(_ context.Context, userID uint) (*string, error) {
-	return f.homes[userID], nil
-}
-
 var (
-	nurse    = Actor{ID: 5, Role: models.RoleNurse}
-	readOnly = Actor{ID: 6, Role: models.RoleStaffReadOnly}
-	admin    = Actor{ID: 1, Role: models.RoleStateAdmin}
-	now      = time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+	nurse        = Actor{ID: 5, Role: models.RoleNurse}
+	receptionist = Actor{ID: 7, Role: models.RoleReceptionist}
+	readOnly     = Actor{ID: 6, Role: models.RoleStaffReadOnly}
+	admin        = Actor{ID: 1, Role: models.RoleStateAdmin}
+	now          = time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+
+	home        = uuid.NewString() // clinic of nurse and receptionist
+	otherClinic = uuid.NewString()
 )
 
 func newSvc() (*Service, *fakeRepo) {
 	repo := newFakeRepo()
-	return NewService(repo, func() time.Time { return now }), repo
+	clinics := clinic.Static{nurse.ID: home, receptionist.ID: home}
+	return NewService(repo, clinics, func() time.Time { return now }), repo
 }
 
 func strp(s string) *string { return &s }
 
+func TestCreateClinicRules(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("receptionist registers patients in their clinic", func(t *testing.T) {
+		s, _ := newSvc()
+		p, err := s.Create(ctx, receptionist, CreateRequest{Name: "Ana"})
+		if err != nil || p.FacilityID == nil || *p.FacilityID != home {
+			t.Fatalf("err=%v facility=%v", err, p)
+		}
+	})
+
+	t.Run("non-admin cannot register into another clinic", func(t *testing.T) {
+		s, _ := newSvc()
+		_, err := s.Create(ctx, nurse, CreateRequest{Name: "Ana", FacilityID: &otherClinic})
+		var v *ValidationError
+		if !errors.As(err, &v) || v.Field != "facility" {
+			t.Fatalf("want facility validation error, got %v", err)
+		}
+	})
+
+	t.Run("admin may register into any clinic", func(t *testing.T) {
+		s, _ := newSvc()
+		p, err := s.Create(ctx, admin, CreateRequest{Name: "Ana", FacilityID: &otherClinic})
+		if err != nil || *p.FacilityID != otherClinic {
+			t.Fatalf("err=%v", err)
+		}
+	})
+}
+
 func TestCreateSetsServerFields(t *testing.T) {
-	s, repo := newSvc()
-	home := uuid.NewString()
-	repo.homes[nurse.ID] = &home
+	s, _ := newSvc()
 
 	p, err := s.Create(context.Background(), nurse, CreateRequest{
 		Name: "  Ana Pereira ", DateOfBirth: strp("1980-05-02"), PhoneNumber: strp("+351 912 345 678"),
@@ -138,7 +166,8 @@ func TestScopeAndPagination(t *testing.T) {
 	}
 
 	_, _, _ = s.List(ctx, nurse, ListQuery{Offset: -3})
-	if repo.lastScope.All || repo.lastScope.UserID != nurse.ID || repo.lastQuery.Offset != 0 {
+	if repo.lastScope.All || repo.lastScope.UserID != nurse.ID || repo.lastQuery.Offset != 0 ||
+		repo.lastScope.ClinicID == nil || *repo.lastScope.ClinicID != home {
 		t.Errorf("nurse scope: %+v %+v", repo.lastScope, repo.lastQuery)
 	}
 

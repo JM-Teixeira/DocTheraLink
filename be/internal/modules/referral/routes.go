@@ -1,6 +1,8 @@
 package referral
 
 import (
+	"klyniva/internal/clinic"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -8,7 +10,7 @@ import (
 // RegisterRoutes wires the module onto an authenticated router group.
 // The group must already run auth.AuthMiddleware.
 func RegisterRoutes(protected *gin.RouterGroup, db *gorm.DB) {
-	h := NewHandler(NewService(NewGormRepository(db), nil))
+	h := NewHandler(NewService(NewGormRepository(db), clinic.NewGormResolver(db), nil))
 
 	g := protected.Group("/referrals")
 	g.GET("/", h.List)

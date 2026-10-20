@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"klyniva/internal/clinic"
 	"klyniva/internal/models"
 )
 
@@ -18,6 +19,12 @@ var (
 	otherPhysio = Actor{ID: 11, Role: models.RolePhysioTherapist}
 	admin       = Actor{ID: 99, Role: models.RoleStateAdmin}
 	nurse       = Actor{ID: 20, Role: models.RoleNurse}
+	farPhysio   = Actor{ID: 12, Role: models.RolePhysioTherapist} // works in another clinic
+)
+
+const (
+	clinicA = "0b5a1c1e-0000-4000-8000-00000000000a"
+	clinicB = "0b5a1c1e-0000-4000-8000-00000000000b"
 )
 
 var fixedNow = time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
@@ -30,7 +37,12 @@ func newTestService(t *testing.T) (*Service, *fakeRepo) {
 	repo.addUser(physio.ID, string(models.RolePhysioTherapist), true)
 	repo.addUser(otherPhysio.ID, string(models.RolePhysioTherapist), true)
 	repo.addUser(nurse.ID, string(models.RoleNurse), true)
-	return NewService(repo, func() time.Time { return fixedNow }), repo
+	repo.addUser(farPhysio.ID, string(models.RolePhysioTherapist), true)
+	clinics := clinic.Static{
+		doctor.ID: clinicA, otherDoctor.ID: clinicA, physio.ID: clinicA,
+		otherPhysio.ID: clinicA, nurse.ID: clinicA, farPhysio.ID: clinicB,
+	}
+	return NewService(repo, clinics, func() time.Time { return fixedNow }), repo
 }
 
 func validCreate() CreateRequest {
@@ -96,6 +108,37 @@ func TestCreate(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+// TestClinicIsolation: referrals belong to the doctor's clinic and never leak
+// into another clinic's therapist inbox.
+func TestClinicIsolation(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newTestService(t)
+	r := mustCreate(t, s, nil)
+	if r.FacilityID == nil || *r.FacilityID != clinicA {
+		t.Fatalf("referral should take the doctor's clinic, got %v", r.FacilityID)
+	}
+
+	if _, err := s.Get(ctx, farPhysio, r.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("therapist of another clinic must not see the open referral, got %v", err)
+	}
+	if _, total, _ := s.List(ctx, farPhysio, ListFilter{}); total != 0 {
+		t.Errorf("other clinic inbox should be empty, got %d", total)
+	}
+	_, err := s.Accept(ctx, farPhysio, r.ID)
+	assertErr(t, err, ErrNotFound)
+
+	req := validCreate()
+	req.TherapistID = ptrUint(farPhysio.ID)
+	_, err = s.Create(ctx, doctor, req)
+	assertErr(t, err, &ValidationError{})
+
+	other := clinicB
+	req = validCreate()
+	req.FacilityID = &other
+	_, err = s.Create(ctx, doctor, req)
+	assertErr(t, err, &ValidationError{})
 }
 
 func TestHappyPathLifecycle(t *testing.T) {

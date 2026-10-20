@@ -10,18 +10,12 @@ import {
   UserSummary,
 } from "@/components/Referral/types";
 
-const ADMIN_ROLES = ["StateAdmin", "DistrictAdmin", "LocalBodyAdmin"];
+import { RoleUser, isAdmin, isDoctor, isTherapist } from "@/Utils/roles";
 
 /** The fields of the signed-in user the helpers need. */
-export interface CurrentUser {
-  id: number;
-  user_type: string;
-}
+export type CurrentUser = RoleUser;
 
-export const isAdmin = (u: CurrentUser) => ADMIN_ROLES.includes(u.user_type);
-export const isDoctor = (u: CurrentUser) => u.user_type === "Doctor";
-export const isTherapist = (u: CurrentUser) =>
-  u.user_type === "PhysioTherapist";
+export { isAdmin, isDoctor, isTherapist };
 
 /** Doctors and admins can open referrals. */
 export const canCreateReferral = (u: CurrentUser) => isDoctor(u) || isAdmin(u);
@@ -110,23 +104,5 @@ export function fullName(u?: UserSummary | null) {
 /** True when a name already carries a doctor title ("Dr. John", "dr Ana"). */
 export const hasDoctorTitle = (name: string) => /^dr\.?\s/i.test(name.trim());
 
-/** Initials for avatars, e.g. "Sarah Johnson" → "SJ". */
-export function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
-}
-
-/** Age in whole years at `now`, or null when the birth date is unknown/invalid. */
-export function ageFromDob(dob?: string | null, now = new Date()) {
-  if (!dob) return null;
-  const d = new Date(dob);
-  if (Number.isNaN(d.getTime())) return null;
-  let age = now.getFullYear() - d.getFullYear();
-  const m = now.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
-  return age;
-}
+// Shared person helpers, re-exported so existing imports keep working
+export { ageFromDob, initials } from "@/Utils/person";

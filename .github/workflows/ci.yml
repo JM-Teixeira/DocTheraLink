@@ -53,7 +53,7 @@ jobs:
       - run: npm run typecheck
       # Strict lint for new modules; the inherited codebase still needs a
       # formatting pass (see TODO.md) before linting all of src/.
-      - run: npx eslint --max-warnings=0 src/components/Referral src/test
+      - run: npm run lint:strict
       - run: npm test
       - name: Build
         run: npm run build:meta && npm run generate && npm run build:react

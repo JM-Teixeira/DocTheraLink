@@ -32,10 +32,12 @@ be/                Go backend (Go module name: klyniva)
   cmd/migrate      migrations + seeding CLI
   internal/
     api/routes.go  all route registration (/api/v1)
-    api/handlers/  legacy handlers (CARE-style; many endpoints still 501)
+    api/handlers/  legacy handlers (users, facilities, time log, timetable;
+                   inventory + file upload endpoints are still 501 stubs)
     modules/       NEW layered modules — use this pattern for new features
       referral/    model → repository → service → handler → routes (+ tests)
       patient/     same layout
+    clinic/        which clinic a user works in (Resolver) — scope new data with it
     auth/          JWT (access/refresh with `typ` claim), middleware, role helpers
     config/        env config + Validate() (release-mode guards)
     database/      GORM connect, phased AutoMigrate, seed data
@@ -43,9 +45,12 @@ be/                Go backend (Go module name: klyniva)
     e2e/           HTTP tests against a RUNNING stack (build tag `e2e`, E2E_BASE_URL)
     models/        legacy shared GORM models
   scripts/         init.sql (compose), portugal_data.sql (reference data)
-fe/                React frontend (fork of open-source CARE frontend)
-  src/components/Referral/   NEW referral UI module (+ tests)
-  src/components/Patient/    patient UI (+ user's validation/api WIP with tests)
+fe/                React frontend (started as a fork of CARE; ICU modules removed)
+  src/components/Referral/   referral UI module (+ tests)
+  src/components/Patient/    Klyniva patient pages (PatientList/Detail/Form,
+                             patientFormUtils) + hooks in api/ (+ tests)
+  src/Utils/roles.ts         role helpers used by every module's UI
+  src/Utils/person.ts        initials / age helpers
   src/Routers/routes/*.tsx   route tables (raviger)
   public/locale/{en,pt}.json translations
 k8s/base/          environment-independent manifests (kustomize)
@@ -89,14 +94,34 @@ regression test checks column types.
 
 **Auth:** `Authorization: Bearer <access>`. Middleware sets
 `authorization_payload` (`*models.TokenClaims`) and `user_id` (uint) in the Gin
-context. Roles are strings on `users.user_type` (`Doctor`, `PhysioTherapist`,
-`Nurse`, `StateAdmin`, …). Admin = State/District/LocalBody admin.
+context. Roles are strings on `users.user_type`. Admin = State/District/LocalBody
+admin (organisation-wide, no clinic).
+
+**Roles in use:** `Doctor` (refers), `PhysioTherapist` (treats), `Nurse`,
+`Receptionist` (front desk: registers/edits patients, appointments in M3, **no**
+referrals/clinical notes), `Staff`, read-only variants, admins. Frontend checks
+live in `fe/src/Utils/roles.ts` and mirror the backend.
+
+**Clinics (decision D2):** single clinic today, built for many. A clinic is a
+row in `facilities`; a user's `home_facility_id` is their clinic. Modules get a
+`clinic.Resolver` and stamp/scope data by clinic (`clinic.SameClinic` treats an
+unset clinic as compatible, so clinic-less setups still work). Seeded demo
+clinic: `database.DemoClinicID` ("Klyniva Demo Clinic"), all non-admin demo
+users work there.
 
 **Visibility rules:**
 - Referrals: admins all; doctors their own; therapists those assigned to them
-  plus unassigned *pending* ones (inbox). Non-participants get 404, not 403.
-- Patients: admins all; others → same home facility, created by / assigned to
-  them, or linked to them through a referral.
+  plus unassigned *pending* ones **of their clinic** (inbox). A referral takes
+  the doctor's clinic; an addressed therapist must work in it.
+  Non-participants get 404, not 403. Receptionists/nurses: 403 on list.
+- Patients: admins all; others → patients of their clinic, created by /
+  assigned to them, or linked to them through a referral. Non-admins cannot
+  register patients into another clinic.
+
+**Removed (decision D1):** CARE's ICU features — beds/locations, assets,
+consultations/daily rounds, prescriptions, shifting, resource requests,
+camera/vitals, HCX insurance, death report — in both frontend and backend.
+Inventory is kept for consumables and will be rebuilt as a module (M5).
 
 **Referral state machine:** `pending → accepted → in_progress → completed`;
 `pending → declined` (assigned therapist, reason required);
@@ -129,8 +154,8 @@ The local cluster's kubeconfig is `~/.kube/klyniva.yaml` (context
 `k3d-klyniva`); the script never touches `~/.kube/config`, which holds real
 cloud clusters — never run kubectl against those from this project.
 Demo users (only when `SEED_DEMO_USERS=true`, never in release): `doctor`,
-`physiotherapist`, `nurse`, `staff`, `stateadmin`, `districtadmin`,
-`facilitycoordinator` — password `1234@1`.
+`physiotherapist`, `nurse`, `receptionist`, `staff` (all in the demo clinic),
+`stateadmin`, `districtadmin`, `facilitycoordinator` — password `1234@1`.
 
 Go toolchain: go.mod pins `toolchain go1.27.3`; with an older local Go use
 `GOTOOLCHAIN=auto`. In this dev environment the repo lives in WSL
@@ -157,7 +182,8 @@ the repo ownership).
 
 ## 7. Known gaps (details in TODO.md)
 
-Most legacy endpoints (assets, consultations, inventory, shifting, transfer,
-notes) still return 501; password reset is a stub; no audit log; no rate
-limiting; frontend still has CARE-era screens calling unimplemented APIs;
-inherited frontend code has ~4.5k (mostly formatting) lint errors.
+Inventory and file-upload endpoints still return 501 (rebuilt in M5 / M1);
+password reset is a stub; no audit log; no rate limiting; inherited frontend
+code still has many (mostly formatting) lint errors, so CI lints new code via
+`npm run lint:strict`. Existing databases keep the tables of removed CARE
+modules until versioned migrations drop them.

@@ -16,8 +16,10 @@ import SidebarUserCard from "@/components/Common/Sidebar/SidebarUserCard";
 import NotificationItem from "@/components/Notifications/NotificationsList";
 
 import useActiveLink from "@/hooks/useActiveLink";
+import useAuthUser from "@/hooks/useAuthUser";
 import { useCareAppNavItems } from "@/hooks/useCareApps";
 
+import { canSeeReferrals } from "@/Utils/roles";
 import { classNames } from "@/Utils/utils";
 
 export const SIDEBAR_SHRINK_PREFERENCE_KEY = "sidebarShrinkPreference";
@@ -50,13 +52,20 @@ const StatelessSidebar = ({
   onItemClick,
 }: StatelessSidebarProps) => {
   const { t } = useTranslation();
+  const user = useAuthUser();
+  // Only show what the role can open (the backend enforces the same rules)
   const BaseNavItems: INavItem[] = [
-    { text: t("facilities"), to: "/facility", icon: "d-hospital" },
     { text: t("patients"), to: "/patients", icon: "d-patient" },
-    { text: t("referrals"), to: "/referrals", icon: "l-stethoscope" },
-    { text: t("assets"), to: "/assets", icon: "d-folder" },
-    { text: t("shifting"), to: "/shifting", icon: "d-ambulance" },
-    { text: t("resource"), to: "/resource", icon: "d-book-open" },
+    ...(canSeeReferrals(user)
+      ? [
+          {
+            text: t("referrals"),
+            to: "/referrals",
+            icon: "l-stethoscope",
+          } as const,
+        ]
+      : []),
+    { text: t("clinic"), to: "/facility", icon: "d-hospital" },
     { text: t("users"), to: "/users", icon: "d-people" },
     { text: t("notice_board"), to: "/notice_board", icon: "d-notice-board" },
   ];

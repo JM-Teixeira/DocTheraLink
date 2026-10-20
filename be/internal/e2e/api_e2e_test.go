@@ -22,6 +22,30 @@ import (
 
 const demoPassword = "1234@1"
 
+// TestMain waits until the target answers through its proxy/ingress (no 5xx)
+// before running the tests, so a just-finished rollout does not cause
+// spurious 502s while the old pod drains.
+func TestMain(m *testing.M) {
+	if base := strings.TrimRight(os.Getenv("E2E_BASE_URL"), "/"); base != "" {
+		deadline := time.Now().Add(90 * time.Second)
+		for {
+			resp, err := http.Get(base + "/api/v1/referrals/")
+			if err == nil {
+				resp.Body.Close()
+				if resp.StatusCode < 500 {
+					break
+				}
+			}
+			if time.Now().After(deadline) {
+				fmt.Fprintf(os.Stderr, "e2e: %s not ready after 90s (last err %v)\n", base, err)
+				os.Exit(1)
+			}
+			time.Sleep(time.Second)
+		}
+	}
+	os.Exit(m.Run())
+}
+
 // client is a tiny JSON HTTP client bound to one user's access token.
 type client struct {
 	t     *testing.T
@@ -103,8 +127,9 @@ func TestReferralLifecycle(t *testing.T) {
 	}, &patient), 201)
 	pid := patient["id"].(string)
 
-	expect(t, "nurse cannot see unrelated patient", nurse.call("GET", "/patient/"+pid+"/", nil, nil), 404)
-	expect(t, "physio cannot see patient before referral", physio.call("GET", "/patient/"+pid+"/", nil, nil), 404)
+	// All demo staff work in the same clinic, so they share its patients
+	// (cross-clinic isolation is covered by the integration tests).
+	expect(t, "nurse sees same-clinic patient", nurse.call("GET", "/patient/"+pid+"/", nil, nil), 200)
 
 	var ref map[string]any
 	expect(t, "create referral", doctor.call("POST", "/referrals/", map[string]any{
@@ -140,7 +165,7 @@ func TestReferralLifecycle(t *testing.T) {
 		}
 	}
 	expect(t, "accept twice conflicts", physio.call("POST", "/referrals/"+rid+"/accept/", map[string]any{}, nil), 409)
-	expect(t, "physio sees patient after accepting", physio.call("GET", "/patient/"+pid+"/", nil, nil), 200)
+	expect(t, "physio sees the referred patient", physio.call("GET", "/patient/"+pid+"/", nil, nil), 200)
 
 	expect(t, "doctor asks on thread", doctor.call("POST", "/referrals/"+rid+"/notes/",
 		map[string]string{"kind": "question", "body": "Any radicular symptoms?"}, nil), 201)
@@ -171,6 +196,22 @@ func TestReferralLifecycle(t *testing.T) {
 	// A refresh token must never work as an access token.
 	refreshClient := &client{t: t, base: doctor.base, token: doctorTokens["refresh"]}
 	expect(t, "refresh token as access", refreshClient.call("GET", "/referrals/", nil, nil), 401)
+}
+
+// TestReceptionist covers the front-desk role: registers and edits patients,
+// but has no access to referrals (clinical content).
+func TestReceptionist(t *testing.T) {
+	rec, _ := login(t, "receptionist")
+	var p map[string]any
+	expect(t, "receptionist registers patient", rec.call("POST", "/patient/", map[string]any{
+		"name": "Front Desk " + time.Now().Format("150405"), "phone_number": "+351 920 000 000",
+	}, &p), 201)
+	expect(t, "receptionist edits patient", rec.call("PATCH", "/patient/"+p["id"].(string)+"/",
+		map[string]any{"address": "Rua Augusta 1, Lisboa"}, nil), 200)
+	expect(t, "receptionist cannot list referrals", rec.call("GET", "/referrals/", nil, nil), 403)
+	expect(t, "receptionist cannot create referrals", rec.call("POST", "/referrals/", map[string]any{
+		"patient_id": p["id"], "diagnosis": "x", "reason": "y",
+	}, nil), 403)
 }
 
 // TestClockInOut covers the staff time log (it used to always return 401).

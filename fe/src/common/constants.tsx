@@ -3,7 +3,6 @@ import { IconName } from "@/CAREUI/icons/CareIcon";
 import { SortOption } from "@/components/Common/SortDropdown";
 import {
   PatientCategory,
-  SpokeRelationship,
 } from "@/components/Facility/models";
 import { PhoneNumberValidator } from "@/components/Form/FieldValidators";
 
@@ -34,6 +33,8 @@ export const USER_TYPE_OPTIONS = [
   { id: "Volunteer", role: "Volunteer", readOnly: false },
   { id: "StaffReadOnly", role: "Staff", readOnly: true },
   { id: "Staff", role: "Staff", readOnly: false },
+  // Front desk: registers patients and (M3) manages appointments; no clinical notes
+  { id: "Receptionist", role: "Receptionist", readOnly: false },
   // { id: "NurseReadOnly", role: "Nurse", readOnly: true },
   { id: "Nurse", role: "Nurse", readOnly: false },
   { id: "PhysioTherapist", role: "PhysioTherapist", readOnly: false },
@@ -1213,6 +1214,7 @@ export const USER_TYPES_MAP = {
   Volunteer: "Volunteer",
   StaffReadOnly: "Staff",
   Staff: "Staff",
+  Receptionist: "Receptionist",
   Doctor: "Doctor",
   Nurse: "Nurse",
   NurseReadOnly: "Nurse",
@@ -1489,17 +1491,6 @@ export const DEFAULT_ALLOWED_EXTENSIONS = [
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.oasis.opendocument.spreadsheet,application/pdf",
-];
-
-export const SPOKE_RELATION_TYPES = [
-  {
-    text: "Regular",
-    value: SpokeRelationship.REGULAR,
-  },
-  {
-    text: "Tele ICU",
-    value: SpokeRelationship.TELE_ICU,
-  },
 ];
 
 export const HumanBodyPaths = {

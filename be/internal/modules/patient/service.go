@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"klyniva/internal/auth"
+	"klyniva/internal/clinic"
 	"klyniva/internal/models"
 
 	"github.com/google/uuid"
@@ -62,16 +63,17 @@ type CreateRequest struct {
 
 // Service holds the patient business rules.
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo    Repository
+	clinics clinic.Resolver
+	now     func() time.Time
 }
 
 // NewService builds a Service. now may be nil to use time.Now.
-func NewService(repo Repository, now func() time.Time) *Service {
+func NewService(repo Repository, clinics clinic.Resolver, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repo: repo, now: now}
+	return &Service{repo: repo, clinics: clinics, now: now}
 }
 
 // scope resolves what the actor may see.
@@ -79,11 +81,11 @@ func (s *Service) scope(ctx context.Context, a Actor) (Scope, error) {
 	if auth.IsAdmin(a.Role) {
 		return Scope{All: true}, nil
 	}
-	home, err := s.repo.HomeFacility(ctx, a.ID)
+	home, err := s.clinics.HomeClinic(ctx, a.ID)
 	if err != nil {
 		return Scope{}, err
 	}
-	return Scope{UserID: a.ID, HomeFacilityID: home}, nil
+	return Scope{UserID: a.ID, ClinicID: home}, nil
 }
 
 // List returns visible patients, newest first, with bounded pagination.
@@ -132,12 +134,17 @@ func (s *Service) Create(ctx context.Context, a Actor, req CreateRequest) (*mode
 		return nil, err
 	}
 
+	// Patients belong to the registering user's clinic so colleagues see them.
+	// Non-admins cannot register patients into another clinic.
+	home, err := s.clinics.HomeClinic(ctx, a.ID)
+	if err != nil {
+		return nil, err
+	}
 	facility := req.FacilityID
 	if facility == nil {
-		// Default to the registering user's home facility so the patient is visible to colleagues.
-		if facility, err = s.repo.HomeFacility(ctx, a.ID); err != nil {
-			return nil, err
-		}
+		facility = home
+	} else if !auth.IsAdmin(a.Role) && !clinic.SameClinic(facility, home) {
+		return nil, &ValidationError{"facility", "must be your own clinic"}
 	}
 
 	p := &models.Patient{

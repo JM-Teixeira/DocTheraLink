@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"klyniva/internal/clinic"
 	"klyniva/internal/config"
 	"klyniva/internal/database"
 	"klyniva/internal/models"
@@ -79,7 +80,7 @@ func TestReferralLifecycleOnPostgres(t *testing.T) {
 
 	doctor := userID(t, "doctor")
 	physio := userID(t, "physiotherapist")
-	svc := referral.NewService(referral.NewGormRepository(db), nil)
+	svc := referral.NewService(referral.NewGormRepository(db), clinic.NewGormResolver(db), nil)
 
 	r, err := svc.Create(ctx, doctor, referral.CreateRequest{
 		PatientID: patient.ID, Diagnosis: "Lumbar disc herniation", Reason: "Core strengthening",
@@ -131,7 +132,7 @@ func TestConcurrentAcceptHasOneWinner(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svc := referral.NewService(referral.NewGormRepository(db), nil)
+	svc := referral.NewService(referral.NewGormRepository(db), clinic.NewGormResolver(db), nil)
 	r, err := svc.Create(ctx, userID(t, "doctor"), referral.CreateRequest{
 		PatientID: patient.ID, Diagnosis: "Frozen shoulder", Reason: "Mobilisation",
 	})

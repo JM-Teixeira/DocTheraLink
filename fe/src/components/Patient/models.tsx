@@ -1,7 +1,4 @@
-import {
-  ConsultationModel,
-  PatientCategory,
-} from "@/components/Facility/models";
+import { PatientCategory } from "@/components/Facility/models";
 import { UserBareMinimum } from "@/components/Users/models";
 
 import {
@@ -92,7 +89,6 @@ export interface PatientModel {
   district_object?: { id: number; name: string };
   state_object?: { id: number; name: string };
   tele_consultation_history?: Array<any>;
-  last_consultation?: ConsultationModel;
   address?: string;
   permanent_address?: string;
   sameAddress?: boolean;

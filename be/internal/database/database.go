@@ -97,84 +97,26 @@ func Migrate() error {
 		log.Printf("Warning: Could not create uuid-ossp extension: %v", err)
 	}
 
-	// Phase 1: Core models without complex relationships
-	log.Println("Migrating Phase 1: Core models...")
-	err := DB.AutoMigrate(
-		&models.State{},
-		&models.District{},
-		&models.LocalBody{},
-		&models.Ward{},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to migrate Phase 1 models: %w", err)
+	// Tables are created in dependency order. Tables of removed CARE modules
+	// (beds, consultations, assets, …) are no longer migrated; existing
+	// databases keep them until versioned migrations drop them (TODO.md).
+	phases := []struct {
+		name   string
+		models []any
+	}{
+		{"reference data", []any{&models.State{}, &models.District{}, &models.LocalBody{}, &models.Ward{}}},
+		{"clinics", []any{&models.Facility{}}},
+		{"users", []any{&models.User{}, &models.Skill{}, &models.UserSkill{}}},
+		{"patients", []any{&models.Patient{}}},
+		{"inventory", []any{&models.InventoryItem{}}},
+		{"staff scheduling", []any{&models.TimeLog{}, &models.TimetableSection{}, &models.TimetableSlot{}}},
+		{"referrals", referral.Models()},
 	}
-
-	// Phase 2: Facility and location models
-	log.Println("Migrating Phase 2: Facility models...")
-	err = DB.AutoMigrate(
-		&models.Facility{},
-		&models.Location{},
-		&models.Bed{},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to migrate Phase 2 models: %w", err)
-	}
-
-	// Phase 3: User models
-	log.Println("Migrating Phase 3: User models...")
-	err = DB.AutoMigrate(
-		&models.User{},
-		&models.Skill{},
-		&models.UserSkill{},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to migrate Phase 3 models: %w", err)
-	}
-
-	// Phase 4: Patient model (simplified)
-	log.Println("Migrating Phase 4: Patient model...")
-	err = DB.AutoMigrate(
-		&models.Patient{},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to migrate Phase 4 models: %w", err)
-	}
-
-	// Phase 5: Consultation models
-	log.Println("Migrating Phase 5: Consultation models...")
-	err = DB.AutoMigrate(
-		&models.Consultation{},
-		&models.DailyRound{},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to migrate Phase 5 models: %w", err)
-	}
-
-	// Phase 6: Basic inventory models
-	log.Println("Migrating Phase 6: Inventory models...")
-	err = DB.AutoMigrate(
-		&models.InventoryItem{},
-		&models.Asset{},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to migrate Phase 6 models: %w", err)
-	}
-
-	// Phase 7: Staff scheduling (previously only created by scripts/fix_timetable_tables.sql)
-	log.Println("Migrating Phase 7: Time log and timetable models...")
-	err = DB.AutoMigrate(
-		&models.TimeLog{},
-		&models.TimetableSection{},
-		&models.TimetableSlot{},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to migrate Phase 7 models: %w", err)
-	}
-
-	// Phase 8: Doctor → physiotherapist referrals (the core Klyniva workflow)
-	log.Println("Migrating Phase 8: Referral models...")
-	if err := DB.AutoMigrate(referral.Models()...); err != nil {
-		return fmt.Errorf("failed to migrate Phase 8 models: %w", err)
+	for i, p := range phases {
+		log.Printf("Migrating phase %d: %s...", i+1, p.name)
+		if err := DB.AutoMigrate(p.models...); err != nil {
+			return fmt.Errorf("failed to migrate %s: %w", p.name, err)
+		}
 	}
 
 	log.Println("Database migration completed")
@@ -274,18 +216,21 @@ func SeedData(includeDemoUsers bool) error {
 		}
 	}
 
-	// Seed inventory items
+	// Seed the consumables catalogue of a physiotherapy clinic
+	const ppe, hygiene, treatment = "PPE", "Hygiene", "Treatment consumables"
 	inventoryItems := []models.InventoryItem{
-		{Name: "N95 Mask", Category: "PPE", Unit: "nos"},
-		{Name: "Surgical Mask", Category: "PPE", Unit: "nos"},
-		{Name: "Hand Sanitizer", Category: "Hygiene", Unit: "bottles"},
-		{Name: "Gloves", Category: "PPE", Unit: "pairs"},
-		{Name: "Face Shield", Category: "PPE", Unit: "nos"},
-		{Name: "Oxygen Cylinder", Category: "Medical Equipment", Unit: "nos"},
-		{Name: "Ventilator", Category: "Medical Equipment", Unit: "nos"},
-		{Name: "Pulse Oximeter", Category: "Medical Equipment", Unit: "nos"},
-		{Name: "Thermometer", Category: "Medical Equipment", Unit: "nos"},
-		{Name: "Paracetamol", Category: "Medicine", Unit: "tablets"},
+		{Name: "Surgical Mask", Category: ppe, Unit: "units"},
+		{Name: "Gloves", Category: ppe, Unit: "pairs"},
+		{Name: "Hand Sanitizer", Category: hygiene, Unit: "bottles"},
+		{Name: "Disinfectant Wipes", Category: hygiene, Unit: "packs"},
+		{Name: "Disposable Couch Roll", Category: hygiene, Unit: "rolls"},
+		{Name: "Towels", Category: hygiene, Unit: "units"},
+		{Name: "Ultrasound Gel", Category: treatment, Unit: "bottles"},
+		{Name: "Massage Oil", Category: treatment, Unit: "bottles"},
+		{Name: "Kinesiology Tape", Category: treatment, Unit: "rolls"},
+		{Name: "Electrode Pads (TENS)", Category: treatment, Unit: "packs"},
+		{Name: "Dry Needling Needles", Category: treatment, Unit: "boxes"},
+		{Name: "Ice / Cold Packs", Category: treatment, Unit: "units"},
 	}
 
 	for _, item := range inventoryItems {
@@ -299,81 +244,65 @@ func SeedData(includeDemoUsers bool) error {
 		return nil
 	}
 
-	// Demo users for development/testing only (disabled in release mode by config.Validate)
-	// Password for all demo users: 1234@1
-	testUsers := []models.User{
-		{
-			Username:  "stateadmin",
-			Email:     "stateadmin@klyniva.com",
-			FirstName: "State",
-			LastName:  "Administrator",
-			UserType:  models.RoleStateAdmin,
-			Password:  "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTOcN7C82", // 1234@1
-			IsActive:  true,
-		},
-		{
-			Username:  "districtadmin",
-			Email:     "districtadmin@klyniva.com",
-			FirstName: "District",
-			LastName:  "Administrator",
-			UserType:  models.RoleDistrictAdmin,
-			Password:  "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTOcN7C82", // 1234@1
-			IsActive:  true,
-		},
-		{
-			Username:  "facilitycoordinator",
-			Email:     "coordinator@klyniva.com",
-			FirstName: "Facility",
-			LastName:  "Coordinator",
-			UserType:  models.RoleLocalBodyAdmin,
-			Password:  "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTOcN7C82", // 1234@1
-			IsActive:  true,
-		},
-		{
-			Username:  "doctor",
-			Email:     "doctor@klyniva.com",
-			FirstName: "Dr. John",
-			LastName:  "Smith",
-			UserType:  models.RoleDoctor,
-			Password:  "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTOcN7C82", // 1234@1
-			IsActive:  true,
-		},
-		{
-			Username:  "physiotherapist",
-			Email:     "physio@klyniva.com",
-			FirstName: "Sarah",
-			LastName:  "Johnson",
-			UserType:  models.RolePhysioTherapist,
-			Password:  "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTOcN7C82", // 1234@1
-			IsActive:  true,
-		},
-		{
-			Username:  "nurse",
-			Email:     "nurse@klyniva.com",
-			FirstName: "Mary",
-			LastName:  "Williams",
-			UserType:  models.RoleNurse,
-			Password:  "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTOcN7C82", // 1234@1
-			IsActive:  true,
-		},
-		{
-			Username:  "staff",
-			Email:     "staff@klyniva.com",
-			FirstName: "General",
-			LastName:  "Staff",
-			UserType:  models.RoleStaff,
-			Password:  "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTOcN7C82", // 1234@1
-			IsActive:  true,
-		},
+	if err := seedDemoClinic(); err != nil {
+		return err
+	}
+	log.Println("Database seeding completed")
+	return nil
+}
+
+// DemoClinicID is the fixed ID of the demo clinic (stable across reseeds).
+const DemoClinicID = "6b1f3c1e-5a8e-4c1d-9a0e-000000000001"
+
+// demoPasswordHash is bcrypt("1234@1"), shared by all demo accounts.
+const demoPasswordHash = "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTOcN7C82"
+
+// seedDemoClinic creates one clinic and demo users working in it, for
+// development and tests only (release mode refuses demo users).
+// Admin accounts are organisation-wide and get no clinic.
+func seedDemoClinic() error {
+	demo := models.Facility{ID: DemoClinicID, Name: "Klyniva Demo Clinic", Address: "Lisboa"}
+	if err := DB.FirstOrCreate(&demo, models.Facility{ID: DemoClinicID}).Error; err != nil {
+		return fmt.Errorf("failed to seed demo clinic: %w", err)
 	}
 
-	for _, user := range testUsers {
-		if err := DB.FirstOrCreate(&user, models.User{Username: user.Username}).Error; err != nil {
-			return fmt.Errorf("failed to seed test user %s: %w", user.Username, err)
+	type demoUser struct {
+		username, first, last string
+		role                  models.UserRole
+		inClinic              bool
+	}
+	users := []demoUser{
+		{"stateadmin", "State", "Administrator", models.RoleStateAdmin, false},
+		{"districtadmin", "District", "Administrator", models.RoleDistrictAdmin, false},
+		{"facilitycoordinator", "Clinic", "Coordinator", models.RoleLocalBodyAdmin, false},
+		{"doctor", "John", "Smith", models.RoleDoctor, true},
+		{"physiotherapist", "Sarah", "Johnson", models.RolePhysioTherapist, true},
+		{"nurse", "Mary", "Williams", models.RoleNurse, true},
+		{"receptionist", "Rita", "Lopes", models.RoleReceptionist, true},
+		{"staff", "General", "Staff", models.RoleStaff, true},
+	}
+	for _, d := range users {
+		u := models.User{
+			Username: d.username, Email: d.username + "@klyniva.com",
+			FirstName: d.first, LastName: d.last, UserType: d.role,
+			Password: demoPasswordHash, IsActive: true,
+		}
+		if d.inClinic {
+			clinicID := DemoClinicID
+			u.HomeFacilityID = &clinicID
+		}
+		if err := DB.FirstOrCreate(&u, models.User{Username: d.username}).Error; err != nil {
+			return fmt.Errorf("failed to seed demo user %s: %w", d.username, err)
+		}
+		// Bring demo users created by older versions up to date
+		updates := map[string]any{"first_name": d.first}
+		if d.inClinic {
+			updates["home_facility_id"] = DemoClinicID
+		}
+		if err := DB.Model(&models.User{}).Where("username = ?", d.username).Updates(updates).Error; err != nil {
+			return fmt.Errorf("failed to update demo user %s: %w", d.username, err)
 		}
 	}
-
-	log.Println("Database seeding completed")
 	return nil
 }
 

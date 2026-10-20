@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"klyniva/internal/clinic"
 	"klyniva/internal/database"
 	"klyniva/internal/models"
 	"klyniva/internal/modules/patient"
@@ -35,22 +36,43 @@ func TestMigrationKeepsColumnTypes(t *testing.T) {
 	}
 }
 
-// TestPatientVisibility checks the SQL scoping: a user sees patients they
-// created, and a therapist gains access once a referral links them.
+// newUser inserts an active user, optionally working in a clinic.
+func newUser(t *testing.T, username string, role models.UserRole, clinicID *string) referral.Actor {
+	t.Helper()
+	u := models.User{Username: username, Email: username + "@example.com", FirstName: "Test",
+		LastName: username, Password: "x", UserType: role, IsActive: true, HomeFacilityID: clinicID}
+	if err := database.GetDB().Create(&u).Error; err != nil {
+		t.Fatalf("create user %s: %v", username, err)
+	}
+	return referral.Actor{ID: u.ID, Role: role}
+}
+
+// TestPatientVisibility checks the SQL scoping: staff see the patients of
+// their own clinic, never another clinic's, and a referral grants access to a
+// therapist who has no clinic assigned.
 func TestPatientVisibility(t *testing.T) {
 	startDB(t)
 	ctx := context.Background()
 	db := database.GetDB()
-	svc := patient.NewService(patient.NewGormRepository(db), nil)
+	svc := patient.NewService(patient.NewGormRepository(db), clinic.NewGormResolver(db), nil)
 
 	doctor := userID(t, "doctor")
-	physio := userID(t, "physiotherapist")
 	nurse := userID(t, "nurse")
 	asPatientActor := func(a referral.Actor) patient.Actor { return patient.Actor{ID: a.ID, Role: a.Role} }
+
+	otherClinic := models.Facility{Name: "Other Clinic"}
+	if err := db.Create(&otherClinic).Error; err != nil {
+		t.Fatal(err)
+	}
+	farNurse := newUser(t, "far-nurse", models.RoleNurse, &otherClinic.ID)
+	freelancePhysio := newUser(t, "freelance-physio", models.RolePhysioTherapist, nil)
 
 	p, err := svc.Create(ctx, asPatientActor(doctor), patient.CreateRequest{Name: "Rui Almeida"})
 	if err != nil {
 		t.Fatalf("create: %v", err)
+	}
+	if p.FacilityID == nil || *p.FacilityID != database.DemoClinicID {
+		t.Fatalf("patient should belong to the doctor's clinic, got %v", p.FacilityID)
 	}
 
 	// Search matches case-insensitively; wildcards in input are literal.
@@ -62,22 +84,28 @@ func TestPatientVisibility(t *testing.T) {
 		t.Errorf("literal %% should not match everything, got %d", total)
 	}
 
-	// Unrelated staff cannot see the patient.
-	if _, err := svc.Get(ctx, asPatientActor(nurse), p.ID); !errors.Is(err, patient.ErrNotFound) {
-		t.Errorf("nurse should not see patient, got %v", err)
+	// Same clinic: visible. Another clinic: invisible.
+	if _, err := svc.Get(ctx, asPatientActor(nurse), p.ID); err != nil {
+		t.Errorf("nurse of the same clinic should see patient, got %v", err)
 	}
-	if _, err := svc.Get(ctx, asPatientActor(physio), p.ID); !errors.Is(err, patient.ErrNotFound) {
-		t.Errorf("physio should not see patient before referral, got %v", err)
+	if _, err := svc.Get(ctx, asPatientActor(farNurse), p.ID); !errors.Is(err, patient.ErrNotFound) {
+		t.Errorf("nurse of another clinic must not see patient, got %v", err)
+	}
+	if _, total, _ := svc.List(ctx, asPatientActor(farNurse), patient.ListQuery{}); total != 0 {
+		t.Errorf("other clinic list should be empty, got %d", total)
 	}
 
-	// After the doctor refers the patient to the physio, the physio can see them.
-	refSvc := referral.NewService(referral.NewGormRepository(db), nil)
+	// A therapist without a clinic sees the patient only once a referral links them.
+	if _, err := svc.Get(ctx, asPatientActor(freelancePhysio), p.ID); !errors.Is(err, patient.ErrNotFound) {
+		t.Errorf("unlinked physio should not see patient, got %v", err)
+	}
+	refSvc := referral.NewService(referral.NewGormRepository(db), clinic.NewGormResolver(db), nil)
 	if _, err := refSvc.Create(ctx, doctor, referral.CreateRequest{
-		PatientID: p.ID, TherapistID: &physio.ID, Diagnosis: "Ankle sprain", Reason: "Proprioception",
+		PatientID: p.ID, TherapistID: &freelancePhysio.ID, Diagnosis: "Ankle sprain", Reason: "Proprioception",
 	}); err != nil {
 		t.Fatalf("referral: %v", err)
 	}
-	if _, err := svc.Get(ctx, asPatientActor(physio), p.ID); err != nil {
+	if _, err := svc.Get(ctx, asPatientActor(freelancePhysio), p.ID); err != nil {
 		t.Errorf("physio should see referred patient, got %v", err)
 	}
 
