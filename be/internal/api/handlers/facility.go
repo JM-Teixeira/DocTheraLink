@@ -97,7 +97,7 @@ func (h *FacilityHandler) CreateFacility(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Log what we received
 	println("DEBUG: Received facility request:")
 	println("  Name:", req.Name)
@@ -128,7 +128,7 @@ func (h *FacilityHandler) CreateFacility(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	println("SUCCESS: Facility created with ID:", facility.ID)
 
 	// Load relationships
@@ -534,10 +534,10 @@ func (h *FacilityHandler) DeleteFacilityBed(c *gin.Context) {
 
 func (h *FacilityHandler) GetDistrictsByState(c *gin.Context) {
 	stateID := c.Param("id")
-	
+
 	var districts []models.District
 	db := database.GetDB()
-	
+
 	if err := db.Where("state_id = ?", stateID).Preload("State").Find(&districts).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "database_error",
@@ -545,7 +545,7 @@ func (h *FacilityHandler) GetDistrictsByState(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, districts)
 }
 
@@ -559,10 +559,10 @@ func (h *FacilityHandler) GetDistrict(c *gin.Context) {
 
 func (h *FacilityHandler) GetAllLocalBodyByDistrict(c *gin.Context) {
 	districtID := c.Param("id")
-	
+
 	var localBodies []models.LocalBody
 	db := database.GetDB()
-	
+
 	if err := db.Where("district_id = ?", districtID).Preload("District").Find(&localBodies).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "database_error",
@@ -570,16 +570,16 @@ func (h *FacilityHandler) GetAllLocalBodyByDistrict(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, localBodies)
 }
 
 func (h *FacilityHandler) GetLocalBodyByDistrict(c *gin.Context) {
 	districtID := c.Param("id")
-	
+
 	var localBodies []models.LocalBody
 	db := database.GetDB()
-	
+
 	if err := db.Where("district_id = ?", districtID).Preload("District").Find(&localBodies).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "database_error",
@@ -587,7 +587,7 @@ func (h *FacilityHandler) GetLocalBodyByDistrict(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, localBodies)
 }
 

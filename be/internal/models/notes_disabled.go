@@ -15,11 +15,11 @@ type PatientNoteDisabled struct {
 	ConsultationID *string          `json:"consultation" gorm:"type:uuid"`
 	CreatedByID    uint             `json:"-"`
 	ReplyToID      *string          `json:"reply_to" gorm:"type:uuid"`
-	
+
 	Patient      Patient          `json:"-" gorm:"foreignKey:PatientID;references:ID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 	Consultation *Consultation    `json:"-" gorm:"foreignKey:ConsultationID;references:ID"`
 	CreatedBy    UserBareMinimum  `json:"created_by" gorm:"foreignKey:CreatedByID;references:ID"`
-	
+
 	CreatedAt time.Time `json:"created_date"`
 	UpdatedAt time.Time `json:"modified_date"`
 }

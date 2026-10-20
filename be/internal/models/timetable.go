@@ -15,9 +15,9 @@ type TimetableSection struct {
 	MaxCapacity int    `json:"max_capacity" gorm:"default:3"`
 	IsActive    bool   `json:"is_active" gorm:"default:true"`
 	Description string `json:"description" gorm:"type:text"`
-	
+
 	Facility Facility `json:"facility" gorm:"foreignKey:FacilityID"`
-	
+
 	CreatedAt time.Time `json:"created_date"`
 	UpdatedAt time.Time `json:"modified_date"`
 }
@@ -35,11 +35,11 @@ type TimetableSlot struct {
 	ValidFrom   time.Time  `json:"valid_from"`
 	ValidUntil  *time.Time `json:"valid_until"`
 	Notes       string     `json:"notes" gorm:"type:text"`
-	
+
 	Facility Facility         `json:"facility" gorm:"foreignKey:FacilityID"`
 	Section  TimetableSection `json:"section" gorm:"foreignKey:SectionID"`
 	User     User             `json:"user" gorm:"foreignKey:UserID"`
-	
+
 	CreatedAt time.Time `json:"created_date"`
 	UpdatedAt time.Time `json:"modified_date"`
 }

@@ -637,8 +637,8 @@ func (h *UserHandler) GetPNConfig(c *gin.Context) {
 	// This prevents 501 errors during facility creation
 	c.JSON(http.StatusOK, gin.H{
 		"pf_endpoint": "",
-		"pf_p256dh": "",
-		"pf_auth": "",
+		"pf_p256dh":   "",
+		"pf_auth":     "",
 	})
 }
 
@@ -653,10 +653,10 @@ func (h *UserHandler) UpdatePNConfig(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"pf_endpoint": "",
-		"pf_p256dh": "",
-		"pf_auth": "",
+		"pf_p256dh":   "",
+		"pf_auth":     "",
 	})
 }

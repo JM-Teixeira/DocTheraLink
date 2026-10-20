@@ -15,15 +15,15 @@ type FacilitySection struct {
 	Description string `json:"description"`
 	Color       string `json:"color" gorm:"default:'#3B82F6'"` // Hex color for UI display
 	IsActive    bool   `json:"is_active" gorm:"default:true"`
-	
+
 	// Foreign keys
-	FacilityID string `json:"facility_id" gorm:"not null"`
-	CreatedByID uint  `json:"-"`
-	
+	FacilityID  string `json:"facility_id" gorm:"not null"`
+	CreatedByID uint   `json:"-"`
+
 	// Relationships
 	Facility  Facility        `json:"facility" gorm:"foreignKey:FacilityID"`
 	CreatedBy UserBareMinimum `json:"created_by" gorm:"foreignKey:CreatedByID"`
-	
+
 	CreatedAt time.Time      `json:"created_date"`
 	UpdatedAt time.Time      `json:"modified_date"`
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
@@ -38,31 +38,31 @@ type FacilitySection struct {
 
 // TherapistSchedule represents therapist availability and schedules
 type TherapistSchedule struct {
-	ID          string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	TherapistID uint      `json:"therapist_id" gorm:"not null"`
-	SectionID   string    `json:"section_id" gorm:"not null"`
-	
+	ID          string `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	TherapistID uint   `json:"therapist_id" gorm:"not null"`
+	SectionID   string `json:"section_id" gorm:"not null"`
+
 	// Schedule details
-	DayOfWeek   int       `json:"day_of_week" gorm:"not null"` // 0=Sunday, 1=Monday, etc.
-	StartTime   time.Time `json:"start_time" gorm:"not null"`
-	EndTime     time.Time `json:"end_time" gorm:"not null"`
-	
+	DayOfWeek int       `json:"day_of_week" gorm:"not null"` // 0=Sunday, 1=Monday, etc.
+	StartTime time.Time `json:"start_time" gorm:"not null"`
+	EndTime   time.Time `json:"end_time" gorm:"not null"`
+
 	// Availability
-	IsAvailable bool      `json:"is_available" gorm:"default:true"`
-	MaxPatients int       `json:"max_patients" gorm:"default:1"`
-	
+	IsAvailable bool `json:"is_available" gorm:"default:true"`
+	MaxPatients int  `json:"max_patients" gorm:"default:1"`
+
 	// Date range (for temporary schedules)
-	ValidFrom   *time.Time `json:"valid_from"`
-	ValidTo     *time.Time `json:"valid_to"`
-	
+	ValidFrom *time.Time `json:"valid_from"`
+	ValidTo   *time.Time `json:"valid_to"`
+
 	// Foreign keys
-	CreatedByID uint      `json:"-"`
-	
+	CreatedByID uint `json:"-"`
+
 	// Relationships
-	Therapist   User            `json:"therapist" gorm:"foreignKey:TherapistID"`
-	Section     FacilitySection `json:"section" gorm:"foreignKey:SectionID"`
-	CreatedBy   UserBareMinimum `json:"created_by" gorm:"foreignKey:CreatedByID"`
-	
+	Therapist User            `json:"therapist" gorm:"foreignKey:TherapistID"`
+	Section   FacilitySection `json:"section" gorm:"foreignKey:SectionID"`
+	CreatedBy UserBareMinimum `json:"created_by" gorm:"foreignKey:CreatedByID"`
+
 	CreatedAt time.Time `json:"created_date"`
 	UpdatedAt time.Time `json:"modified_date"`
 }
