@@ -30,7 +30,7 @@ const Loading = () => {
       style={{ height: `calc(100vh - ${offsetTop}px)` }}
     >
       <img
-        src="/images/kliniva-gray.svg"
+        src="/images/klyniva-gray.png"
         className="App-logo"
         alt="loading"
       />

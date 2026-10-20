@@ -633,15 +633,30 @@ func (h *UserHandler) DeleteProfilePicture(c *gin.Context) {
 }
 
 func (h *UserHandler) GetPNConfig(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
+	// Return empty push notification config for now
+	// This prevents 501 errors during facility creation
+	c.JSON(http.StatusOK, gin.H{
+		"pf_endpoint": "",
+		"pf_p256dh": "",
+		"pf_auth": "",
 	})
 }
 
 func (h *UserHandler) UpdatePNConfig(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
+	// Accept push notification config updates but don't store them yet
+	// This prevents 501 errors during facility creation
+	var config map[string]interface{}
+	if err := c.ShouldBindJSON(&config); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid request body",
+		})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"pf_endpoint": "",
+		"pf_p256dh": "",
+		"pf_auth": "",
 	})
 }

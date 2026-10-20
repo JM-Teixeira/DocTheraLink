@@ -219,3 +219,6 @@ fe/src/generated/
 *_FIX*.md
 *_STATUS*.md
 *_FIXED*.md
+
+# Stray empty files created by tools writing through a mangled WSL UNC path
+wsl.localhost/

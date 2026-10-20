@@ -17,10 +17,15 @@ const (
 	FacilityTypeTalukHospitals       FacilityType = 830
 	FacilityTypeDistrictHospitals    FacilityType = 860
 	FacilityTypeGovtMedicalCollegeHospitals FacilityType = 870
+	FacilityTypePrivateHospital      FacilityType = 2
+	FacilityTypeClinic               FacilityType = 2000
+	FacilityTypePhysiotherapyClinic  FacilityType = 2010
+	FacilityTypeDentalClinic         FacilityType = 2020
+	FacilityTypeRehabilitationCenter FacilityType = 2030
+	FacilityTypeNursingHome          FacilityType = 2040
 	FacilityTypeGovtLabs             FacilityType = 9
 	FacilityTypePrivateLabs          FacilityType = 10
 	FacilityTypeTeleMedicine         FacilityType = 7
-	FacilityTypePrivateHospital      FacilityType = 2
 	FacilityTypeAutonomousHealthcare FacilityType = 910
 	FacilityTypeShiftingCentre       FacilityType = 1300
 	FacilityTypeRequestApprovingCenter FacilityType = 1500
@@ -85,25 +90,21 @@ type Facility struct {
 	Name              string        `json:"name" gorm:"not null"`
 	FacilityType      FacilityType  `json:"facility_type"`
 	Address           string        `json:"address"`
-	PhoneNumber       *string       `json:"phone_number"`
 	MiddlewareAddress *string       `json:"middleware_address"`
 	Pincode           *string       `json:"pincode"`
 	Latitude          *float64      `json:"latitude"`
 	Longitude         *float64      `json:"longitude"`
 	CoverImageURL     *string       `json:"read_cover_image_url"`
 	KaspEmpanelled    bool          `json:"kasp_empanelled" gorm:"default:false"`
+	Features          []int         `json:"features" gorm:"type:integer[]"`
 	
 	// Foreign keys
 	StateID     *uint `json:"state"`
 	DistrictID  *uint `json:"district"`
-	LocalBodyID *uint `json:"local_body"`
-	WardID      *uint `json:"ward"`
 	
 	// Relationships
 	State     *State     `json:"state_object" gorm:"foreignKey:StateID"`
 	District  *District  `json:"district_object" gorm:"foreignKey:DistrictID"`
-	LocalBody *LocalBody `json:"local_body_object" gorm:"foreignKey:LocalBodyID"`
-	Ward      *Ward      `json:"ward_object" gorm:"foreignKey:WardID"`
 	
 	// Computed fields
 	PatientCount *int `json:"patient_count" gorm:"-"`
@@ -159,16 +160,14 @@ type FacilityRequest struct {
 	Name              string        `json:"name" binding:"required"`
 	FacilityType      FacilityType  `json:"facility_type" binding:"required"`
 	Address           string        `json:"address" binding:"required"`
-	PhoneNumber       *string       `json:"phone_number"`
 	MiddlewareAddress *string       `json:"middleware_address"`
 	Pincode           *string       `json:"pincode"`
 	Latitude          *float64      `json:"latitude"`
 	Longitude         *float64      `json:"longitude"`
 	StateID           *uint         `json:"state"`
 	DistrictID        *uint         `json:"district"`
-	LocalBodyID       *uint         `json:"local_body"`
-	WardID            *uint         `json:"ward"`
 	KaspEmpanelled    bool          `json:"kasp_empanelled"`
+	Features          []int         `json:"features"`
 }
 
 // FacilitySpokeRequest represents facility spoke creation/update request

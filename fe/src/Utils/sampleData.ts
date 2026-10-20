@@ -12,7 +12,6 @@ export interface SampleFacility {
   name: string;
   facility_type: string;
   address: string;
-  phone_number: string;
   district: number;
   state: number;
   pincode: string;
@@ -21,7 +20,6 @@ export interface SampleFacility {
 
 export interface SamplePatient {
   name: string;
-  phone_number: string;
   age: number;
   gender: number;
   address: string;
@@ -35,7 +33,6 @@ export const sampleFacilities: SampleFacility[] = [
     name: "Climutua Medical Center",
     facility_type: "Private Hospital",
     address: "Rua da Saúde, 123, Lisboa",
-    phone_number: "+351 21 123 4567",
     district: 1, // This would need to be mapped to actual district IDs
     state: 1, // This would need to be mapped to actual state IDs
     pincode: "1000-001",
@@ -45,7 +42,6 @@ export const sampleFacilities: SampleFacility[] = [
     name: "Klyniva General Hospital",
     facility_type: "Public Hospital",
     address: "Avenida Central, 456, Porto",
-    phone_number: "+351 22 987 6543",
     district: 2,
     state: 1,
     pincode: "4000-001"
@@ -55,7 +51,6 @@ export const sampleFacilities: SampleFacility[] = [
 export const samplePatients: SamplePatient[] = [
   {
     name: "Maria Silva",
-    phone_number: "+351 91 234 5678",
     age: 45,
     gender: 2, // Female
     address: "Rua das Flores, 789, Lisboa",
@@ -65,7 +60,6 @@ export const samplePatients: SamplePatient[] = [
   },
   {
     name: "João Santos",
-    phone_number: "+351 92 345 6789",
     age: 62,
     gender: 1, // Male
     address: "Praça da República, 321, Porto",
@@ -75,7 +69,6 @@ export const samplePatients: SamplePatient[] = [
   },
   {
     name: "Ana Costa",
-    phone_number: "+351 93 456 7890",
     age: 28,
     gender: 2, // Female
     address: "Rua Nova, 654, Coimbra",
@@ -85,7 +78,6 @@ export const samplePatients: SamplePatient[] = [
   },
   {
     name: "Pedro Oliveira",
-    phone_number: "+351 94 567 8901",
     age: 55,
     gender: 1, // Male
     address: "Avenida da Liberdade, 987, Lisboa",
@@ -95,7 +87,6 @@ export const samplePatients: SamplePatient[] = [
   },
   {
     name: "Catarina Ferreira",
-    phone_number: "+351 95 678 9012",
     age: 38,
     gender: 2, // Female
     address: "Rua do Comércio, 147, Braga",

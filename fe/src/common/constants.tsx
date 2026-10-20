@@ -102,10 +102,6 @@ export const VEHICLE_TYPES: Array<OptionsType> = [
 ];
 
 export const FACILITY_TYPES: Array<OptionsType> = [
-  // { id: 1, text: "Educational Inst" },
-  // { id: 4, text: "Hostel" },
-  // { id: 5, text: "Hotel" },
-  // { id: 6, text: "Lodge" },
   { id: 800, text: "Primary Health Centres" },
   { id: 802, text: "Family Health Centres" },
   { id: 803, text: "Community Health Centres" },
@@ -113,32 +109,20 @@ export const FACILITY_TYPES: Array<OptionsType> = [
   { id: 830, text: "Taluk Hospitals" },
   { id: 860, text: "District Hospitals" },
   { id: 870, text: "Govt Medical College Hospitals" },
+  { id: 2, text: "Private Hospital" },
+  { id: 2000, text: "Clinic" }, // NEW
+  { id: 2010, text: "Physiotherapy Clinic" }, // NEW
+  { id: 2020, text: "Dental Clinic" }, // NEW
+  { id: 2030, text: "Rehabilitation Center" }, // NEW
+  { id: 2040, text: "Nursing Home" }, // NEW
   { id: 9, text: "Govt Labs" },
   { id: 10, text: "Private Labs" },
   { id: 7, text: "TeleMedicine" },
-  { id: 2, text: "Private Hospital" },
   { id: 910, text: "Autonomous healthcare facility" },
   { id: 1300, text: "Shifting Centre" },
   { id: 1500, text: "Request Approving Center" },
   { id: 1510, text: "Request Fulfilment Center" },
   { id: 3, text: "Other" },
-
-  // { id: 8, text: "Govt Hospital" },
-  // { id: 801, text: "24x7 Public Health Centres" },
-  // { id: 820, text: "Urban Primary Health Center" },
-  // { id: 831, text: "Taluk Headquarters Hospitals" },
-  // { id: 850, text: "General hospitals" },
-
-  // { id: 900, text: "Co-operative hospitals" },
-
-  // { id: 950, text: "Corona Testing Labs" },
-  // { id: 1000, text: "Corona Care Centre" },
-
-  // { id: 1010, text: "COVID-19 Domiciliary Care Center" },
-  // { id: 1100, text: "First Line Treatment Centre" },
-  // { id: 1200, text: "Second Line Treatment Center" },
-  // { id: 1400, text: "Covid Management Center" },
-  // { id: 1600, text: "District War Room" },
 ];
 
 export const SHIFTING_CHOICES_WARTIME: Array<OptionsType> = [
@@ -893,15 +877,11 @@ export const FACILITY_FEATURE_TYPES: {
   name: string;
   icon: IconName;
 }[] = [
+  // Diagnostic & Imaging
   {
     id: 1,
     name: "CT Scan",
     icon: "l-compact-disc",
-  },
-  {
-    id: 2,
-    name: "Maternity Care",
-    icon: "l-baby-carriage",
   },
   {
     id: 3,
@@ -909,10 +889,37 @@ export const FACILITY_FEATURE_TYPES: {
     icon: "l-clipboard-alt",
   },
   {
+    id: 20,
+    name: "MRI",
+    icon: "l-compact-disc",
+  },
+  {
+    id: 21,
+    name: "Ultrasound",
+    icon: "l-stethoscope",
+  },
+  {
+    id: 22,
+    name: "Laboratory",
+    icon: "l-flask",
+  },
+  // Maternity & Pediatrics
+  {
+    id: 2,
+    name: "Maternity Care",
+    icon: "l-baby-carriage",
+  },
+  {
     id: 4,
     name: "Neonatal Care",
     icon: "l-baby-carriage",
   },
+  {
+    id: 23,
+    name: "Pediatrics",
+    icon: "l-kid",
+  },
+  // Surgery & Emergency
   {
     id: 5,
     name: "Operation Theater",
@@ -922,6 +929,114 @@ export const FACILITY_FEATURE_TYPES: {
     id: 6,
     name: "Blood Bank",
     icon: "l-medical-drip",
+  },
+  {
+    id: 24,
+    name: "Emergency Services",
+    icon: "l-ambulance",
+  },
+  {
+    id: 25,
+    name: "ICU",
+    icon: "l-heart-medical",
+  },
+  // Physical Therapy & Rehabilitation
+  {
+    id: 10,
+    name: "Physiotherapy",
+    icon: "l-dumbbell",
+  },
+  {
+    id: 11,
+    name: "Hydrotherapy",
+    icon: "l-water",
+  },
+  {
+    id: 12,
+    name: "Sports Rehabilitation",
+    icon: "l-basketball",
+  },
+  {
+    id: 13,
+    name: "Manual Therapy",
+    icon: "l-heart-medical",
+  },
+  {
+    id: 14,
+    name: "Electrotherapy",
+    icon: "l-bolt",
+  },
+  {
+    id: 15,
+    name: "Occupational Therapy",
+    icon: "l-briefcase",
+  },
+  // Medical Specialties
+  {
+    id: 26,
+    name: "General Practice",
+    icon: "l-stethoscope",
+  },
+  {
+    id: 27,
+    name: "Cardiology",
+    icon: "l-heartbeat",
+  },
+  {
+    id: 28,
+    name: "Dermatology",
+    icon: "l-user",
+  },
+  {
+    id: 29,
+    name: "Orthopedics",
+    icon: "l-user-injured",
+  },
+  {
+    id: 30,
+    name: "Neurology",
+    icon: "l-brain",
+  },
+  {
+    id: 31,
+    name: "Dentistry",
+    icon: "l-smile",
+  },
+  {
+    id: 32,
+    name: "Ophthalmology",
+    icon: "l-eye",
+  },
+  // Support Services
+  {
+    id: 40,
+    name: "Pharmacy",
+    icon: "l-capsule",
+  },
+  {
+    id: 41,
+    name: "Ambulance Service",
+    icon: "l-ambulance",
+  },
+  {
+    id: 42,
+    name: "Home Care",
+    icon: "l-home",
+  },
+  {
+    id: 43,
+    name: "Teleconsultation",
+    icon: "l-video",
+  },
+  {
+    id: 44,
+    name: "Nutrition & Dietetics",
+    icon: "l-apple-alt",
+  },
+  {
+    id: 45,
+    name: "Mental Health Services",
+    icon: "l-brain",
   },
 ];
 

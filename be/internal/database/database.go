@@ -157,11 +157,28 @@ func SeedData() error {
 		return fmt.Errorf("database not initialized")
 	}
 
-	// Seed states
+	// Seed Portugal districts (Distritos)
 	states := []models.State{
-		{ID: 1, Name: "Kerala"},
-		{ID: 2, Name: "Karnataka"},
-		{ID: 3, Name: "Tamil Nadu"},
+		{ID: 1, Name: "Aveiro"},
+		{ID: 2, Name: "Beja"},
+		{ID: 3, Name: "Braga"},
+		{ID: 4, Name: "Bragança"},
+		{ID: 5, Name: "Castelo Branco"},
+		{ID: 6, Name: "Coimbra"},
+		{ID: 7, Name: "Évora"},
+		{ID: 8, Name: "Faro"},
+		{ID: 9, Name: "Guarda"},
+		{ID: 10, Name: "Leiria"},
+		{ID: 11, Name: "Lisboa"},
+		{ID: 12, Name: "Portalegre"},
+		{ID: 13, Name: "Porto"},
+		{ID: 14, Name: "Santarém"},
+		{ID: 15, Name: "Setúbal"},
+		{ID: 16, Name: "Viana do Castelo"},
+		{ID: 17, Name: "Vila Real"},
+		{ID: 18, Name: "Viseu"},
+		{ID: 19, Name: "Região Autónoma dos Açores"},
+		{ID: 20, Name: "Região Autónoma da Madeira"},
 	}
 
 	for _, state := range states {
@@ -170,24 +187,31 @@ func SeedData() error {
 		}
 	}
 
-	
-
-	// Seed districts for Kerala
+	// Seed major municipalities (Concelhos) - sample for main districts
 	districts := []models.District{
-		{ID: 1, Name: "Thiruvananthapuram", StateID: 1},
-		{ID: 2, Name: "Kollam", StateID: 1},
-		{ID: 3, Name: "Pathanamthitta", StateID: 1},
-		{ID: 4, Name: "Alappuzha", StateID: 1},
-		{ID: 5, Name: "Kottayam", StateID: 1},
-		{ID: 6, Name: "Idukki", StateID: 1},
-		{ID: 7, Name: "Ernakulam", StateID: 1},
-		{ID: 8, Name: "Thrissur", StateID: 1},
-		{ID: 9, Name: "Palakkad", StateID: 1},
-		{ID: 10, Name: "Malappuram", StateID: 1},
-		{ID: 11, Name: "Kozhikode", StateID: 1},
-		{ID: 12, Name: "Wayanad", StateID: 1},
-		{ID: 13, Name: "Kannur", StateID: 1},
-		{ID: 14, Name: "Kasaragod", StateID: 1},
+		// Lisboa District
+		{ID: 1, Name: "Lisboa", StateID: 11},
+		{ID: 2, Name: "Cascais", StateID: 11},
+		{ID: 3, Name: "Sintra", StateID: 11},
+		{ID: 4, Name: "Oeiras", StateID: 11},
+		{ID: 5, Name: "Loures", StateID: 11},
+		{ID: 6, Name: "Amadora", StateID: 11},
+		// Porto District
+		{ID: 7, Name: "Porto", StateID: 13},
+		{ID: 8, Name: "Vila Nova de Gaia", StateID: 13},
+		{ID: 9, Name: "Matosinhos", StateID: 13},
+		{ID: 10, Name: "Gondomar", StateID: 13},
+		{ID: 11, Name: "Maia", StateID: 13},
+		// Other major cities
+		{ID: 12, Name: "Coimbra", StateID: 6},
+		{ID: 13, Name: "Braga", StateID: 3},
+		{ID: 14, Name: "Faro", StateID: 8},
+		{ID: 15, Name: "Aveiro", StateID: 1},
+		{ID: 16, Name: "Setúbal", StateID: 15},
+		{ID: 17, Name: "Leiria", StateID: 10},
+		{ID: 18, Name: "Viseu", StateID: 18},
+		{ID: 19, Name: "Funchal", StateID: 20},
+		{ID: 20, Name: "Ponta Delgada", StateID: 19},
 	}
 
 	for _, district := range districts {

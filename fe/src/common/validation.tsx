@@ -53,7 +53,8 @@ export const validatePassword = (password: string) => {
 };
 
 export const validatePincode = (pincode: string) => {
-  const pattern = /^[1-9][0-9]{5}$/;
+  // Portugal postal code format: XXXX-XXX (e.g., 1000-001, 4000-123)
+  const pattern = /^[0-9]{4}-[0-9]{3}$/;
   return pattern.test(pincode);
 };
 

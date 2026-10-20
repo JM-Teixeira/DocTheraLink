@@ -1,6 +1,6 @@
 # DocTheraLink - Healthcare Management System
 
-DocTheraLink is a comprehensive healthcare management system designed for physical therapy clinics and healthcare facilities. It provides patient management, therapist scheduling, treatment tracking, and administrative tools.
+DocTheraLink is a comprehensive healthcare management system designed for physical therapy clinics and healthcare facilities in Portugal. It provides patient management, therapist scheduling, treatment tracking, time logging, timetable management, and administrative tools.
 
 ## 🏗️ System Architecture
 
@@ -416,7 +416,36 @@ docker-compose up --build -d
 - **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 - **[Repository Structure](docs/REPOSITORY_STRUCTURE.md)** - What to commit to Git
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment
+- **[Refactor Plan](docs/REFACTOR_PLAN.md)** - Major refactoring phases
+- **[Portugal Implementation](docs/PORTUGAL_IMPLEMENTATION.md)** - Portugal-specific features
+- **[Phase 3-5 Implementation](docs/PHASE3_5_IMPLEMENTATION.md)** - Latest features guide
 - **[API Documentation](http://localhost:9000/swagger/)** - Interactive API docs (when running)
+
+## ✨ New Features (Phases 3-5)
+
+### Phase 3: Enhanced Facility Types & Features ✅
+
+- **New Facility Types**: Clinic, Physiotherapy Clinic, Dental Clinic, Rehabilitation Center, Nursing Home
+- **Expanded Features**: 45+ facility features including physiotherapy, hydrotherapy, sports rehabilitation, and more
+- **Portugal Localization**: Phone numbers default to +351 (Portugal)
+
+### Phase 4: Clock In/Out System ⏰ ✅
+
+- Staff can clock in/out for shifts
+- Automatic duration tracking
+- Time log history with detailed reports
+- Admin can view all staff time logs
+- Real-time clock status display
+
+### Phase 5: Timetable Management 📅 ✅
+
+- Create facility sections/rooms
+- Assign staff to sections by day and time
+- Visual timetable grid view
+- Capacity management (prevent over-allocation)
+- Recurring schedules support
+
+See [Phase 3-5 Implementation Guide](docs/PHASE3_5_IMPLEMENTATION.md) for detailed documentation.
 
 ## 🤝 Contributing
 

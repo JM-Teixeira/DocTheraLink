@@ -60,29 +60,24 @@ export interface FacilityModel {
   id?: string;
   name?: string;
   read_cover_image_url?: string;
-  facility_type?: string;
+  facility_type?: number;
   address?: string;
   features?: number[];
   location?: {
     latitude: number;
     longitude: number;
   };
-  phone_number?: string;
   middleware_address?: string;
-  local_body_object?: LocalBodyModel;
   district_object?: DistrictModel;
   state_object?: StateModel;
-  ward_object?: WardModel;
   modified_date?: string;
   created_date?: string;
   state?: number;
   district?: number;
-  local_body?: number;
-  ward?: number;
   pincode?: string;
   facility_flags?: FeatureFlag[];
-  latitude?: string;
-  longitude?: string;
+  latitude?: string | number; // Can be string in form, number in API
+  longitude?: string | number; // Can be string in form, number in API
   kasp_empanelled?: boolean;
   patient_count?: number;
   bed_count?: number;
@@ -515,11 +510,8 @@ export interface CreateBedBody {
 export interface BaseFacilityModel {
   id: string;
   name: string;
-  local_body: number;
   district: number;
   state: number;
-  ward_object: WardModel;
-  local_body_object?: LocalBodyModel;
   district_object?: DistrictModel;
   state_object?: StateModel;
   facility_type: FacilityType;
@@ -591,7 +583,10 @@ export type IUserFacilityRequest = {
   facility: string;
 };
 
-export type FacilityRequest = Omit<FacilityModel, "location" | "id">;
+export type FacilityRequest = Omit<FacilityModel, "location" | "id" | "latitude" | "longitude"> & {
+  latitude?: number;
+  longitude?: number;
+};
 
 export type InventorySummaryResponse = {
   id: string;

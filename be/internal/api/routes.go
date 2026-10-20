@@ -19,6 +19,8 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	consultationHandler := handlers.NewConsultationHandler(cfg)
 	assetHandler := handlers.NewAssetHandler(cfg)
 	notificationHandler := handlers.NewNotificationHandler(cfg)
+	timeLogHandler := handlers.NewTimeLogHandler(cfg)
+	timetableHandler := handlers.NewTimetableHandler(cfg)
 	// therapyHandler := handlers.NewTherapyHandler(cfg) // Temporarily disabled
 
 	// Public routes (no authentication required)
@@ -129,9 +131,9 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			// Patient asset beds
 			facilities.GET("/:id/patient_asset_beds/", facilityHandler.ListPatientAssetBeds)
 			
-			// Facility sections for therapy - TEMPORARILY DISABLED
-			// facilities.GET("/:facility_id/sections/", therapyHandler.ListFacilitySections)
-			// facilities.POST("/:facility_id/sections/", therapyHandler.CreateFacilitySection)
+			// Facility sections for timetable
+			facilities.GET("/:id/sections/", timetableHandler.ListSections)
+			facilities.POST("/:id/sections/", timetableHandler.CreateSection)
 		}
 
 		// All facilities (public access)
@@ -312,6 +314,33 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			shifting.POST("/:id/transfer/", facilityHandler.CompleteTransfer)
 			shifting.GET("/:id/comment/", facilityHandler.GetShiftComments)
 			shifting.POST("/:id/comment/", facilityHandler.AddShiftComments)
+		}
+
+		// Time Log (Clock In/Out)
+		timelog := protected.Group("/timelog")
+		{
+			timelog.POST("/clock-in", timeLogHandler.ClockIn)
+			timelog.POST("/clock-out", timeLogHandler.ClockOut)
+			timelog.GET("/my-logs", timeLogHandler.GetMyLogs)
+			timelog.GET("/status", timeLogHandler.GetCurrentStatus)
+			timelog.GET("/user/:id", timeLogHandler.GetUserLogs) // Admin only
+		}
+
+		// Timetable
+		timetable := protected.Group("/timetable")
+		{
+			timetable.GET("/:id", timetableHandler.GetTimetable)
+			timetable.POST("/:id/slot", timetableHandler.CreateSlot)
+			timetable.PUT("/slot/:id", timetableHandler.UpdateSlot)
+			timetable.DELETE("/slot/:id", timetableHandler.DeleteSlot)
+		}
+
+		// Sections
+		sections := protected.Group("/sections")
+		{
+			sections.GET("/:id", timetableHandler.GetSection)
+			sections.PUT("/:id", timetableHandler.UpdateSection)
+			sections.DELETE("/:id", timetableHandler.DeleteSection)
 		}
 
 		// Physical Therapy routes - TEMPORARILY DISABLED due to model conflicts

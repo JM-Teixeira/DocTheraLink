@@ -1,3 +1,5 @@
+/// <reference types="cypress" />
+
 import { advanceFilters } from "pageobject/utils/advanceFilterHelpers";
 
 export interface FacilityData {
@@ -6,15 +8,12 @@ export interface FacilityData {
     type: string;
     features?: string[];
     address: string;
-    phoneNumber: string;
     location?: string;
   };
   location: {
     pincode: string;
     state: string;
     district: string;
-    localBody: string;
-    ward: string;
   };
 }
 
@@ -31,9 +30,7 @@ class FacilityPage {
     advanceFilters.selectFacilityType(facility);
   }
 
-  selectLocalBody(localBody: string) {
-    advanceFilters.selectLocalBody(localBody);
-  }
+
 
   typeFacilityName(name: string, clearBeforeTyping: boolean = false) {
     cy.typeIntoField("#name", name, { clearBeforeTyping });
@@ -43,23 +40,13 @@ class FacilityPage {
     cy.get("#pincode").click().type(pincode);
   }
 
-  selectWard(ward: string) {
-    advanceFilters.selectWard(ward);
-  }
+
 
   typeFacilityAddress(address: string, clearBeforeTyping: boolean = false) {
     cy.typeIntoField("#address", address, { clearBeforeTyping });
   }
 
-  typeFacilityPhoneNumber(
-    phoneNumber: string,
-    clearBeforeTyping: boolean = false,
-  ) {
-    cy.typeIntoField("#phone_number", phoneNumber, {
-      clearBeforeTyping,
-      skipVerification: true,
-    });
-  }
+
 
   clickSaveFacilityButton() {
     cy.verifyAndClickElement("#submit", "Save Facility");
@@ -128,9 +115,7 @@ class FacilityPage {
     return cy.get("#address-details-view");
   }
 
-  getPhoneNumberView() {
-    return cy.get("#phone-number-view");
-  }
+
 
   getFacilityAvailableFeatures() {
     return cy.get("#facility-available-features");
@@ -364,7 +349,6 @@ class FacilityPage {
     }
 
     this.typeFacilityAddress(basic.address);
-    this.typeFacilityPhoneNumber(basic.phoneNumber);
 
     if (basic.location) {
       this.selectLocation(basic.location);
@@ -375,8 +359,6 @@ class FacilityPage {
     this.fillPincode(location.pincode);
     this.selectStateOnPincode(location.state);
     this.selectDistrictOnPincode(location.district);
-    this.selectLocalBody(location.localBody);
-    this.selectWard(location.ward);
   }
 }
 

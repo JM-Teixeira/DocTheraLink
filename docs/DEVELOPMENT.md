@@ -315,10 +315,6 @@ docker inspect care-backend
 docker stats
 ```
 
-### Common Issues
-
-See [Troubleshooting Guide](./TROUBLESHOOTING.md)
-
 ## Code Style
 
 ### Backend (Go)
@@ -353,7 +349,6 @@ See [Deployment Guide](./DEPLOYMENT.md) (if available)
 
 ## Additional Resources
 
-- [Troubleshooting Guide](./TROUBLESHOOTING.md)
 - [API Documentation](http://localhost:9000/swagger/)
 - [Go Documentation](https://golang.org/doc/)
 - [React Documentation](https://react.dev/)
