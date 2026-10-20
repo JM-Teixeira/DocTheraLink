@@ -1,5 +1,5 @@
-# DocTheraLink backend image
-# Build: docker build -t doctheralink/backend ./be
+# Klyniva backend image
+# Build: docker build -t klyniva/backend ./be
 
 # ---- Build stage ----------------------------------------------------------
 FROM golang:1.27-alpine AS builder

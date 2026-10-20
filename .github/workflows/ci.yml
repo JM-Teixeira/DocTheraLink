@@ -1,4 +1,4 @@
-# Continuous integration for DocTheraLink.
+# Continuous integration for Klyniva.
 # Runs on every push and pull request: backend tests (unit + PostgreSQL
 # integration), frontend typecheck/lint/tests/build, and Docker image builds.
 name: CI
@@ -30,7 +30,7 @@ jobs:
           cache-dependency-path: be/go.sum
       - name: gofmt
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
-      - run: go vet ./... && go vet -tags integration ./...
+      - run: go vet ./... && go vet -tags integration ./... && go vet -tags e2e ./...
       - name: Unit tests
         run: go test -race -count=1 -coverprofile=coverage.out ./...
       - name: Integration tests (PostgreSQL via testcontainers)
@@ -59,6 +59,36 @@ jobs:
         run: npm run build:meta && npm run supported-browsers && npm run build:react
         env:
           REACT_CARE_API_URL: http://placeholder
+
+  e2e:
+    name: End-to-end (docker compose)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: be/go.mod
+          cache-dependency-path: be/go.sum
+      - name: Start stack
+        run: |
+          {
+            echo "DB_PASSWORD=$(openssl rand -hex 16)"
+            echo "JWT_SECRET=$(openssl rand -hex 32)"
+            echo "SEED_DEMO_USERS=true"
+          } > .env
+          docker compose up -d --build --wait --wait-timeout 300
+      - name: API end-to-end tests
+        working-directory: be
+        run: go test -tags e2e -count=1 -v ./internal/e2e/
+        env:
+          E2E_BASE_URL: http://localhost:4000
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
 
   images:
     name: Docker images

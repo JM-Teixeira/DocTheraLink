@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"care-backend/internal/models"
+	"klyniva/internal/models"
 )
 
 const patientID = "7f1c1f9e-6a3e-4b3c-9a43-0d2b5e1b7a11"

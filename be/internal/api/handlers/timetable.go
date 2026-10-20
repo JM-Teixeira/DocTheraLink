@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/database"
-	"care-backend/internal/models"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -30,7 +30,7 @@ func NewTimetableHandler(cfg *config.Config) *TimetableHandler {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Facility ID"
-// @Success 200 {array} models.FacilitySection
+// @Success 200 {array} models.TimetableSection
 // @Router /facility/{id}/sections [get]
 func (h *TimetableHandler) ListSections(c *gin.Context) {
 	facilityID := c.Param("id")
@@ -58,8 +58,8 @@ func (h *TimetableHandler) ListSections(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Facility ID"
-// @Param section body models.FacilitySectionRequest true "Section data"
-// @Success 201 {object} models.FacilitySection
+// @Param section body models.TimetableSectionRequest true "Section data"
+// @Success 201 {object} models.TimetableSection
 // @Router /facility/{id}/sections [post]
 func (h *TimetableHandler) CreateSection(c *gin.Context) {
 	facilityID := c.Param("id")
@@ -105,7 +105,7 @@ func (h *TimetableHandler) CreateSection(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Section ID"
-// @Success 200 {object} models.FacilitySection
+// @Success 200 {object} models.TimetableSection
 // @Router /sections/{id} [get]
 func (h *TimetableHandler) GetSection(c *gin.Context) {
 	id := c.Param("id")
@@ -140,8 +140,8 @@ func (h *TimetableHandler) GetSection(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Section ID"
-// @Param section body models.FacilitySectionRequest true "Section data"
-// @Success 200 {object} models.FacilitySection
+// @Param section body models.TimetableSectionRequest true "Section data"
+// @Success 200 {object} models.TimetableSection
 // @Router /sections/{id} [put]
 func (h *TimetableHandler) UpdateSection(c *gin.Context) {
 	id := c.Param("id")

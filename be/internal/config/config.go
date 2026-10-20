@@ -134,9 +134,9 @@ func Load() *Config {
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),
-			User:     getEnv("DB_USER", "care"),
-			Password: getEnv("DB_PASSWORD", "care"),
-			Name:     getEnv("DB_NAME", "care"),
+			User:     getEnv("DB_USER", "klyniva"),
+			Password: getEnv("DB_PASSWORD", "klyniva"),
+			Name:     getEnv("DB_NAME", "klyniva"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 			Timezone: getEnv("DB_TIMEZONE", "UTC"),
 		},
@@ -163,7 +163,7 @@ func Load() *Config {
 			SMTPPort:     getEnv("SMTP_PORT", "587"),
 			SMTPUsername: getEnv("SMTP_USERNAME", ""),
 			SMTPPassword: getEnv("SMTP_PASSWORD", ""),
-			FromEmail:    getEnv("FROM_EMAIL", "noreply@care.ohc.network"),
+			FromEmail:    getEnv("FROM_EMAIL", "noreply@klyniva.com"),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "localhost"),

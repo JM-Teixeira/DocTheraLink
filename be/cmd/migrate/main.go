@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"log"
+	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/database"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
 )
 
 func main() {
@@ -18,7 +19,7 @@ func main() {
 	cfg := config.Load()
 
 	// Connect to database
-	if err := database.Connect(cfg); err != nil {
+	if err := database.ConnectWithRetry(cfg, 30, 2*time.Second); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Close()

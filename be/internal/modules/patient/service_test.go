@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"care-backend/internal/models"
+	"klyniva/internal/models"
 
 	"github.com/google/uuid"
 )

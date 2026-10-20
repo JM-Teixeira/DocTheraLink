@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"care-backend/internal/auth"
-	"care-backend/internal/models"
+	"klyniva/internal/auth"
+	"klyniva/internal/models"
 )
 
 var (

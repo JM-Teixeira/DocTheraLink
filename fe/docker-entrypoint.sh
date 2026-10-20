@@ -1,5 +1,5 @@
 #!/bin/sh
-# Docker entrypoint for the DocTheraLink frontend.
+# Docker entrypoint for the Klyniva frontend.
 # Writes the runtime configuration (/config.js) and renders nginx.conf so one
 # image works in every environment.
 

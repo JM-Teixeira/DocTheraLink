@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/models"
-	"care-backend/internal/modules/referral"
+	"klyniva/internal/config"
+	"klyniva/internal/models"
+	"klyniva/internal/modules/referral"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -61,6 +61,29 @@ func Connect(cfg *config.Config) error {
 	DB = db
 	log.Println("Database connection established")
 	return nil
+}
+
+// ConnectWithRetry calls Connect until it succeeds or attempts run out.
+// In containers the database often starts after the API; retrying avoids
+// crash loops during startup.
+func ConnectWithRetry(cfg *config.Config, attempts int, delay time.Duration) error {
+	return retry(attempts, delay, func() error { return Connect(cfg) })
+}
+
+// retry runs fn up to attempts times, sleeping delay between failures, and
+// returns the last error.
+func retry(attempts int, delay time.Duration, fn func() error) error {
+	var err error
+	for i := 1; i <= attempts; i++ {
+		if err = fn(); err == nil {
+			return nil
+		}
+		if i < attempts {
+			log.Printf("database not ready (attempt %d/%d): %v", i, attempts, err)
+			time.Sleep(delay)
+		}
+	}
+	return err
 }
 
 // Migrate runs database migrations
@@ -148,7 +171,7 @@ func Migrate() error {
 		return fmt.Errorf("failed to migrate Phase 7 models: %w", err)
 	}
 
-	// Phase 8: Doctor → physiotherapist referrals (the core DocTheraLink workflow)
+	// Phase 8: Doctor → physiotherapist referrals (the core Klyniva workflow)
 	log.Println("Migrating Phase 8: Referral models...")
 	if err := DB.AutoMigrate(referral.Models()...); err != nil {
 		return fmt.Errorf("failed to migrate Phase 8 models: %w", err)
@@ -281,7 +304,7 @@ func SeedData(includeDemoUsers bool) error {
 	testUsers := []models.User{
 		{
 			Username:  "stateadmin",
-			Email:     "stateadmin@doctheralink.com",
+			Email:     "stateadmin@klyniva.com",
 			FirstName: "State",
 			LastName:  "Administrator",
 			UserType:  models.RoleStateAdmin,
@@ -290,7 +313,7 @@ func SeedData(includeDemoUsers bool) error {
 		},
 		{
 			Username:  "districtadmin",
-			Email:     "districtadmin@doctheralink.com",
+			Email:     "districtadmin@klyniva.com",
 			FirstName: "District",
 			LastName:  "Administrator",
 			UserType:  models.RoleDistrictAdmin,
@@ -299,7 +322,7 @@ func SeedData(includeDemoUsers bool) error {
 		},
 		{
 			Username:  "facilitycoordinator",
-			Email:     "coordinator@doctheralink.com",
+			Email:     "coordinator@klyniva.com",
 			FirstName: "Facility",
 			LastName:  "Coordinator",
 			UserType:  models.RoleLocalBodyAdmin,
@@ -308,7 +331,7 @@ func SeedData(includeDemoUsers bool) error {
 		},
 		{
 			Username:  "doctor",
-			Email:     "doctor@doctheralink.com",
+			Email:     "doctor@klyniva.com",
 			FirstName: "Dr. John",
 			LastName:  "Smith",
 			UserType:  models.RoleDoctor,
@@ -317,7 +340,7 @@ func SeedData(includeDemoUsers bool) error {
 		},
 		{
 			Username:  "physiotherapist",
-			Email:     "physio@doctheralink.com",
+			Email:     "physio@klyniva.com",
 			FirstName: "Sarah",
 			LastName:  "Johnson",
 			UserType:  models.RolePhysioTherapist,
@@ -326,7 +349,7 @@ func SeedData(includeDemoUsers bool) error {
 		},
 		{
 			Username:  "nurse",
-			Email:     "nurse@doctheralink.com",
+			Email:     "nurse@klyniva.com",
 			FirstName: "Mary",
 			LastName:  "Williams",
 			UserType:  models.RoleNurse,
@@ -335,7 +358,7 @@ func SeedData(includeDemoUsers bool) error {
 		},
 		{
 			Username:  "staff",
-			Email:     "staff@doctheralink.com",
+			Email:     "staff@klyniva.com",
 			FirstName: "General",
 			LastName:  "Staff",
 			UserType:  models.RoleStaff,

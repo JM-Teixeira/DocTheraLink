@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"care-backend/internal/auth"
-	"care-backend/internal/config"
-	"care-backend/internal/models"
+	"klyniva/internal/auth"
+	"klyniva/internal/config"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

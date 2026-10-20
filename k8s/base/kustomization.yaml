@@ -1,0 +1,42 @@
+# Klyniva — environment-independent manifests.
+# Do not apply directly; use an overlay:
+#   kubectl apply -k k8s/overlays/local        (k3d, see scripts/k8s-local.sh)
+#   kubectl apply -k k8s/overlays/production
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: klyniva
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: klyniva
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - backend.yaml
+  - frontend.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+
+# Non-secret settings shared by backend and postgres. Overlays merge into it.
+# Secrets (klyniva-secrets: DB_PASSWORD, JWT_SECRET) come from the overlay.
+configMapGenerator:
+  - name: klyniva-config
+    literals:
+      - PORT=9000
+      - GIN_MODE=release
+      - LOG_LEVEL=info
+      - ENABLE_SWAGGER=false
+      - SEED_DEMO_USERS=false
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=klyniva
+      - DB_USER=klyniva
+      # In-cluster postgres has no TLS; use verify-full with a managed database.
+      - DB_SSLMODE=disable
+      - DB_TIMEZONE=UTC
+      - JWT_EXPIRY=1h
+      - JWT_REFRESH_EXPIRY=168h
+      - CORS_ALLOWED_ORIGINS=https://klyniva.com

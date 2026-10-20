@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/database"
-	"care-backend/internal/models"
-	"care-backend/internal/modules/referral"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
+	"klyniva/internal/models"
+	"klyniva/internal/modules/referral"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/models"
+	"klyniva/internal/config"
+	"klyniva/internal/models"
 
 	"github.com/golang-jwt/jwt/v5"
 )

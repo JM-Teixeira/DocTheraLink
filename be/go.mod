@@ -1,4 +1,4 @@
-module care-backend
+module klyniva
 
 go 1.27
 

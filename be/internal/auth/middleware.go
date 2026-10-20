@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"care-backend/internal/models"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

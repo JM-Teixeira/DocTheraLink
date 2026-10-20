@@ -1,13 +1,13 @@
 package api
 
 import (
-	"care-backend/internal/api/handlers"
-	"care-backend/internal/auth"
-	"care-backend/internal/config"
-	"care-backend/internal/database"
-	"care-backend/internal/models"
-	"care-backend/internal/modules/patient"
-	"care-backend/internal/modules/referral"
+	"klyniva/internal/api/handlers"
+	"klyniva/internal/auth"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
+	"klyniva/internal/models"
+	"klyniva/internal/modules/patient"
+	"klyniva/internal/modules/referral"
 
 	"github.com/gin-gonic/gin"
 )
@@ -342,7 +342,7 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			sections.DELETE("/:id", timetableHandler.DeleteSection)
 		}
 
-		// Doctor → physiotherapist referrals (core DocTheraLink workflow)
+		// Doctor → physiotherapist referrals (core Klyniva workflow)
 		referral.RegisterRoutes(protected, database.GetDB())
 
 		// Physical Therapy routes - TEMPORARILY DISABLED due to model conflicts

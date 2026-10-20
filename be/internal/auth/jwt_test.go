@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/models"
+	"klyniva/internal/config"
+	"klyniva/internal/models"
 )
 
 func newManager(expiry time.Duration) *JWTManager {

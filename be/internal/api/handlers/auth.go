@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"care-backend/internal/auth"
-	"care-backend/internal/config"
-	"care-backend/internal/database"
-	"care-backend/internal/models"
+	"klyniva/internal/auth"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"

@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"care-backend/internal/auth"
-	"care-backend/internal/models"
+	"klyniva/internal/auth"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

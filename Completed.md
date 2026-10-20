@@ -1,10 +1,34 @@
-# Completed — DocTheraLink / Klyniva
+# Completed — Klyniva
 
 Log of finished work, newest first. Timestamps are local time (Europe/Lisbon,
-UTC+01:00). Each entry links to the commit(s) on branch
-`chore/project-foundation` unless noted.
+UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
+
+## 2026-10-20 — Klyniva rename, cleanup, local Kubernetes
+
+### 23:00 · Local Kubernetes (k3d) and end-to-end tests
+- `k8s/` reorganised into `base/` + `overlays/local` (k3d) + `overlays/production`
+  (nginx-ingress, cert-manager, HPA). Restricted Pod Security Standard,
+  NetworkPolicy isolating PostgreSQL, Postgres as a StatefulSet, Redis removed.
+- `scripts/k8s-local.sh` (`make k8s-up/deploy/e2e/status/down`): cluster
+  `klyniva` with its own kubeconfig, images built and imported, generated
+  secrets, app at http://localhost:8088.
+- End-to-end API test suite `be/internal/e2e` (referral journey, permissions,
+  token rules, clock in/out) runnable against compose (`make e2e-compose`), the
+  cluster (`make k8s-e2e`) and in CI (new `e2e` job).
+- TODO.md rewritten: mandatory testing policy, proposed roadmap M1–M7 and
+  decisions D1–D5 for product-owner review.
+
+### 22:45 · Rename to Klyniva and cleanup
+- Go module `care-backend` → `klyniva`; namespace, images, compose project,
+  DB name/user, Swagger metadata and UI titles renamed.
+- Removed: `.kiro/` (relevant items moved into TODO.md M4), stray
+  `wsl.localhost/`, 69 MB Go tarball, root `package.json`/`node_modules`,
+  `be/docker-compose.yml`, one-off SQL fix scripts, disabled therapy code,
+  outdated `docs/` and `be/docs/API_MAPPING.md`, CARE leftovers (Netlify,
+  Crowdin, CodeClimate, devcontainer, CARE community docs, `.example.env`).
+- Pushed over HTTPS with the `JM-Teixeira` account (`origin` now uses HTTPS).
 
 ## 2026-10-20 — Project foundation pass
 

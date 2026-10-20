@@ -1,4 +1,4 @@
-// Package referral implements the core DocTheraLink workflow: a doctor refers
+// Package referral implements the core Klyniva workflow: a doctor refers
 // a patient to a physiotherapist, the therapist accepts and treats the patient,
 // and both sides exchange notes on a shared thread until the episode closes.
 //

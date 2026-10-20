@@ -1,0 +1,51 @@
+# Local cluster (k3d). Managed by scripts/k8s-local.sh, which builds the
+# images, imports them into the cluster and creates secrets.env.
+# App: http://localhost:8088
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Needed here too: generators in an overlay are not namespaced by the base
+namespace: klyniva
+
+resources:
+  - ../../base
+
+configMapGenerator:
+  - name: klyniva-config
+    behavior: merge
+    literals:
+      - GIN_MODE=debug
+      - ENABLE_SWAGGER=true
+      - SEED_DEMO_USERS=true
+      - CORS_ALLOWED_ORIGINS=http://localhost:8088
+
+# secrets.env is git-ignored and generated with random values by the script
+secretGenerator:
+  - name: klyniva-secrets
+    envs:
+      - secrets.env
+
+# Images are built locally and imported with `k3d image import`
+images:
+  - name: klyniva/backend
+    newTag: dev
+  - name: klyniva/frontend
+    newTag: dev
+
+patches:
+  # Match any host so http://localhost:8088 works from Windows and WSL alike
+  - target: { kind: Ingress, name: klyniva }
+    patch: |-
+      - op: remove
+        path: /spec/rules/0/host
+  - target: { kind: Deployment, name: frontend }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: http://localhost:8088
+  # Smaller volumes for a laptop
+  - target: { kind: PersistentVolumeClaim }
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi

@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/database"
-	"care-backend/internal/models"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

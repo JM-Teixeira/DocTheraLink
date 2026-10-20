@@ -1,4 +1,4 @@
-// Package main provides the entry point for the DocTheraLink backend server.
+// Package main provides the entry point for the Klyniva backend server.
 // This is a Go-based REST API server that provides healthcare management
 // functionality including patient management, therapy scheduling, and
 // facility administration.
@@ -27,10 +27,10 @@ import (
 	"syscall"
 	"time"
 
-	"care-backend/internal/api"
-	"care-backend/internal/auth"
-	"care-backend/internal/config"
-	"care-backend/internal/database"
+	"klyniva/internal/api"
+	"klyniva/internal/auth"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -38,14 +38,9 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// @title CARE Backend API
+// @title Klyniva API
 // @version 1.0
-// @description Healthcare management system backend API
-// @termsOfService http://swagger.io/terms/
-
-// @contact.name API Support
-// @contact.url http://www.care.ohc.network/support
-// @contact.email support@ohc.network
+// @description Klyniva clinic platform API (doctor ↔ physiotherapist workflow)
 
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
@@ -58,7 +53,7 @@ import (
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
 
-// main is the entry point for the DocTheraLink backend server.
+// main is the entry point for the Klyniva backend server.
 // It initializes all components and starts the HTTP server with graceful shutdown.
 func main() {
 	// "server -healthcheck" probes the local /health endpoint and exits 0/1.
@@ -83,7 +78,8 @@ func main() {
 
 	// Connect to PostgreSQL database using GORM
 	// The connection includes automatic retry logic and connection pooling
-	if err := database.Connect(cfg); err != nil {
+	// Retry for ~60s: in containers the database may start after the API
+	if err := database.ConnectWithRetry(cfg, 30, 2*time.Second); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Close()

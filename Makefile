@@ -1,9 +1,10 @@
-# DocTheraLink — common tasks. Run `make help` for the list.
+# Klyniva — common tasks. Run `make help` for the list.
 
 .DEFAULT_GOAL := help
 COMPOSE := docker compose
 
-.PHONY: help up down logs build test test-be test-be-integration test-fe check k8s-render
+.PHONY: help up down logs build test test-be test-be-integration test-fe check k8s-render \
+	k8s-up k8s-deploy k8s-e2e k8s-status k8s-down e2e-compose
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -35,9 +36,27 @@ test-fe: ## Frontend unit tests
 	cd fe && npm test
 
 check: ## Everything CI runs (except image builds)
-	cd be && test -z "$$(gofmt -l .)" && go vet ./... && go vet -tags integration ./...
+	cd be && test -z "$$(gofmt -l .)" && go vet ./... && go vet -tags integration ./... && go vet -tags e2e ./...
 	$(MAKE) test test-be-integration
 	cd fe && npm run typecheck && npx eslint --max-warnings=0 src/components/Referral src/test
 
-k8s-render: ## Render the Kubernetes manifests (kustomize)
-	kubectl kustomize k8s
+k8s-up: ## Local Kubernetes (k3d): create cluster, build, deploy → http://localhost:8088
+	scripts/k8s-local.sh up
+
+k8s-deploy: ## Rebuild images and roll out to the local cluster
+	scripts/k8s-local.sh deploy
+
+k8s-e2e: ## End-to-end API tests against the local cluster
+	scripts/k8s-local.sh e2e
+
+k8s-status: ## Pods/services of the local cluster
+	scripts/k8s-local.sh status
+
+k8s-down: ## Delete the local cluster (and its data)
+	scripts/k8s-local.sh down
+
+e2e-compose: ## End-to-end API tests against the docker compose stack
+	cd be && E2E_BASE_URL=http://localhost:4000 go test -tags e2e -count=1 -v ./internal/e2e/
+
+k8s-render: ## Render the production overlay (kustomize)
+	kubectl kustomize k8s/overlays/production

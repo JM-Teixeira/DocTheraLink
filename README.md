@@ -1,4 +1,4 @@
-# DocTheraLink (Klyniva)
+# Klyniva
 
 Clinic platform that links **doctors and physiotherapists** around shared
 patients: doctors refer patients to physiotherapy, therapists accept and treat
@@ -14,7 +14,6 @@ operations such as facilities, staff time tracking and timetables.
 | [CONTEXT.md](CONTEXT.md) | Architecture, conventions and key decisions — start here |
 | [TODO.md](TODO.md) | Prioritised backlog |
 | [Completed.md](Completed.md) | What has been done, with timestamps |
-| [docs/](docs/) | Older long-form docs (partly outdated, see TODO) |
 
 ## Quick start (Docker)
 
@@ -51,7 +50,10 @@ cd fe && npm install && npm run dev   # set REACT_CARE_API_URL=http://localhost:
 make test                 # Go unit tests + Vitest
 make test-be-integration  # PostgreSQL integration tests (Docker required)
 make check                # everything CI runs except image builds
+make e2e-compose          # end-to-end API journeys against the running compose stack
 ```
+
+Every change needs tests — see the testing policy at the top of [TODO.md](TODO.md).
 
 CI runs on every push and pull request (`.github/workflows/ci.yml`).
 
@@ -59,16 +61,21 @@ CI runs on every push and pull request (`.github/workflows/ci.yml`).
 
 - **Docker:** set `GIN_MODE=release`, a strong `JWT_SECRET`, `SEED_DEMO_USERS=false`
   and `PUBLIC_URL` in `.env`. Release mode refuses to start with weak settings.
-- **Kubernetes:** create the secrets (see `k8s/secrets.example.yaml`), then
-  `kubectl apply -k k8s`. Replace the placeholder domains and image tags first.
+- **Local Kubernetes (k3d in Docker Desktop):** `make k8s-up` creates a cluster
+  called `klyniva`, builds and imports the images and deploys
+  `k8s/overlays/local` → <http://localhost:8088>. `make k8s-e2e` runs the
+  end-to-end tests against it; `make k8s-down` removes it. The cluster uses
+  its own kubeconfig (`~/.kube/klyniva.yaml`) and never changes your default context.
+- **Production Kubernetes:** see the header of `k8s/overlays/production/kustomization.yaml`
+  (create the secret, set domain/e-mail/image tags, then `kubectl apply -k k8s/overlays/production`).
 
 ## Project layout
 
 ```
 be/    Go API — new features live in be/internal/modules/<name>/
 fe/    React app — new features live in fe/src/components/<Name>/
-k8s/   Kubernetes manifests (kustomize)
-docs/  Additional documentation
+k8s/   Kubernetes manifests (kustomize base + overlays)
+scripts/  Local cluster tooling
 ```
 
 ## License

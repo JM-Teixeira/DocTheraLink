@@ -1,0 +1,34 @@
+# Only the backend may talk to PostgreSQL. Frontend and backend accept
+# traffic from the ingress controller (any namespace) on their HTTP ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-from-backend-only
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-http-only
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [frontend, backend]
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 8080 # frontend
+        - port: 9000 # backend

@@ -13,7 +13,7 @@ import (
 	"errors"
 	"strings"
 
-	"care-backend/internal/models"
+	"klyniva/internal/models"
 
 	"gorm.io/gorm"
 )

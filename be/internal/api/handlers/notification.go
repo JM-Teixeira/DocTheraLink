@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"care-backend/internal/config"
-	"care-backend/internal/models"
+	"klyniva/internal/config"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

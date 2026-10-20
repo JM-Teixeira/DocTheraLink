@@ -7,10 +7,10 @@ import (
 	"errors"
 	"testing"
 
-	"care-backend/internal/database"
-	"care-backend/internal/models"
-	"care-backend/internal/modules/patient"
-	"care-backend/internal/modules/referral"
+	"klyniva/internal/database"
+	"klyniva/internal/models"
+	"klyniva/internal/modules/patient"
+	"klyniva/internal/modules/referral"
 )
 
 // TestMigrationKeepsColumnTypes guards against AutoMigrate rewriting tables

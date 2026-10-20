@@ -1,4 +1,4 @@
-# DocTheraLink / Klyniva — local stack
+# Klyniva — local stack
 #
 #   cp .env.example .env        # then edit secrets
 #   docker compose up -d --build
@@ -9,14 +9,14 @@
 #
 # Database/Redis ports bind to 127.0.0.1 only, so they are not exposed on the LAN.
 
-name: doctheralink
+name: klyniva
 
 services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_DB: ${DB_NAME:-care}
-      POSTGRES_USER: ${DB_USER:-care}
+      POSTGRES_DB: ${DB_NAME:-klyniva}
+      POSTGRES_USER: ${DB_USER:-klyniva}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     ports:
       - "127.0.0.1:5432:5432"
@@ -42,9 +42,9 @@ services:
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-true}
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: ${DB_USER:-care}
+      DB_USER: ${DB_USER:-klyniva}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME:-care}
+      DB_NAME: ${DB_NAME:-klyniva}
       DB_SSLMODE: disable
       DB_TIMEZONE: UTC
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}

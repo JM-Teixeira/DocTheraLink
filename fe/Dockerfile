@@ -1,5 +1,5 @@
-# DocTheraLink / Klyniva frontend image
-# Build: docker build -t doctheralink/frontend ./fe
+# Klyniva frontend image
+# Build: docker build -t klyniva/frontend ./fe
 
 # ---- Build stage ----------------------------------------------------------
 FROM node:24-alpine AS builder
@@ -22,8 +22,8 @@ FROM nginx:1.29-alpine
 
 COPY nginx.conf /etc/nginx/nginx.conf.template
 COPY --from=builder /app/build /usr/share/nginx/html
-COPY docker-entrypoint.sh /docker-entrypoint-doctheralink.sh
-RUN chmod +x /docker-entrypoint-doctheralink.sh
+COPY docker-entrypoint.sh /docker-entrypoint-klyniva.sh
+RUN chmod +x /docker-entrypoint-klyniva.sh
 
 # Where nginx proxies /api/ (compose service name by default)
 ENV BACKEND_UPSTREAM=backend:9000
@@ -35,5 +35,5 @@ USER 101
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1
 
-ENTRYPOINT ["/docker-entrypoint-doctheralink.sh"]
+ENTRYPOINT ["/docker-entrypoint-klyniva.sh"]
 CMD ["nginx", "-c", "/tmp/nginx.conf", "-g", "daemon off;"]
