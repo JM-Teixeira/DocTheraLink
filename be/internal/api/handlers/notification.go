@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"care-backend/internal/config"
-	"care-backend/internal/models"
+	"klyniva/internal/config"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,9 +21,13 @@ func NewNotificationHandler(cfg *config.Config) *NotificationHandler {
 
 // Placeholder implementations for all notification endpoints
 func (h *NotificationHandler) GetNotifications(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
+	// Return empty notification list for now
+	// This prevents 501 errors and ad blocker issues
+	c.JSON(http.StatusOK, models.PaginatedResponse{
+		Count:    0,
+		Next:     nil,
+		Previous: nil,
+		Results:  []interface{}{},
 	})
 }
 
@@ -42,9 +46,10 @@ func (h *NotificationHandler) MarkNotificationAsRead(c *gin.Context) {
 }
 
 func (h *NotificationHandler) GetPublicKey(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
+	// Return empty public key for now
+	// This prevents 501 errors during facility creation
+	c.JSON(http.StatusOK, gin.H{
+		"public_key": "",
 	})
 }
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -20,6 +21,32 @@ type Config struct {
 	Email    EmailConfig
 	Redis    RedisConfig
 	Security SecurityConfig
+	Seed     SeedConfig
+}
+
+// SeedConfig controls which bootstrap data is inserted on startup.
+type SeedConfig struct {
+	// DemoUsers inserts the demo accounts (shared, publicly known password).
+	// Defaults to on outside release mode and off in release mode.
+	DemoUsers bool
+}
+
+// defaultJWTSecret is the development fallback; Validate rejects it in release mode.
+const defaultJWTSecret = "your-secret-key"
+
+// Validate checks settings that must never ship to production with
+// development defaults. It only enforces them in release mode.
+func (c *Config) Validate() error {
+	if c.Server.Mode != "release" {
+		return nil
+	}
+	if c.JWT.Secret == defaultJWTSecret || len(c.JWT.Secret) < 32 {
+		return errors.New("JWT_SECRET must be set to a random value of at least 32 characters in release mode")
+	}
+	if c.Seed.DemoUsers {
+		return errors.New("SEED_DEMO_USERS must be false in release mode")
+	}
+	return nil
 }
 
 type ServerConfig struct {
@@ -78,11 +105,11 @@ type RedisConfig struct {
 }
 
 type SecurityConfig struct {
-	BcryptCost         int
-	RateLimitRequests  int
-	RateLimitWindow    time.Duration
-	GoogleMapsAPIKey   string
-	GovDataAPIKey      string
+	BcryptCost        int
+	RateLimitRequests int
+	RateLimitWindow   time.Duration
+	GoogleMapsAPIKey  string
+	GovDataAPIKey     string
 }
 
 func Load() *Config {
@@ -91,25 +118,30 @@ func Load() *Config {
 		log.Println("No .env file found, using environment variables")
 	}
 
+	mode := getEnv("GIN_MODE", "debug")
+
 	return &Config{
+		Seed: SeedConfig{
+			DemoUsers: getEnvBool("SEED_DEMO_USERS", mode != "release"),
+		},
 		Server: ServerConfig{
 			Port:    getEnv("PORT", "9000"),
 			Host:    getEnv("HOST", "0.0.0.0"),
-			Mode:    getEnv("GIN_MODE", "debug"),
+			Mode:    mode,
 			Debug:   getEnvBool("DEBUG", true),
 			Swagger: getEnvBool("ENABLE_SWAGGER", true),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),
-			User:     getEnv("DB_USER", "care"),
-			Password: getEnv("DB_PASSWORD", "care"),
-			Name:     getEnv("DB_NAME", "care"),
+			User:     getEnv("DB_USER", "klyniva"),
+			Password: getEnv("DB_PASSWORD", "klyniva"),
+			Name:     getEnv("DB_NAME", "klyniva"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 			Timezone: getEnv("DB_TIMEZONE", "UTC"),
 		},
 		JWT: JWTConfig{
-			Secret:        getEnv("JWT_SECRET", "your-secret-key"),
+			Secret:        getEnv("JWT_SECRET", defaultJWTSecret),
 			Expiry:        getEnvDuration("JWT_EXPIRY", 24*time.Hour),
 			RefreshExpiry: getEnvDuration("JWT_REFRESH_EXPIRY", 168*time.Hour),
 		},
@@ -131,7 +163,7 @@ func Load() *Config {
 			SMTPPort:     getEnv("SMTP_PORT", "587"),
 			SMTPUsername: getEnv("SMTP_USERNAME", ""),
 			SMTPPassword: getEnv("SMTP_PASSWORD", ""),
-			FromEmail:    getEnv("FROM_EMAIL", "noreply@care.ohc.network"),
+			FromEmail:    getEnv("FROM_EMAIL", "noreply@klyniva.com"),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "localhost"),
@@ -140,11 +172,11 @@ func Load() *Config {
 			DB:       getEnvInt("REDIS_DB", 0),
 		},
 		Security: SecurityConfig{
-			BcryptCost:         getEnvInt("BCRYPT_COST", 12),
-			RateLimitRequests:  getEnvInt("RATE_LIMIT_REQUESTS", 100),
-			RateLimitWindow:    getEnvDuration("RATE_LIMIT_WINDOW", time.Hour),
-			GoogleMapsAPIKey:   getEnv("GOOGLE_MAPS_API_KEY", ""),
-			GovDataAPIKey:      getEnv("GOV_DATA_API_KEY", ""),
+			BcryptCost:        getEnvInt("BCRYPT_COST", 12),
+			RateLimitRequests: getEnvInt("RATE_LIMIT_REQUESTS", 100),
+			RateLimitWindow:   getEnvDuration("RATE_LIMIT_WINDOW", time.Hour),
+			GoogleMapsAPIKey:  getEnv("GOOGLE_MAPS_API_KEY", ""),
+			GovDataAPIKey:     getEnv("GOV_DATA_API_KEY", ""),
 		},
 	}
 }

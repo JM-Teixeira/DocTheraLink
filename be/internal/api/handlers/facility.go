@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"care-backend/internal/config"
-	"care-backend/internal/database"
-	"care-backend/internal/models"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -50,9 +50,7 @@ func (h *FacilityHandler) ListFacilities(c *gin.Context) {
 	db := database.GetDB()
 	query := db.Model(&models.Facility{}).
 		Preload("State").
-		Preload("District").
-		Preload("LocalBody").
-		Preload("Ward")
+		Preload("District")
 
 	if params.Search != "" {
 		query = query.Where("name ILIKE ?", "%"+params.Search+"%")
@@ -91,43 +89,51 @@ func (h *FacilityHandler) ListFacilities(c *gin.Context) {
 func (h *FacilityHandler) CreateFacility(c *gin.Context) {
 	var req models.FacilityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		// Log the actual error for debugging
+		println("ERROR: Failed to bind JSON:", err.Error())
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
-			Message: "Invalid request body",
+			Message: "Invalid request body: " + err.Error(),
 		})
 		return
 	}
+
+	// Log what we received
+	println("DEBUG: Received facility request:")
+	println("  Name:", req.Name)
+	println("  FacilityType:", req.FacilityType)
+	println("  Address:", req.Address)
 
 	facility := models.Facility{
 		Name:              req.Name,
 		FacilityType:      req.FacilityType,
 		Address:           req.Address,
-		PhoneNumber:       req.PhoneNumber,
 		MiddlewareAddress: req.MiddlewareAddress,
 		Pincode:           req.Pincode,
 		Latitude:          req.Latitude,
 		Longitude:         req.Longitude,
 		StateID:           req.StateID,
 		DistrictID:        req.DistrictID,
-		LocalBodyID:       req.LocalBodyID,
-		WardID:            req.WardID,
 		KaspEmpanelled:    req.KaspEmpanelled,
+		Features:          req.Features,
 	}
 
 	db := database.GetDB()
 	if err := db.Create(&facility).Error; err != nil {
+		// Log the actual database error
+		println("ERROR: Failed to create facility in database:", err.Error())
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
-			Message: "Failed to create facility",
+			Message: "Failed to create facility: " + err.Error(),
 		})
 		return
 	}
 
+	println("SUCCESS: Facility created with ID:", facility.ID)
+
 	// Load relationships
 	db.Preload("State").
 		Preload("District").
-		Preload("LocalBody").
-		Preload("Ward").
 		First(&facility, "id = ?", facility.ID)
 
 	c.JSON(http.StatusCreated, facility)
@@ -150,8 +156,6 @@ func (h *FacilityHandler) GetFacility(c *gin.Context) {
 	db := database.GetDB()
 	if err := db.Preload("State").
 		Preload("District").
-		Preload("LocalBody").
-		Preload("Ward").
 		Where("id = ?", id).
 		First(&facility).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -208,16 +212,14 @@ func (h *FacilityHandler) UpdateFacility(c *gin.Context) {
 	facility.Name = req.Name
 	facility.FacilityType = req.FacilityType
 	facility.Address = req.Address
-	facility.PhoneNumber = req.PhoneNumber
 	facility.MiddlewareAddress = req.MiddlewareAddress
 	facility.Pincode = req.Pincode
 	facility.Latitude = req.Latitude
 	facility.Longitude = req.Longitude
 	facility.StateID = req.StateID
 	facility.DistrictID = req.DistrictID
-	facility.LocalBodyID = req.LocalBodyID
-	facility.WardID = req.WardID
 	facility.KaspEmpanelled = req.KaspEmpanelled
+	facility.Features = req.Features
 
 	if err := db.Save(&facility).Error; err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
@@ -230,8 +232,6 @@ func (h *FacilityHandler) UpdateFacility(c *gin.Context) {
 	// Load relationships
 	db.Preload("State").
 		Preload("District").
-		Preload("LocalBody").
-		Preload("Ward").
 		First(&facility, "id = ?", facility.ID)
 
 	c.JSON(http.StatusOK, facility)
@@ -281,8 +281,6 @@ func (h *FacilityHandler) PartialUpdateFacility(c *gin.Context) {
 	// Load relationships
 	db.Preload("State").
 		Preload("District").
-		Preload("LocalBody").
-		Preload("Ward").
 		First(&facility, "id = ?", facility.ID)
 
 	c.JSON(http.StatusOK, facility)
@@ -535,7 +533,20 @@ func (h *FacilityHandler) DeleteFacilityBed(c *gin.Context) {
 }
 
 func (h *FacilityHandler) GetDistrictsByState(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+	stateID := c.Param("id")
+
+	var districts []models.District
+	db := database.GetDB()
+
+	if err := db.Where("state_id = ?", stateID).Preload("State").Find(&districts).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "database_error",
+			Message: "Failed to fetch districts",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, districts)
 }
 
 func (h *FacilityHandler) GetDistrictByName(c *gin.Context) {
@@ -547,11 +558,37 @@ func (h *FacilityHandler) GetDistrict(c *gin.Context) {
 }
 
 func (h *FacilityHandler) GetAllLocalBodyByDistrict(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+	districtID := c.Param("id")
+
+	var localBodies []models.LocalBody
+	db := database.GetDB()
+
+	if err := db.Where("district_id = ?", districtID).Preload("District").Find(&localBodies).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "database_error",
+			Message: "Failed to fetch cities",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, localBodies)
 }
 
 func (h *FacilityHandler) GetLocalBodyByDistrict(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+	districtID := c.Param("id")
+
+	var localBodies []models.LocalBody
+	db := database.GetDB()
+
+	if err := db.Where("district_id = ?", districtID).Preload("District").Find(&localBodies).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "database_error",
+			Message: "Failed to fetch cities",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, localBodies)
 }
 
 func (h *FacilityHandler) GetAllLocalBody(c *gin.Context) {

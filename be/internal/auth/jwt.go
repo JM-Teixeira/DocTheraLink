@@ -4,15 +4,23 @@ import (
 	"errors"
 	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/models"
+	"klyniva/internal/config"
+	"klyniva/internal/models"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 var (
-	ErrInvalidToken = errors.New("invalid token")
-	ErrExpiredToken = errors.New("token has expired")
+	ErrInvalidToken   = errors.New("invalid token")
+	ErrExpiredToken   = errors.New("token has expired")
+	ErrWrongTokenType = errors.New("wrong token type")
+)
+
+// Token types stored in the "typ" claim. Keeping them distinct stops a
+// long-lived refresh token from being accepted as an access token.
+const (
+	TokenTypeAccess  = "access"
+	TokenTypeRefresh = "refresh"
 )
 
 type JWTManager struct {
@@ -32,13 +40,13 @@ func NewJWTManager(cfg *config.Config) *JWTManager {
 // GenerateTokenPair generates both access and refresh tokens
 func (j *JWTManager) GenerateTokenPair(user *models.User) (*models.LoginResponse, error) {
 	// Generate access token
-	accessToken, err := j.generateToken(user, j.tokenExpiry)
+	accessToken, err := j.generateToken(user, TokenTypeAccess, j.tokenExpiry)
 	if err != nil {
 		return nil, err
 	}
 
 	// Generate refresh token
-	refreshToken, err := j.generateToken(user, j.refreshExpiry)
+	refreshToken, err := j.generateToken(user, TokenTypeRefresh, j.refreshExpiry)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +57,8 @@ func (j *JWTManager) GenerateTokenPair(user *models.User) (*models.LoginResponse
 	}, nil
 }
 
-// generateToken creates a JWT token with the given expiry
-func (j *JWTManager) generateToken(user *models.User, expiry time.Duration) (string, error) {
+// generateToken creates a JWT token of the given type with the given expiry
+func (j *JWTManager) generateToken(user *models.User, tokenType string, expiry time.Duration) (string, error) {
 	now := time.Now()
 	claims := &models.TokenClaims{
 		UserID:   user.ID,
@@ -64,6 +72,7 @@ func (j *JWTManager) generateToken(user *models.User, expiry time.Duration) (str
 		"user_id":   claims.UserID,
 		"username":  claims.Username,
 		"user_type": claims.UserType,
+		"typ":       tokenType,
 		"exp":       claims.Exp,
 		"iat":       claims.Iat,
 	})
@@ -71,8 +80,19 @@ func (j *JWTManager) generateToken(user *models.User, expiry time.Duration) (str
 	return token.SignedString([]byte(j.secretKey))
 }
 
-// ValidateToken validates a JWT token and returns the claims
+// ValidateToken validates an access token and returns the claims.
+// Refresh tokens are rejected so they cannot be used to call the API.
 func (j *JWTManager) ValidateToken(tokenString string) (*models.TokenClaims, error) {
+	return j.validate(tokenString, TokenTypeAccess)
+}
+
+// ValidateRefreshToken validates a refresh token and returns the claims.
+func (j *JWTManager) ValidateRefreshToken(tokenString string) (*models.TokenClaims, error) {
+	return j.validate(tokenString, TokenTypeRefresh)
+}
+
+// validate parses the token, checks the signature, expiry and token type.
+func (j *JWTManager) validate(tokenString, wantType string) (*models.TokenClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
@@ -100,6 +120,10 @@ func (j *JWTManager) ValidateToken(tokenString string) (*models.TokenClaims, err
 		}
 	}
 
+	if typ, _ := claims["typ"].(string); typ != wantType {
+		return nil, ErrWrongTokenType
+	}
+
 	// Extract claims
 	userID, ok := claims["user_id"].(float64)
 	if !ok {
@@ -123,22 +147,4 @@ func (j *JWTManager) ValidateToken(tokenString string) (*models.TokenClaims, err
 		Exp:      int64(claims["exp"].(float64)),
 		Iat:      int64(claims["iat"].(float64)),
 	}, nil
-}
-
-// RefreshToken generates a new access token from a valid refresh token
-func (j *JWTManager) RefreshToken(refreshTokenString string) (*models.LoginResponse, error) {
-	claims, err := j.ValidateToken(refreshTokenString)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a temporary user object for token generation
-	user := &models.User{
-		ID:       claims.UserID,
-		Username: claims.Username,
-		UserType: claims.UserType,
-	}
-
-	// Generate new token pair
-	return j.GenerateTokenPair(user)
 }

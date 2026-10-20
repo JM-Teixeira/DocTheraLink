@@ -1255,6 +1255,132 @@ const routes = {
       },
     },
   },
+
+  // Time Log Endpoints (Clock In/Out)
+  timeLog: {
+    clockIn: {
+      path: "/api/v1/timelog/clock-in",
+      method: "POST",
+      TBody: Type<{ notes?: string }>(),
+      TRes: Type<any>(),
+    },
+
+    clockOut: {
+      path: "/api/v1/timelog/clock-out",
+      method: "POST",
+      TBody: Type<{ notes?: string }>(),
+      TRes: Type<any>(),
+    },
+
+    getMyLogs: {
+      path: "/api/v1/timelog/my-logs",
+      method: "GET",
+      TRes: Type<PaginatedResponse<any>>(),
+    },
+
+    getUserLogs: {
+      path: "/api/v1/timelog/user/{id}",
+      method: "GET",
+      TRes: Type<PaginatedResponse<any>>(),
+    },
+
+    getStatus: {
+      path: "/api/v1/timelog/status",
+      method: "GET",
+      TRes: Type<{ clocked_in: boolean; time_log: any | null }>(),
+    },
+  },
+
+  // Timetable Endpoints
+  timetable: {
+    listSections: {
+      path: "/api/v1/facility/{id}/sections/",
+      method: "GET",
+      TRes: Type<any[]>(),
+    },
+
+    createSection: {
+      path: "/api/v1/facility/{id}/sections/",
+      method: "POST",
+      TBody: Type<{
+        name: string;
+        max_capacity?: number;
+        is_active?: boolean;
+        description?: string;
+      }>(),
+      TRes: Type<any>(),
+    },
+
+    getSection: {
+      path: "/api/v1/sections/{id}",
+      method: "GET",
+      TRes: Type<any>(),
+    },
+
+    updateSection: {
+      path: "/api/v1/sections/{id}",
+      method: "PUT",
+      TBody: Type<{
+        name: string;
+        max_capacity?: number;
+        is_active?: boolean;
+        description?: string;
+      }>(),
+      TRes: Type<any>(),
+    },
+
+    deleteSection: {
+      path: "/api/v1/sections/{id}",
+      method: "DELETE",
+      TRes: Type<Record<string, never>>(),
+    },
+
+    getTimetable: {
+      path: "/api/v1/timetable/{id}",
+      method: "GET",
+      TRes: Type<any[]>(),
+    },
+
+    createSlot: {
+      path: "/api/v1/timetable/{id}/slot",
+      method: "POST",
+      TBody: Type<{
+        section_id: string;
+        user_id: number;
+        day_of_week: number;
+        start_time: string;
+        end_time: string;
+        is_recurring?: boolean;
+        valid_from?: string;
+        valid_until?: string;
+        notes?: string;
+      }>(),
+      TRes: Type<any>(),
+    },
+
+    updateSlot: {
+      path: "/api/v1/timetable/slot/{id}",
+      method: "PUT",
+      TBody: Type<{
+        section_id: string;
+        user_id: number;
+        day_of_week: number;
+        start_time: string;
+        end_time: string;
+        is_recurring?: boolean;
+        valid_from?: string;
+        valid_until?: string;
+        notes?: string;
+      }>(),
+      TRes: Type<any>(),
+    },
+
+    deleteSlot: {
+      path: "/api/v1/timetable/slot/{id}",
+      method: "DELETE",
+      TRes: Type<Record<string, never>>(),
+    },
+  },
 } as const;
 
 export default routes;

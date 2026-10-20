@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: klyniva
+  labels:
+    # Enforce the restricted Pod Security Standard: every pod must run
+    # non-root, drop capabilities and use the runtime seccomp profile.
+    pod-security.kubernetes.io/enforce: restricted

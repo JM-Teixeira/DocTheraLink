@@ -53,6 +53,7 @@ const StatelessSidebar = ({
   const BaseNavItems: INavItem[] = [
     { text: t("facilities"), to: "/facility", icon: "d-hospital" },
     { text: t("patients"), to: "/patients", icon: "d-patient" },
+    { text: t("referrals"), to: "/referrals", icon: "l-stethoscope" },
     { text: t("assets"), to: "/assets", icon: "d-folder" },
     { text: t("shifting"), to: "/shifting", icon: "d-ambulance" },
     { text: t("resource"), to: "/resource", icon: "d-book-open" },

@@ -1,4 +1,4 @@
-// Package main provides the entry point for the DocTheraLink backend server.
+// Package main provides the entry point for the Klyniva backend server.
 // This is a Go-based REST API server that provides healthcare management
 // functionality including patient management, therapy scheduling, and
 // facility administration.
@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -26,10 +27,10 @@ import (
 	"syscall"
 	"time"
 
-	"care-backend/internal/api"
-	"care-backend/internal/auth"
-	"care-backend/internal/config"
-	"care-backend/internal/database"
+	"klyniva/internal/api"
+	"klyniva/internal/auth"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -37,14 +38,9 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// @title CARE Backend API
+// @title Klyniva API
 // @version 1.0
-// @description Healthcare management system backend API
-// @termsOfService http://swagger.io/terms/
-
-// @contact.name API Support
-// @contact.url http://www.care.ohc.network/support
-// @contact.email support@ohc.network
+// @description Klyniva clinic platform API (doctor ↔ physiotherapist workflow)
 
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
@@ -57,12 +53,24 @@ import (
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
 
-// main is the entry point for the DocTheraLink backend server.
+// main is the entry point for the Klyniva backend server.
 // It initializes all components and starts the HTTP server with graceful shutdown.
 func main() {
+	// "server -healthcheck" probes the local /health endpoint and exits 0/1.
+	// The runtime image is distroless (no shell or curl), so Docker's
+	// HEALTHCHECK calls the binary itself.
+	healthcheck := flag.Bool("healthcheck", false, "probe the local /health endpoint and exit")
+	flag.Parse()
+	if *healthcheck {
+		os.Exit(probeHealth())
+	}
+
 	// Load configuration from environment variables and .env file
 	// This allows the same binary to work in different environments
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
 
 	// Set Gin framework mode (debug, release, test)
 	// In production, this should be "release" for better performance
@@ -70,7 +78,8 @@ func main() {
 
 	// Connect to PostgreSQL database using GORM
 	// The connection includes automatic retry logic and connection pooling
-	if err := database.Connect(cfg); err != nil {
+	// Retry for ~60s: in containers the database may start after the API
+	if err := database.ConnectWithRetry(cfg, 30, 2*time.Second); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Close()
@@ -81,9 +90,8 @@ func main() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
-	// Seed initial data including states, districts, skills, and test users
-	// TODO: Remove test users in production (they have #TODO tags in database.go)
-	if err := database.SeedData(); err != nil {
+	// Seed initial data including states, districts, skills and (outside release mode) demo users
+	if err := database.SeedData(cfg.Seed.DemoUsers); err != nil {
 		log.Printf("Warning: Failed to seed data: %v", err)
 	}
 
@@ -105,7 +113,7 @@ func main() {
 		AllowMethods:     cfg.CORS.AllowedMethods, // HTTP methods
 		AllowHeaders:     cfg.CORS.AllowedHeaders, // Request headers
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,    // Allow cookies and auth headers
+		AllowCredentials: true,           // Allow cookies and auth headers
 		MaxAge:           12 * time.Hour, // Cache preflight requests
 	}
 	router.Use(cors.New(corsConfig))
@@ -118,6 +126,20 @@ func main() {
 			"timestamp": time.Now(),
 			"version":   "1.0.0",
 		})
+	})
+
+	// Readiness check: only report ready when the database answers, so
+	// Kubernetes stops routing traffic to a pod that lost its connection.
+	router.GET("/ready", func(c *gin.Context) {
+		sqlDB, err := database.GetDB().DB()
+		if err == nil {
+			err = sqlDB.PingContext(c.Request.Context())
+		}
+		if err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable", "database": "down"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ready", "database": "up"})
 	})
 
 	// Swagger API documentation endpoint (only in development)
@@ -162,4 +184,22 @@ func main() {
 	}
 
 	log.Println("Server exited")
+}
+
+// probeHealth returns 0 when GET /health on the local port answers 200.
+func probeHealth() int {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "9000"
+	}
+	client := http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/health")
+	if err != nil {
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }

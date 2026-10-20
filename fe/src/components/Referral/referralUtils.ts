@@ -1,0 +1,132 @@
+/**
+ * Pure helpers for the referral UI. Kept free of React so they are easy to test.
+ * Permission rules mirror be/internal/modules/referral/service.go — the
+ * backend remains the source of truth; these only decide which buttons to show.
+ */
+import {
+  Referral,
+  ReferralAction,
+  ReferralStatus,
+  UserSummary,
+} from "@/components/Referral/types";
+
+const ADMIN_ROLES = ["StateAdmin", "DistrictAdmin", "LocalBodyAdmin"];
+
+/** The fields of the signed-in user the helpers need. */
+export interface CurrentUser {
+  id: number;
+  user_type: string;
+}
+
+export const isAdmin = (u: CurrentUser) => ADMIN_ROLES.includes(u.user_type);
+export const isDoctor = (u: CurrentUser) => u.user_type === "Doctor";
+export const isTherapist = (u: CurrentUser) =>
+  u.user_type === "PhysioTherapist";
+
+/** Doctors and admins can open referrals. */
+export const canCreateReferral = (u: CurrentUser) => isDoctor(u) || isAdmin(u);
+
+const isAssignedTherapist = (r: Referral, u: CurrentUser) =>
+  isTherapist(u) && r.therapist_id === u.id;
+
+/** Which workflow buttons to show for this user and referral. */
+export function allowedActions(r: Referral, u: CurrentUser): ReferralAction[] {
+  const actions: ReferralAction[] = [];
+  switch (r.status) {
+    case "pending":
+      if (isTherapist(u) && (r.therapist_id == null || r.therapist_id === u.id))
+        actions.push("accept");
+      if (isAssignedTherapist(r, u)) actions.push("decline");
+      break;
+    case "accepted":
+      if (isAssignedTherapist(r, u)) actions.push("start");
+      break;
+    case "in_progress":
+      if (isAssignedTherapist(r, u)) actions.push("complete");
+      break;
+  }
+  const open = ["pending", "accepted", "in_progress"].includes(r.status);
+  if (open && (isAdmin(u) || (isDoctor(u) && r.doctor_id === u.id)))
+    actions.push("cancel");
+  return actions;
+}
+
+/** Actions that require a free-text reason (or outcome summary). */
+export const actionNeedsReason = (a: ReferralAction) =>
+  a === "decline" || a === "complete" || a === "cancel";
+
+/** Only the referring doctor, assigned therapist and admins post on the thread. */
+export function canPostNote(r: Referral, u: CurrentUser) {
+  return isAdmin(u) || r.doctor_id === u.id || isAssignedTherapist(r, u);
+}
+
+/** Visual style per status: tailwind classes for badges and the accent bar. */
+export const STATUS_STYLES: Record<
+  ReferralStatus,
+  { badge: string; dot: string }
+> = {
+  pending: {
+    badge: "bg-amber-50 text-amber-800 ring-amber-200",
+    dot: "bg-amber-500",
+  },
+  accepted: { badge: "bg-sky-50 text-sky-800 ring-sky-200", dot: "bg-sky-500" },
+  in_progress: {
+    badge: "bg-violet-50 text-violet-800 ring-violet-200",
+    dot: "bg-violet-500",
+  },
+  completed: {
+    badge: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+    dot: "bg-emerald-500",
+  },
+  declined: {
+    badge: "bg-rose-50 text-rose-800 ring-rose-200",
+    dot: "bg-rose-500",
+  },
+  cancelled: {
+    badge: "bg-gray-100 text-gray-700 ring-gray-200",
+    dot: "bg-gray-400",
+  },
+};
+
+/** Happy-path steps shown in the progress tracker. */
+export const STATUS_STEPS: ReferralStatus[] = [
+  "pending",
+  "accepted",
+  "in_progress",
+  "completed",
+];
+
+/**
+ * Index of the current step in STATUS_STEPS, or -1 when the referral left the
+ * happy path (declined/cancelled).
+ */
+export const stepIndex = (s: ReferralStatus) => STATUS_STEPS.indexOf(s);
+
+export function fullName(u?: UserSummary | null) {
+  if (!u) return "";
+  return `${u.first_name} ${u.last_name}`.trim() || u.username;
+}
+
+/** True when a name already carries a doctor title ("Dr. John", "dr Ana"). */
+export const hasDoctorTitle = (name: string) => /^dr\.?\s/i.test(name.trim());
+
+/** Initials for avatars, e.g. "Sarah Johnson" → "SJ". */
+export function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("");
+}
+
+/** Age in whole years at `now`, or null when the birth date is unknown/invalid. */
+export function ageFromDob(dob?: string | null, now = new Date()) {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age;
+}

@@ -133,7 +133,7 @@ const UpdateAppPopup = ({ onUpdate }: UpdateAppPopupProps) => {
           <span className="mr-4 flex flex-col">
             <p className="font-semibold">Software Update</p>
             <p className="text-sm font-medium">
-              A new version of CARE is available
+              A new version of Klyniva is available
             </p>
           </span>
           <ButtonV2

@@ -232,25 +232,7 @@ export const FacilityHome = ({ facilityId }: Props) => {
                     </div>
 
                     <div className="flex-col md:flex lg:flex-1">
-                      <div className="mb-4">
-                        <h1 className="text-base font-semibold text-[#B9B9B9]">
-                          {t("local_body")}
-                        </h1>
-                        <p className="w-2/3 text-base font-medium md:w-full">
-                          {facilityData?.local_body_object?.name}
-                        </p>
-                      </div>
                       <div className="mb-4 flex flex-col flex-wrap gap-4 md:flex-row">
-                        <div>
-                          <h1 className="text-base font-semibold text-[#B9B9B9]">
-                            {t("ward")}
-                          </h1>
-                          <p className="text-base font-medium">
-                            {facilityData?.ward_object?.number +
-                              ", " +
-                              facilityData?.ward_object?.name}
-                          </p>
-                        </div>
                         <div>
                           <h1 className="text-base font-semibold text-[#B9B9B9]">
                             {t("district")}
@@ -258,16 +240,6 @@ export const FacilityHome = ({ facilityId }: Props) => {
                           <p className="text-base font-medium">
                             {facilityData?.district_object?.name}
                           </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div id="phone-number-view">
-                          <h1 className="text-base font-semibold text-[#B9B9B9]">
-                            {t("phone_number")}
-                          </h1>
-                          <ContactLink
-                            tel={String(facilityData?.phone_number)}
-                          />
                         </div>
                       </div>
                       {!!spokesQuery.data?.results?.length && (

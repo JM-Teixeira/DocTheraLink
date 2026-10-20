@@ -44,12 +44,6 @@ export default function ResourceDetails(props: { id: string }) {
           {facilityData?.district_object?.name || "--"}
         </div>
         <div>
-          <span className="mr-1 font-semibold leading-relaxed">
-            Local body:{" "}
-          </span>
-          {facilityData?.local_body_object?.name || "--"}
-        </div>
-        <div>
           <span className="mr-1 font-semibold leading-relaxed">State: </span>
           {facilityData?.state_object?.name || "--"}
         </div>

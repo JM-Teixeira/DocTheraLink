@@ -5,8 +5,9 @@ import (
 	"log"
 	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/models"
+	"klyniva/internal/config"
+	"klyniva/internal/models"
+	"klyniva/internal/modules/referral"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -14,8 +15,6 @@ import (
 )
 
 var DB *gorm.DB
-
-
 
 // Connect initializes the database connection
 func Connect(cfg *config.Config) error {
@@ -62,6 +61,29 @@ func Connect(cfg *config.Config) error {
 	DB = db
 	log.Println("Database connection established")
 	return nil
+}
+
+// ConnectWithRetry calls Connect until it succeeds or attempts run out.
+// In containers the database often starts after the API; retrying avoids
+// crash loops during startup.
+func ConnectWithRetry(cfg *config.Config, attempts int, delay time.Duration) error {
+	return retry(attempts, delay, func() error { return Connect(cfg) })
+}
+
+// retry runs fn up to attempts times, sleeping delay between failures, and
+// returns the last error.
+func retry(attempts int, delay time.Duration, fn func() error) error {
+	var err error
+	for i := 1; i <= attempts; i++ {
+		if err = fn(); err == nil {
+			return nil
+		}
+		if i < attempts {
+			log.Printf("database not ready (attempt %d/%d): %v", i, attempts, err)
+			time.Sleep(delay)
+		}
+	}
+	return err
 }
 
 // Migrate runs database migrations
@@ -138,8 +160,21 @@ func Migrate() error {
 		return fmt.Errorf("failed to migrate Phase 6 models: %w", err)
 	}
 
+	// Phase 7: Staff scheduling (previously only created by scripts/fix_timetable_tables.sql)
+	log.Println("Migrating Phase 7: Time log and timetable models...")
+	err = DB.AutoMigrate(
+		&models.TimeLog{},
+		&models.TimetableSection{},
+		&models.TimetableSlot{},
+	)
 	if err != nil {
-		return fmt.Errorf("failed to migrate database: %w", err)
+		return fmt.Errorf("failed to migrate Phase 7 models: %w", err)
+	}
+
+	// Phase 8: Doctor → physiotherapist referrals (the core Klyniva workflow)
+	log.Println("Migrating Phase 8: Referral models...")
+	if err := DB.AutoMigrate(referral.Models()...); err != nil {
+		return fmt.Errorf("failed to migrate Phase 8 models: %w", err)
 	}
 
 	log.Println("Database migration completed")
@@ -151,17 +186,35 @@ func ptr(s string) *string {
 	return &s
 }
 
-// SeedData inserts initial data into the database
-func SeedData() error {
+// SeedData inserts initial data into the database. Demo users share a
+// publicly known password, so they are only inserted when includeDemoUsers is set.
+func SeedData(includeDemoUsers bool) error {
 	if DB == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
-	// Seed states
+	// Seed Portugal districts (Distritos)
 	states := []models.State{
-		{ID: 1, Name: "Kerala"},
-		{ID: 2, Name: "Karnataka"},
-		{ID: 3, Name: "Tamil Nadu"},
+		{ID: 1, Name: "Aveiro"},
+		{ID: 2, Name: "Beja"},
+		{ID: 3, Name: "Braga"},
+		{ID: 4, Name: "Bragança"},
+		{ID: 5, Name: "Castelo Branco"},
+		{ID: 6, Name: "Coimbra"},
+		{ID: 7, Name: "Évora"},
+		{ID: 8, Name: "Faro"},
+		{ID: 9, Name: "Guarda"},
+		{ID: 10, Name: "Leiria"},
+		{ID: 11, Name: "Lisboa"},
+		{ID: 12, Name: "Portalegre"},
+		{ID: 13, Name: "Porto"},
+		{ID: 14, Name: "Santarém"},
+		{ID: 15, Name: "Setúbal"},
+		{ID: 16, Name: "Viana do Castelo"},
+		{ID: 17, Name: "Vila Real"},
+		{ID: 18, Name: "Viseu"},
+		{ID: 19, Name: "Região Autónoma dos Açores"},
+		{ID: 20, Name: "Região Autónoma da Madeira"},
 	}
 
 	for _, state := range states {
@@ -170,24 +223,31 @@ func SeedData() error {
 		}
 	}
 
-	
-
-	// Seed districts for Kerala
+	// Seed major municipalities (Concelhos) - sample for main districts
 	districts := []models.District{
-		{ID: 1, Name: "Thiruvananthapuram", StateID: 1},
-		{ID: 2, Name: "Kollam", StateID: 1},
-		{ID: 3, Name: "Pathanamthitta", StateID: 1},
-		{ID: 4, Name: "Alappuzha", StateID: 1},
-		{ID: 5, Name: "Kottayam", StateID: 1},
-		{ID: 6, Name: "Idukki", StateID: 1},
-		{ID: 7, Name: "Ernakulam", StateID: 1},
-		{ID: 8, Name: "Thrissur", StateID: 1},
-		{ID: 9, Name: "Palakkad", StateID: 1},
-		{ID: 10, Name: "Malappuram", StateID: 1},
-		{ID: 11, Name: "Kozhikode", StateID: 1},
-		{ID: 12, Name: "Wayanad", StateID: 1},
-		{ID: 13, Name: "Kannur", StateID: 1},
-		{ID: 14, Name: "Kasaragod", StateID: 1},
+		// Lisboa District
+		{ID: 1, Name: "Lisboa", StateID: 11},
+		{ID: 2, Name: "Cascais", StateID: 11},
+		{ID: 3, Name: "Sintra", StateID: 11},
+		{ID: 4, Name: "Oeiras", StateID: 11},
+		{ID: 5, Name: "Loures", StateID: 11},
+		{ID: 6, Name: "Amadora", StateID: 11},
+		// Porto District
+		{ID: 7, Name: "Porto", StateID: 13},
+		{ID: 8, Name: "Vila Nova de Gaia", StateID: 13},
+		{ID: 9, Name: "Matosinhos", StateID: 13},
+		{ID: 10, Name: "Gondomar", StateID: 13},
+		{ID: 11, Name: "Maia", StateID: 13},
+		// Other major cities
+		{ID: 12, Name: "Coimbra", StateID: 6},
+		{ID: 13, Name: "Braga", StateID: 3},
+		{ID: 14, Name: "Faro", StateID: 8},
+		{ID: 15, Name: "Aveiro", StateID: 1},
+		{ID: 16, Name: "Setúbal", StateID: 15},
+		{ID: 17, Name: "Leiria", StateID: 10},
+		{ID: 18, Name: "Viseu", StateID: 18},
+		{ID: 19, Name: "Funchal", StateID: 20},
+		{ID: 20, Name: "Ponta Delgada", StateID: 19},
 	}
 
 	for _, district := range districts {
@@ -195,8 +255,6 @@ func SeedData() error {
 			return fmt.Errorf("failed to seed district %s: %w", district.Name, err)
 		}
 	}
-
-	
 
 	// Seed basic skills
 	skills := []models.Skill{
@@ -209,7 +267,6 @@ func SeedData() error {
 		{Name: "Laboratory", Description: ptr("Laboratory testing and diagnostics")},
 		{Name: "Radiology", Description: ptr("Medical imaging and interpretation")},
 	}
-
 
 	for _, skill := range skills {
 		if err := DB.FirstOrCreate(&skill, models.Skill{Name: skill.Name}).Error; err != nil {
@@ -237,13 +294,17 @@ func SeedData() error {
 		}
 	}
 
-	// TODO: Remove these test users in production - they are for development/testing only
-	// Create bootstrap users with test credentials
-	// Password for all test users: 1234@1
+	if !includeDemoUsers {
+		log.Println("Database seeding completed (demo users skipped)")
+		return nil
+	}
+
+	// Demo users for development/testing only (disabled in release mode by config.Validate)
+	// Password for all demo users: 1234@1
 	testUsers := []models.User{
 		{
 			Username:  "stateadmin",
-			Email:     "stateadmin@doctheralink.com",
+			Email:     "stateadmin@klyniva.com",
 			FirstName: "State",
 			LastName:  "Administrator",
 			UserType:  models.RoleStateAdmin,
@@ -252,7 +313,7 @@ func SeedData() error {
 		},
 		{
 			Username:  "districtadmin",
-			Email:     "districtadmin@doctheralink.com",
+			Email:     "districtadmin@klyniva.com",
 			FirstName: "District",
 			LastName:  "Administrator",
 			UserType:  models.RoleDistrictAdmin,
@@ -261,7 +322,7 @@ func SeedData() error {
 		},
 		{
 			Username:  "facilitycoordinator",
-			Email:     "coordinator@doctheralink.com",
+			Email:     "coordinator@klyniva.com",
 			FirstName: "Facility",
 			LastName:  "Coordinator",
 			UserType:  models.RoleLocalBodyAdmin,
@@ -270,7 +331,7 @@ func SeedData() error {
 		},
 		{
 			Username:  "doctor",
-			Email:     "doctor@doctheralink.com",
+			Email:     "doctor@klyniva.com",
 			FirstName: "Dr. John",
 			LastName:  "Smith",
 			UserType:  models.RoleDoctor,
@@ -279,7 +340,7 @@ func SeedData() error {
 		},
 		{
 			Username:  "physiotherapist",
-			Email:     "physio@doctheralink.com",
+			Email:     "physio@klyniva.com",
 			FirstName: "Sarah",
 			LastName:  "Johnson",
 			UserType:  models.RolePhysioTherapist,
@@ -288,7 +349,7 @@ func SeedData() error {
 		},
 		{
 			Username:  "nurse",
-			Email:     "nurse@doctheralink.com",
+			Email:     "nurse@klyniva.com",
 			FirstName: "Mary",
 			LastName:  "Williams",
 			UserType:  models.RoleNurse,
@@ -297,7 +358,7 @@ func SeedData() error {
 		},
 		{
 			Username:  "staff",
-			Email:     "staff@doctheralink.com",
+			Email:     "staff@klyniva.com",
 			FirstName: "General",
 			LastName:  "Staff",
 			UserType:  models.RoleStaff,

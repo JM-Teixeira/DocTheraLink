@@ -1,0 +1,49 @@
+# Production template: nginx ingress + cert-manager TLS, 2+ replicas.
+# Before applying:
+#   1. Create the secret (never commit it):
+#        kubectl create namespace klyniva
+#        kubectl -n klyniva create secret generic klyniva-secrets \
+#          --from-literal=DB_PASSWORD="$(openssl rand -base64 24)" \
+#          --from-literal=JWT_SECRET="$(openssl rand -base64 48)"
+#   2. Replace klyniva.com, the ACME e-mail and the image registry/tags below.
+#   3. Uploads need RWX storage or S3 before running >1 backend replica (TODO.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: klyniva
+
+resources:
+  - ../../base
+  - cluster-issuer.yaml
+  - hpa.yaml
+
+images:
+  - name: klyniva/backend
+    newName: ghcr.io/jm-teixeira/klyniva-backend
+    newTag: "0.1.0"
+  - name: klyniva/frontend
+    newName: ghcr.io/jm-teixeira/klyniva-frontend
+    newTag: "0.1.0"
+
+patches:
+  - target: { kind: Deployment, name: frontend }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target: { kind: Ingress, name: klyniva }
+    patch: |-
+      - op: add
+        path: /spec/ingressClassName
+        value: nginx
+      - op: add
+        path: /metadata/annotations
+        value:
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+          nginx.ingress.kubernetes.io/proxy-body-size: 10m
+          nginx.ingress.kubernetes.io/limit-rps: "20"
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts: [klyniva.com]
+            secretName: klyniva-tls

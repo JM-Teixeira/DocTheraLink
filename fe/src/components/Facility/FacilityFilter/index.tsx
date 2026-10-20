@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import FiltersSlideover from "@/CAREUI/misc/interactive/FiltersSlideover";
 
 import DistrictAutocompleteFormField from "@/components/Common/DistrictAutocompleteFormField";
-import LocalBodyAutocompleteFormField from "@/components/Common/LocalBodyAutocompleteFormField";
 import StateAutocompleteFormField from "@/components/Common/StateAutocompleteFormField";
 import { SelectFormField } from "@/components/Form/FormFields/SelectFormField";
 import { FieldChangeEvent } from "@/components/Form/FormFields/Utils";
@@ -19,7 +18,6 @@ function FacilityFilter(props: any) {
   const [filterState, setFilterState] = useMergeState({
     state: filter.state || "",
     district: filter.district || "",
-    local_body: filter.local_body || "",
     facility_type: filter.facility_type || "",
   });
 
@@ -27,7 +25,6 @@ function FacilityFilter(props: any) {
     const data = {
       state: Number(filterState.state) || "",
       district: Number(filterState.district) || "",
-      local_body: Number(filterState.local_body) || "",
       facility_type: filterState.facility_type || "",
     };
     onChange(data);
@@ -38,11 +35,6 @@ function FacilityFilter(props: any) {
 
     if (name === "state") {
       filterData["district"] = 0;
-      filterData["local_body"] = 0;
-    }
-
-    if (name === "district") {
-      filterData["local_body"] = 0;
     }
 
     filterData[name] = value;
@@ -71,10 +63,6 @@ function FacilityFilter(props: any) {
         <DistrictAutocompleteFormField
           {...field("district")}
           state={filterState.state}
-        />
-        <LocalBodyAutocompleteFormField
-          {...field("local_body")}
-          district={filterState.district}
         />
         <SelectFormField
           {...field("facility_type")}

@@ -1,0 +1,9 @@
+# Normalise line endings. gofmt and POSIX shells require LF, and mixed CRLF
+# files make every edit look like a whole-file rewrite.
+* text=auto
+*.go text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf

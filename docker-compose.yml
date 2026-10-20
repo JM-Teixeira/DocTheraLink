@@ -1,144 +1,106 @@
+# Klyniva — local stack
+#
+#   cp .env.example .env        # then edit secrets
+#   docker compose up -d --build
+#
+# App:     http://localhost:4000   (nginx serves the SPA and proxies /api/)
+# API:     http://localhost:9000   (Swagger at /swagger/index.html when enabled)
+# Adminer: docker compose --profile tools up -d  →  http://localhost:8080
+#
+# Database/Redis ports bind to 127.0.0.1 only, so they are not exposed on the LAN.
+
+name: klyniva
+
 services:
-  # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
-    container_name: care-postgres
+    image: postgres:18-alpine
     environment:
-      POSTGRES_DB: care
-      POSTGRES_USER: care
-      POSTGRES_PASSWORD: care
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: ${DB_NAME:-klyniva}
+      POSTGRES_USER: ${DB_USER:-klyniva}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./be/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - care-network
+      # PostgreSQL 18 images keep data under /var/lib/postgresql/<major>/.
+      # New volume name so an old postgres:15 volume is left untouched.
+      - postgres18_data:/var/lib/postgresql
+      - ./be/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U care -d care"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
-  # Redis (optional, for caching)
-  redis:
-    image: redis:7-alpine
-    container_name: care-redis
+  backend:
+    build:
+      context: ./be
+    environment:
+      PORT: 9000
+      GIN_MODE: ${GIN_MODE:-debug}
+      DEBUG: ${DEBUG:-false}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-true}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-klyniva}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-klyniva}
+      DB_SSLMODE: disable
+      DB_TIMEZONE: UTC
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_EXPIRY: ${JWT_EXPIRY:-1h}
+      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-168h}
+      SEED_DEMO_USERS: ${SEED_DEMO_USERS:-true}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      - "6379:6379"
+      - "9000:9000"
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./fe
+    environment:
+      # Browser-facing URL of the API; nginx in this container proxies /api/ to the backend.
+      REACT_CARE_API_URL: ${PUBLIC_URL:-http://localhost:4000}
+      BACKEND_UPSTREAM: backend:9000
+    ports:
+      - "4000:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Not used by the backend yet; reserved for caching/rate limiting (see TODO.md).
+  redis:
+    image: redis:8-alpine
+    profiles: ["cache"]
+    ports:
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
-    networks:
-      - care-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # CARE Backend API
-  backend:
-    build:
-      context: ./be
-      dockerfile: Dockerfile
-    container_name: care-backend
-    environment:
-      # Server
-      PORT: 9000
-      HOST: 0.0.0.0
-      GIN_MODE: debug
-      
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: care
-      DB_PASSWORD: care
-      DB_NAME: care
-      DB_SSLMODE: disable
-      DB_TIMEZONE: UTC
-      
-      # JWT
-      JWT_SECRET: your-super-secret-jwt-key-for-development
-      JWT_EXPIRY: 24h
-      JWT_REFRESH_EXPIRY: 168h
-      
-      # CORS
-      CORS_ALLOWED_ORIGINS: http://localhost:4000,http://frontend:80
-      
-      # Logging
-      LOG_LEVEL: debug
-      LOG_FORMAT: text
-      
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      
-      # Development
-      DEBUG: true
-      ENABLE_SWAGGER: true
-    ports:
-      - "9000:9000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - care-network
-    volumes:
-      - backend_uploads:/app/uploads
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Klyniva Frontend
-  frontend:
-    build:
-      context: ./fe
-      dockerfile: Dockerfile
-    container_name: klyniva-frontend
-    environment:
-      REACT_CARE_API_URL: http://localhost:4000
-      REACT_CUSTOM_DESCRIPTION: Klyniva Healthcare Management System
-      REACT_APP_TITLE: Klyniva
-      REACT_ALLOWED_LOCALES: en,pt
-    ports:
-      - "4000:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - care-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Adminer (Database management UI)
   adminer:
-    image: adminer:latest
-    container_name: care-adminer
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-    networks:
-      - care-network
+    image: adminer:5
+    profiles: ["tools"]
     environment:
       ADMINER_DEFAULT_SERVER: postgres
-    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - postgres
 
 volumes:
-  postgres_data:
+  postgres18_data:
   redis_data:
   backend_uploads:
-
-networks:
-  care-network:
-    driver: bridge

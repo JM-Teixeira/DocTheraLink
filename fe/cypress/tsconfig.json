@@ -12,7 +12,8 @@
       "es2019",
       "es2020"
     ],
-    "typeRoots": ["./support"],
+    "types": ["cypress"],
+    "typeRoots": ["./support", "../node_modules/@types"],
     "resolveJsonModule": true
   },
   "include": ["**/*.cy.ts", "support/commands.ts", "**/*.ts"]

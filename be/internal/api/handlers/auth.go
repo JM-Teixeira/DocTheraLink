@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"care-backend/internal/auth"
-	"care-backend/internal/config"
-	"care-backend/internal/database"
-	"care-backend/internal/models"
+	"klyniva/internal/auth"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
+	"klyniva/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -123,11 +123,31 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	tokens, err := h.jwtManager.RefreshToken(req.Refresh)
+	claims, err := h.jwtManager.ValidateRefreshToken(req.Refresh)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error:   "unauthorized",
 			Message: err.Error(),
+		})
+		return
+	}
+
+	// Re-load the user so deactivated accounts and role changes take effect
+	// on refresh instead of living on for the whole refresh-token lifetime.
+	var user models.User
+	if err := database.GetDB().First(&user, claims.UserID).Error; err != nil || !user.IsActive {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Account is not active",
+		})
+		return
+	}
+
+	tokens, err := h.jwtManager.GenerateTokenPair(&user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to generate tokens",
 		})
 		return
 	}

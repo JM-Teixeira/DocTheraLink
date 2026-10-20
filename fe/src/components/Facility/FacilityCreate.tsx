@@ -59,16 +59,13 @@ interface FacilityProps {
 }
 
 type FacilityForm = {
-  facility_type?: string;
+  facility_type?: number;
   name: string;
   state: number;
   district: number;
-  local_body: number;
   features: number[];
-  ward: number;
   kasp_empanelled: string;
   address: string;
-  phone_number: string;
   latitude: string;
   longitude: string;
   pincode: string;
@@ -79,12 +76,9 @@ const initForm: FacilityForm = {
   name: "",
   state: 0,
   district: 0,
-  local_body: 0,
-  ward: 0,
   kasp_empanelled: "false",
   features: [],
   address: "",
-  phone_number: "",
   latitude: "",
   longitude: "",
   pincode: "",
@@ -113,6 +107,19 @@ const facilityCreateReducer = (state = initialState, action: FormAction) => {
   }
 };
 
+/**
+ * Safely converts a string coordinate value to a number or undefined.
+ * @param value - The string value to convert
+ * @returns number if valid, undefined if empty or invalid
+ */
+const convertCoordinate = (value: string): number | undefined => {
+  if (!value || value.trim() === '') {
+    return undefined;
+  }
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? undefined : parsed;
+};
+
 export const FacilityCreate = (props: FacilityProps) => {
   const { t } = useTranslation();
   const { facilityId } = props;
@@ -126,7 +133,6 @@ export const FacilityCreate = (props: FacilityProps) => {
   const [showAutoFilledPincode, setShowAutoFilledPincode] = useState(false);
   const [stateId, setStateId] = useState<number>();
   const [districtId, setDistrictId] = useState<number>();
-  const [localBodyId, setLocalBodyId] = useState<number>();
   const { goBack } = useAppHistory();
   const headerText = !facilityId ? "Create Facility" : "Update Facility";
   const buttonText = !facilityId ? "Save Facility" : "Update Facility";
@@ -157,23 +163,7 @@ export const FacilityCreate = (props: FacilityProps) => {
     prefetch: !!stateId,
   });
 
-  const { data: localbodyData, loading: isLocalbodyLoading } =
-    useTanStackQueryInstead(routes.getLocalbodyByDistrict, {
-      pathParams: {
-        id: String(districtId),
-      },
-      prefetch: !!districtId,
-    });
 
-  const { data: wardData, loading: isWardLoading } = useTanStackQueryInstead(
-    routes.getWardByLocalBody,
-    {
-      pathParams: {
-        id: String(localBodyId),
-      },
-      prefetch: !!localBodyId,
-    },
-  );
 
   const facilityQuery = useTanStackQueryInstead(routes.getPermittedFacility, {
     pathParams: {
@@ -185,30 +175,22 @@ export const FacilityCreate = (props: FacilityProps) => {
         setIsLoading(true);
         if (res?.ok && data) {
           const formData = {
-            facility_type: data.facility_type ? data.facility_type : "",
+            facility_type: (typeof data.facility_type === 'number'
+              ? data.facility_type
+              : FACILITY_TYPES.find(ft => ft.text === String(data.facility_type))?.id) as number | undefined,
             name: data.name ? data.name : "",
             state: data.state ? data.state : 0,
             district: data.district ? data.district : 0,
-            local_body: data.local_body ? data.local_body : 0,
             features: data.features || [],
-            ward: data.ward_object ? data.ward_object.id : 0,
             kasp_empanelled: "",
             address: data.address ? data.address : "",
             pincode: data.pincode ? data.pincode : "",
-            phone_number: data.phone_number
-              ? data.phone_number.length == 10
-                ? "+91" + data.phone_number
-                : data.phone_number
-              : "",
-            latitude: data.latitude ? parseFloat(data.latitude).toFixed(7) : "",
-            longitude: data.longitude
-              ? parseFloat(data.longitude).toFixed(7)
-              : "",
+            latitude: data.latitude ? String(data.latitude) : "",
+            longitude: data.longitude ? String(data.longitude) : "",
           };
           dispatch({ type: "set_form", form: formData });
           setStateId(data.state);
           setDistrictId(data.district);
-          setLocalBodyId(data.local_body);
         } else {
           navigate(`/facility/${facilityId}`);
         }
@@ -243,46 +225,9 @@ export const FacilityCreate = (props: FacilityProps) => {
 
   const handlePincodeChange = async (e: FieldChangeEvent<string>) => {
     handleChange(e);
-
-    if (!validatePincode(e.value)) return;
-
-    const pincodeDetails = await getPincodeDetails(
-      e.value,
-      careConfig.govDataApiKey,
-    );
-    if (!pincodeDetails) return;
-
-    const matchedState = (stateData ? stateData.results : []).find((state) => {
-      return includesIgnoreCase(state.name, pincodeDetails.statename);
-    });
-    if (!matchedState) return;
-
-    const newDistrictDataResult: RequestResult<DistrictModel[]> =
-      await districtFetch({ pathParams: { id: String(matchedState.id) } });
-    const fetchedDistricts: DistrictModel[] = newDistrictDataResult.data || [];
-
-    if (!fetchedDistricts) return;
-
-    const matchedDistrict = fetchedDistricts.find((district) => {
-      return includesIgnoreCase(district.name, pincodeDetails.districtname);
-    });
-    if (!matchedDistrict) return;
-
-    dispatch({
-      type: "set_form",
-      form: {
-        ...state.form,
-        state: matchedState.id,
-        district: matchedDistrict.id,
-        pincode: e.value,
-      },
-    });
-
-    setDistrictId(matchedDistrict.id);
-    setShowAutoFilledPincode(true);
-    setTimeout(() => {
-      setShowAutoFilledPincode(false);
-    }, 2000);
+    // Note: Auto-fill from postal code is disabled for Portugal
+    // Portugal uses XXXX-XXX format but doesn't have a public API for postal code lookup
+    // Users must manually select state and district
   };
 
   const handleSelectCurrentLocation = (
@@ -320,8 +265,6 @@ export const FacilityCreate = (props: FacilityProps) => {
 
         case "district":
         case "state":
-        case "local_body":
-        case "ward":
           if (!Number(state.form[field])) {
             errors[field] = t("required");
             invalidForm = true;
@@ -331,18 +274,6 @@ export const FacilityCreate = (props: FacilityProps) => {
         case "pincode":
           if (!validatePincode(state.form[field])) {
             errors[field] = t("invalid_pincode");
-            invalidForm = true;
-          }
-          return;
-        case "phone_number":
-          // eslint-disable-next-line no-case-declarations
-          const phoneNumber = state.form[field];
-          if (
-            !phoneNumber ||
-            !PhoneNumberValidator()(phoneNumber) === undefined ||
-            !phonePreg(phoneNumber)
-          ) {
-            errors[field] = t("invalid_phone_number");
             invalidForm = true;
           }
           return;
@@ -376,31 +307,35 @@ export const FacilityCreate = (props: FacilityProps) => {
     const validated = validateForm();
     if (validated) {
       setIsLoading(true);
+      
+      // Ensure facility_type is a number, not a string (runtime safety check)
+      const rawFacilityType = state.form.facility_type as any;
+      const facilityType: number | undefined = typeof rawFacilityType === 'string'
+        ? FACILITY_TYPES.find(ft => ft.text === rawFacilityType)?.id
+        : rawFacilityType;
+      
       const data: FacilityRequest = {
-        facility_type: state.form.facility_type,
+        facility_type: facilityType,
         name: state.form.name,
         district: state.form.district,
         state: state.form.state,
         address: state.form.address,
-        local_body: state.form.local_body,
         features: state.form.features,
-        ward: state.form.ward,
         pincode: state.form.pincode,
-        latitude: state.form.latitude,
-        longitude: state.form.longitude,
-        phone_number: parsePhoneNumber(state.form.phone_number),
+        latitude: convertCoordinate(state.form.latitude),
+        longitude: convertCoordinate(state.form.longitude),
       };
 
       const { res, data: requestData } = facilityId
         ? await request(routes.updateFacility, {
-            body: data,
-            pathParams: {
-              id: facilityId,
-            },
-          })
+          body: data,
+          pathParams: {
+            id: facilityId,
+          },
+        })
         : await request(routes.createFacility, {
-            body: data,
-          });
+          body: data,
+        });
 
       if (res?.ok && requestData) {
         const id = requestData.id;
@@ -450,7 +385,6 @@ export const FacilityCreate = (props: FacilityProps) => {
                 dispatch({ type: "set_state", state: newState });
                 setStateId(newState.form.state);
                 setDistrictId(newState.form.district);
-                setLocalBodyId(newState.form.local_body);
               }}
               formData={state.form}
             />
@@ -460,7 +394,7 @@ export const FacilityCreate = (props: FacilityProps) => {
                 required
                 options={FACILITY_TYPES}
                 optionLabel={(o) => o.text}
-                optionValue={(o) => o.text}
+                optionValue={(o) => o.id}
               />
               <TextFormField
                 {...field("name")}
@@ -519,45 +453,7 @@ export const FacilityCreate = (props: FacilityProps) => {
                   setDistrictId(event.value);
                 }}
               />
-              <SelectFormField
-                {...field("local_body")}
-                required
-                className={isLocalbodyLoading ? "animate-pulse" : ""}
-                disabled={isLocalbodyLoading}
-                placeholder="Choose Local Body"
-                options={localbodyData ? localbodyData : []}
-                optionLabel={(o) => o.name}
-                optionValue={(o) => o.id}
-                onChange={(event) => {
-                  handleChange(event);
-                  if (!event) return;
-                  setLocalBodyId(event.value);
-                }}
-              />
-              <SelectFormField
-                {...field("ward")}
-                required
-                className={isWardLoading ? "animate-pulse" : ""}
-                disabled={isWardLoading}
-                placeholder="Choose Ward"
-                options={(wardData ? wardData.results : [])
-                  .sort(compareBy("number"))
-                  .map((e) => {
-                    return {
-                      id: e.id,
-                      name: e.number + ": " + e.name,
-                    };
-                  })}
-                optionLabel={(o) => o.name}
-                optionValue={(o) => o.id}
-              />
               <TextAreaFormField {...field("address")} required />
-              <PhoneNumberFormField
-                {...field("phone_number")}
-                label={t("emergency_contact_number")}
-                required
-                types={["mobile", "landline"]}
-              />
               {facilityId && (
                 <div className="py-4 md:col-span-2">
                   <h4 className="mb-4">{t("spokes")}</h4>

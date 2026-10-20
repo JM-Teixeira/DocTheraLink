@@ -34,7 +34,7 @@ export default function FacilityBlock(props: {
       <div>
         <b className="font-semibold">{facility.name}</b>
         <p className="text-sm">
-          {facility.address} {facility.local_body_object?.name}
+          {facility.address} {facility.district_object?.name}
         </p>
       </div>
     </Element>

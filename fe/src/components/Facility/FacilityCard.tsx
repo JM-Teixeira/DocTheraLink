@@ -15,7 +15,7 @@ import DialogModal from "@/components/Common/Dialog";
 import { FacilityModel } from "@/components/Facility/models";
 import TextAreaFormField from "@/components/Form/FormFields/TextAreaFormField";
 
-import { FACILITY_FEATURE_TYPES } from "@/common/constants";
+import { FACILITY_FEATURE_TYPES, FACILITY_TYPES } from "@/common/constants";
 
 import * as Notification from "@/Utils/Notifications";
 import routes from "@/Utils/request/api";
@@ -143,7 +143,11 @@ export const FacilityCard = (props: {
 
                     <div className="mt-2 flex flex-wrap gap-1">
                       <Chip
-                        text={facility.facility_type || ""}
+                        text={
+                          typeof facility.facility_type === 'number'
+                            ? FACILITY_TYPES.find(ft => ft.id === facility.facility_type)?.text || ""
+                            : facility.facility_type || ""
+                        }
                         variant="custom"
                         className="bg-blue-100 text-blue-900"
                         hideBorder
@@ -176,19 +180,10 @@ export const FacilityCard = (props: {
                     <div className="mt-2 flex justify-between">
                       <div className="flex flex-col">
                         <div className="font-semibold">
-                          {facility.local_body_object?.name}
+                          {facility.district_object?.name}
                         </div>
                       </div>
                     </div>
-                    <a
-                      href={`tel:${facility.phone_number}`}
-                      className="text-sm font-semibold tracking-wider"
-                    >
-                      {formatPhoneNumber(
-                        parsePhoneNumber(facility.phone_number as string) ??
-                          "-",
-                      )}
-                    </a>
                   </div>
                 </div>
               </div>

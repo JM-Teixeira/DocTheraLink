@@ -1,5 +1,0 @@
-{
-  "devDependencies": {
-    "@julr/vite-plugin-validate-env": "^2.2.0"
-  }
-}

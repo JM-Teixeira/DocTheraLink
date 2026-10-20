@@ -23,6 +23,7 @@ import AssetRoutes from "@/Routers/routes/AssetRoutes";
 import ConsultationRoutes from "@/Routers/routes/ConsultationRoutes";
 import FacilityRoutes from "@/Routers/routes/FacilityRoutes";
 import PatientRoutes from "@/Routers/routes/PatientRoutes";
+import ReferralRoutes from "@/Routers/routes/ReferralRoutes";
 import ResourceRoutes from "@/Routers/routes/ResourceRoutes";
 import ShiftingRoutes from "@/Routers/routes/ShiftingRoutes";
 import UserRoutes from "@/Routers/routes/UserRoutes";
@@ -49,6 +50,7 @@ const Routes: AppRoutes = {
   ...ConsultationRoutes,
   ...FacilityRoutes,
   ...PatientRoutes,
+  ...ReferralRoutes,
   ...ResourceRoutes,
   ...ShiftingRoutes,
   ...UserRoutes,

@@ -38,11 +38,8 @@ export const FacilityList = () => {
   });
 
   useEffect(() => {
-    if (!qParams.state && (qParams.district || qParams.local_body)) {
-      advancedFilter.removeFilters(["district", "local_body"]);
-    }
-    if (!qParams.district && qParams.local_body) {
-      advancedFilter.removeFilters(["local_body"]);
+    if (!qParams.state && qParams.district) {
+      advancedFilter.removeFilters(["district"]);
     }
   }, [advancedFilter, qParams]);
 
@@ -60,7 +57,6 @@ export const FacilityList = () => {
         search_text: qParams.search || undefined,
         state: qParams.state,
         district: qParams.district,
-        local_body: qParams.local_body,
         facility_type: qParams.facility_type,
         kasp_empanelled: qParams.kasp_empanelled,
       },
@@ -81,12 +77,7 @@ export const FacilityList = () => {
     prefetch: qParams.district !== undefined,
   });
 
-  const { data: localBodyData } = useTanStackQueryInstead(routes.getLocalBody, {
-    pathParams: {
-      id: qParams.local_body,
-    },
-    prefetch: qParams.local_body !== undefined,
-  });
+
 
   const findFacilityTypeById = (id: number) => {
     const facility_type = FACILITY_TYPES.find((type) => type.id == id);
@@ -97,7 +88,6 @@ export const FacilityList = () => {
     return (
       qParams.state ||
       qParams.district ||
-      qParams.local_body ||
       qParams.facility_type ||
       qParams.kasp_empanelled ||
       qParams?.search
@@ -210,11 +200,6 @@ export const FacilityList = () => {
             "District",
             "district",
             qParams.district && districtData ? districtData.name : "",
-          ),
-          value(
-            "Local Body",
-            "local_body",
-            qParams.local_body && localBodyData ? localBodyData.name : "",
           ),
           value(
             "Facility type",

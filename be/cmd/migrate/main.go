@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"log"
+	"time"
 
-	"care-backend/internal/config"
-	"care-backend/internal/database"
+	"klyniva/internal/config"
+	"klyniva/internal/database"
 )
 
 func main() {
@@ -18,7 +19,7 @@ func main() {
 	cfg := config.Load()
 
 	// Connect to database
-	if err := database.Connect(cfg); err != nil {
+	if err := database.ConnectWithRetry(cfg, 30, 2*time.Second); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Close()
@@ -32,7 +33,7 @@ func main() {
 
 	// Run seeding if requested
 	if *seed {
-		if err := database.SeedData(); err != nil {
+		if err := database.SeedData(cfg.Seed.DemoUsers); err != nil {
 			log.Fatalf("Failed to seed database: %v", err)
 		}
 		log.Println("Database seeding completed successfully")
