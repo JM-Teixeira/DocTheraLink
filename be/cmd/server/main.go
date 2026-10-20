@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -60,6 +61,15 @@ import (
 // main is the entry point for the DocTheraLink backend server.
 // It initializes all components and starts the HTTP server with graceful shutdown.
 func main() {
+	// "server -healthcheck" probes the local /health endpoint and exits 0/1.
+	// The runtime image is distroless (no shell or curl), so Docker's
+	// HEALTHCHECK calls the binary itself.
+	healthcheck := flag.Bool("healthcheck", false, "probe the local /health endpoint and exit")
+	flag.Parse()
+	if *healthcheck {
+		os.Exit(probeHealth())
+	}
+
 	// Load configuration from environment variables and .env file
 	// This allows the same binary to work in different environments
 	cfg := config.Load()
@@ -178,4 +188,22 @@ func main() {
 	}
 
 	log.Println("Server exited")
+}
+
+// probeHealth returns 0 when GET /health on the local port answers 200.
+func probeHealth() int {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "9000"
+	}
+	client := http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/health")
+	if err != nil {
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }

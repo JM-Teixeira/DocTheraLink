@@ -42,7 +42,9 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: postgres:15-alpine
+        # Same major version as docker-compose and the integration tests.
+        # A major upgrade needs pg_upgrade/dump-restore of an existing volume.
+        image: postgres:18-alpine
         ports:
         - containerPort: 5432
           name: postgres

@@ -148,9 +148,10 @@ spec:
           timeoutSeconds: 5
           failureThreshold: 3
         
+        # /ready pings the database; /health (liveness) only checks the process
         readinessProbe:
           httpGet:
-            path: /health
+            path: /ready
             port: 9000
           initialDelaySeconds: 5
           periodSeconds: 5
@@ -160,7 +161,7 @@ spec:
         # Security context
         securityContext:
           runAsNonRoot: true
-          runAsUser: 1000
+          runAsUser: 65532 # distroless "nonroot" user baked into the image
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           capabilities:
@@ -181,9 +182,9 @@ spec:
       - name: tmp
         emptyDir: {}
       
-      # Security context for pod
+      # Security context for pod (group-writable uploads volume)
       securityContext:
-        fsGroup: 1000
+        fsGroup: 65532
 
 ---
 # Persistent Volume Claim for file uploads

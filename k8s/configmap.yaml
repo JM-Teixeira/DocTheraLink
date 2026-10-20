@@ -14,11 +14,14 @@ data:
   GIN_MODE: "release"
   LOG_LEVEL: "info"
   LOG_FORMAT: "json"
-  DB_SSLMODE: "require"
+  # The in-cluster postgres.yaml has no TLS; use "require" (or "verify-full")
+  # when pointing DB_HOST at a managed database.
+  DB_SSLMODE: "disable"
   DB_TIMEZONE: "UTC"
-  JWT_EXPIRY: "24h"
+  JWT_EXPIRY: "1h"
   JWT_REFRESH_EXPIRY: "168h"
   ENABLE_SWAGGER: "false"
+  SEED_DEMO_USERS: "false"
   
   # Frontend configuration
   REACT_CUSTOM_DESCRIPTION: "DocTheraLink Healthcare Management System"

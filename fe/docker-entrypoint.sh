@@ -1,14 +1,16 @@
 #!/bin/sh
-# Docker entrypoint script for DocTheraLink Frontend
-# Handles environment variable substitution in runtime configuration
+# Docker entrypoint for the DocTheraLink frontend.
+# Writes the runtime configuration (/config.js) and renders nginx.conf so one
+# image works in every environment.
 
 set -e
 
-# Default values
-REACT_CARE_API_URL=${REACT_CARE_API_URL:-"http://localhost:9000"}
+# Public URL the browser uses to reach the API. Behind the bundled nginx proxy
+# this is the frontend's own origin (nginx forwards /api/ to the backend).
+REACT_CARE_API_URL=${REACT_CARE_API_URL:-"http://localhost:4000"}
 
-# Create runtime configuration file
-cat > /usr/share/nginx/html/config.js << EOF
+# Served at /config.js by nginx (see "location = /config.js" in nginx.conf)
+cat > /tmp/config.js << EOF
 window.ENV = {
   REACT_CARE_API_URL: "${REACT_CARE_API_URL}",
   REACT_CUSTOM_DESCRIPTION: "${REACT_CUSTOM_DESCRIPTION:-}",
@@ -24,9 +26,8 @@ window.ENV = {
 };
 EOF
 
-# Substitute environment variables in nginx config
-envsubst '${REACT_CARE_API_URL}' < /etc/nginx/nginx.conf > /tmp/nginx.conf
-mv /tmp/nginx.conf /etc/nginx/nginx.conf
+# Only substitute our variable; nginx's own $variables must stay untouched.
+export BACKEND_UPSTREAM=${BACKEND_UPSTREAM:-"backend:9000"}
+envsubst '${BACKEND_UPSTREAM}' < /etc/nginx/nginx.conf.template > /tmp/nginx.conf
 
-# Execute the main command
 exec "$@"

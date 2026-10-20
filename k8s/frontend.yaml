@@ -30,11 +30,14 @@ spec:
       - name: frontend
         image: doctheralink/frontend:latest # Replace with your registry
         ports:
-        - containerPort: 80
+        - containerPort: 8080 # non-root nginx listens on 8080
           name: http
         env:
         - name: REACT_CARE_API_URL
           value: "https://api.doctheralink.com" # Adjust for your domain
+        # Where the bundled nginx proxies /api/ (the backend Service)
+        - name: BACKEND_UPSTREAM
+          value: "backend-service:9000"
         - name: REACT_CUSTOM_DESCRIPTION
           valueFrom:
             configMapKeyRef:
@@ -52,22 +55,23 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 80
+            port: http
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
-        
+
         readinessProbe:
           httpGet:
             path: /health
-            port: 80
+            port: http
           initialDelaySeconds: 5
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
         
-        # Security context
+        # Security context: nginx runs as uid 101 and writes only to /tmp
+        # (rendered nginx.conf, config.js, pid and temp files)
         securityContext:
           runAsNonRoot: true
           runAsUser: 101 # nginx user
@@ -76,25 +80,12 @@ spec:
           capabilities:
             drop:
             - ALL
-            add:
-            - CHOWN
-            - SETGID
-            - SETUID
-        
-        # Volume mounts for nginx
+
         volumeMounts:
-        - name: nginx-cache
-          mountPath: /var/cache/nginx
-        - name: nginx-run
-          mountPath: /var/run
         - name: tmp
           mountPath: /tmp
-      
+
       volumes:
-      - name: nginx-cache
-        emptyDir: {}
-      - name: nginx-run
-        emptyDir: {}
       - name: tmp
         emptyDir: {}
 
@@ -112,7 +103,7 @@ spec:
   type: ClusterIP
   ports:
   - port: 80
-    targetPort: 80
+    targetPort: http
     name: http
   selector:
     app: doctheralink
