@@ -1,0 +1,102 @@
+/**
+ * Types for the doctor → physiotherapist referral workflow.
+ * Mirrors be/internal/modules/referral/model.go.
+ */
+
+export const REFERRAL_STATUSES = [
+  "pending",
+  "accepted",
+  "in_progress",
+  "completed",
+  "declined",
+  "cancelled",
+] as const;
+
+export type ReferralStatus = (typeof REFERRAL_STATUSES)[number];
+
+export type ReferralPriority = "routine" | "urgent";
+
+export type NoteKind = "progress" | "question" | "reply" | "system";
+
+/** Minimal user view embedded in referral responses. */
+export interface UserSummary {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  user_type: string;
+}
+
+/** Minimal patient view embedded in referral responses. */
+export interface PatientSummary {
+  id: string;
+  name: string;
+  date_of_birth?: string | null;
+  phone_number?: string | null;
+}
+
+export interface Referral {
+  id: string;
+  patient_id: string;
+  facility_id?: string | null;
+  doctor_id: number;
+  therapist_id?: number | null;
+  diagnosis: string;
+  icd_code?: string | null;
+  reason: string;
+  precautions?: string | null;
+  goals?: string | null;
+  recommended_sessions?: number | null;
+  priority: ReferralPriority;
+  status: ReferralStatus;
+  decline_reason?: string | null;
+  cancel_reason?: string | null;
+  outcome_summary?: string | null;
+  accepted_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  patient?: PatientSummary;
+  doctor?: UserSummary;
+  therapist?: UserSummary | null;
+  created_date: string;
+  modified_date: string;
+}
+
+export interface ReferralNote {
+  id: string;
+  referral_id: string;
+  author_id: number;
+  kind: NoteKind;
+  body: string;
+  author?: UserSummary;
+  created_date: string;
+}
+
+export interface CreateReferralRequest {
+  patient_id: string;
+  therapist_id?: number;
+  diagnosis: string;
+  icd_code?: string;
+  reason: string;
+  precautions?: string;
+  goals?: string;
+  recommended_sessions?: number;
+  priority: ReferralPriority;
+}
+
+export interface ReasonRequest {
+  reason: string;
+}
+
+export interface NoteRequest {
+  kind?: Exclude<NoteKind, "system">;
+  body: string;
+}
+
+/** Actions a user can take on a referral (see referralUtils.allowedActions). */
+export type ReferralAction =
+  | "accept"
+  | "decline"
+  | "start"
+  | "complete"
+  | "cancel";

@@ -3,14 +3,14 @@
  * Feature: Centralized Patient Creation
  * Task 2.2: Write property test for data model validation
  */
-
-import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
+import { describe, expect, it } from "vitest";
+
 import { PatientModel } from "../models";
 
 /**
  * **Validates: Requirements 2.1, 3.3**
- * 
+ *
  * Property 1: Type safety - All patient data fields maintain correct types
  * Property 2: Required fields validation - Required fields cannot be empty
  */
@@ -46,7 +46,10 @@ const emailArbitrary = fc.emailAddress();
 /**
  * Generator for valid dates in ISO format
  */
-const dateArbitrary = fc.date().map((d) => d.toISOString());
+// noInvalidDate: fast-check v4 may otherwise yield Date(NaN), and toISOString() throws on it
+const dateArbitrary = fc
+  .date({ noInvalidDate: true })
+  .map((d) => d.toISOString());
 
 /**
  * Generator for valid year of birth (1900-2024)
@@ -72,7 +75,9 @@ const patientModelArbitrary = fc.record({
   phone_number: phoneNumberArbitrary,
   gender: genderArbitrary,
   year_of_birth: yearOfBirthArbitrary,
-  address: fc.string({ minLength: 1, maxLength: 500 }).filter((s) => s.trim().length > 0),
+  address: fc
+    .string({ minLength: 1, maxLength: 500 })
+    .filter((s) => s.trim().length > 0),
   pincode: pincodeArbitrary,
   facility: fc.string({ minLength: 1 }).filter((s) => s.trim().length > 0),
 });
@@ -86,14 +91,19 @@ const patientModelWithOptionalsArbitrary = fc.record({
   phone_number: phoneNumberArbitrary,
   gender: genderArbitrary,
   year_of_birth: yearOfBirthArbitrary,
-  address: fc.string({ minLength: 1, maxLength: 500 }).filter((s) => s.trim().length > 0),
+  address: fc
+    .string({ minLength: 1, maxLength: 500 })
+    .filter((s) => s.trim().length > 0),
   pincode: pincodeArbitrary,
   facility: fc.string({ minLength: 1 }).filter((s) => s.trim().length > 0),
   emergency_phone_number: fc.option(phoneNumberArbitrary, { nil: undefined }),
   email: fc.option(emailArbitrary, { nil: undefined }),
   date_of_birth: fc.option(dateArbitrary, { nil: undefined }),
   allergies: fc.option(fc.string(), { nil: undefined }),
-  blood_group: fc.option(fc.constantFrom("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"), { nil: undefined }),
+  blood_group: fc.option(
+    fc.constantFrom("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"),
+    { nil: undefined },
+  ),
   is_vaccinated: fc.option(fc.boolean(), { nil: undefined }),
 });
 
@@ -109,7 +119,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(typeof patient.name).toBe("string");
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -119,7 +129,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(typeof patient.phone_number).toBe("string");
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -131,7 +141,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(patient.gender).toBeLessThanOrEqual(3);
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -143,7 +153,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(patient.year_of_birth).toBeLessThanOrEqual(2024);
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -153,7 +163,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(typeof patient.address).toBe("string");
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -165,7 +175,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(patient.pincode).toBeLessThanOrEqual(999999);
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -174,11 +184,12 @@ describe("Patient Data Model Validation - Property Tests", () => {
         fc.property(patientModelArbitrary, (patient) => {
           expect(typeof patient.id).toBe("string");
           // UUID format validation
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const uuidRegex =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
           expect(patient.id).toMatch(uuidRegex);
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -190,14 +201,23 @@ describe("Patient Data Model Validation - Property Tests", () => {
           }
           if (patient.blood_group !== undefined) {
             expect(typeof patient.blood_group).toBe("string");
-            expect(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).toContain(patient.blood_group);
+            expect([
+              "A+",
+              "A-",
+              "B+",
+              "B-",
+              "AB+",
+              "AB-",
+              "O+",
+              "O-",
+            ]).toContain(patient.blood_group);
           }
           if (patient.is_vaccinated !== undefined) {
             expect(typeof patient.is_vaccinated).toBe("boolean");
           }
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -233,7 +253,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(patient.name.trim().length).toBeGreaterThan(0);
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -245,7 +265,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(patient.phone_number.length).toBeLessThanOrEqual(15);
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -257,7 +277,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect([1, 2, 3]).toContain(patient.gender);
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -268,7 +288,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(patient.facility.length).toBeGreaterThan(0);
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -280,7 +300,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
           expect(patient.address.length).toBeLessThanOrEqual(500);
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -309,7 +329,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
 
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -334,7 +354,7 @@ describe("Patient Data Model Validation - Property Tests", () => {
 
           return true;
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
