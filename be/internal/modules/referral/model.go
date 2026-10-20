@@ -183,8 +183,10 @@ type ListFilter struct {
 	PatientID   string `form:"patient"`
 	DoctorID    uint   `form:"-"`
 	TherapistID uint   `form:"-"`
-	// InboxForTherapist also includes unassigned pending referrals.
-	InboxForTherapist bool `form:"-"`
-	Limit             int  `form:"limit"`
-	Offset            int  `form:"offset"`
+	// InboxForTherapist also includes unassigned pending referrals
+	// (restricted to ClinicID when set).
+	InboxForTherapist bool    `form:"-"`
+	ClinicID          *string `form:"-"`
+	Limit             int     `form:"limit"`
+	Offset            int     `form:"offset"`
 }

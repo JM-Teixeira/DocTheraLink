@@ -1,6 +1,8 @@
 package patient
 
 import (
+	"klyniva/internal/clinic"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -8,7 +10,7 @@ import (
 // RegisterRoutes wires the module's endpoints onto an existing /patient group.
 // The group must already run auth.AuthMiddleware.
 func RegisterRoutes(patients *gin.RouterGroup, db *gorm.DB) {
-	h := NewHandler(NewService(NewGormRepository(db), nil))
+	h := NewHandler(NewService(NewGormRepository(db), clinic.NewGormResolver(db), nil))
 
 	patients.GET("/", h.List)
 	patients.POST("/", h.Create)

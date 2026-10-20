@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"klyniva/internal/auth"
+	"klyniva/internal/clinic"
 	"klyniva/internal/models"
 )
 
@@ -41,16 +42,17 @@ const (
 
 // Service holds the referral business rules.
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo    Repository
+	clinics clinic.Resolver
+	now     func() time.Time
 }
 
 // NewService builds a Service. now may be nil to use time.Now.
-func NewService(repo Repository, now func() time.Time) *Service {
+func NewService(repo Repository, clinics clinic.Resolver, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repo: repo, now: now}
+	return &Service{repo: repo, clinics: clinics, now: now}
 }
 
 // Create opens a new referral. Only doctors and admins can refer patients.
@@ -70,8 +72,20 @@ func (s *Service) Create(ctx context.Context, actor Actor, req CreateRequest) (*
 		return nil, &ValidationError{"patient does not exist"}
 	}
 
-	// A doctor may address the referral to a specific therapist; otherwise
-	// it lands in every therapist's inbox until someone accepts it.
+	// The referral belongs to the referring doctor's clinic.
+	home, err := s.clinics.HomeClinic(ctx, actor.ID)
+	if err != nil {
+		return nil, err
+	}
+	facility := req.FacilityID
+	if facility == nil {
+		facility = home
+	} else if !actor.isAdmin() && !clinic.SameClinic(facility, home) {
+		return nil, &ValidationError{"facility_id must be your own clinic"}
+	}
+
+	// A doctor may address the referral to a specific therapist of the same
+	// clinic; otherwise it lands in that clinic's therapist inbox.
 	if req.TherapistID != nil {
 		role, active, err := s.repo.UserRole(ctx, *req.TherapistID)
 		if err != nil {
@@ -79,6 +93,13 @@ func (s *Service) Create(ctx context.Context, actor Actor, req CreateRequest) (*
 		}
 		if !active || models.UserRole(role) != models.RolePhysioTherapist {
 			return nil, &ValidationError{"therapist_id must be an active physiotherapist"}
+		}
+		therapistClinic, err := s.clinics.HomeClinic(ctx, *req.TherapistID)
+		if err != nil {
+			return nil, err
+		}
+		if !clinic.SameClinic(facility, therapistClinic) {
+			return nil, &ValidationError{"therapist_id must work in the referral's clinic"}
 		}
 	}
 
@@ -89,7 +110,7 @@ func (s *Service) Create(ctx context.Context, actor Actor, req CreateRequest) (*
 
 	r := &Referral{
 		PatientID:           req.PatientID,
-		FacilityID:          req.FacilityID,
+		FacilityID:          facility,
 		DoctorID:            actor.ID,
 		TherapistID:         req.TherapistID,
 		Diagnosis:           strings.TrimSpace(req.Diagnosis),
@@ -113,11 +134,21 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (*Referral, e
 	if err != nil {
 		return nil, err
 	}
-	if !canView(actor, r) {
-		// Hide existence from users who are not involved.
-		return nil, ErrNotFound
+	if isParticipant(actor, r) {
+		return r, nil
 	}
-	return r, nil
+	// Any therapist of the same clinic may see open, unassigned referrals (inbox).
+	if actor.isTherapist() && r.TherapistID == nil && r.Status == StatusPending {
+		mine, err := s.clinics.HomeClinic(ctx, actor.ID)
+		if err != nil {
+			return nil, err
+		}
+		if clinic.SameClinic(r.FacilityID, mine) {
+			return r, nil
+		}
+	}
+	// Hide existence from users who are not involved.
+	return nil, ErrNotFound
 }
 
 // List returns the referrals visible to the actor, scoped by role:
@@ -131,6 +162,11 @@ func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referr
 	case actor.isTherapist():
 		f.TherapistID = actor.ID
 		f.InboxForTherapist = true
+		mine, err := s.clinics.HomeClinic(ctx, actor.ID)
+		if err != nil {
+			return nil, 0, err
+		}
+		f.ClinicID = mine
 	default:
 		return nil, 0, ErrForbidden
 	}
@@ -286,14 +322,6 @@ func (s *Service) transition(ctx context.Context, actor Actor, id string, from S
 		return nil, err
 	}
 	return s.repo.Get(ctx, r.ID)
-}
-
-// canView: participants, admins, and any therapist for unassigned open referrals.
-func canView(a Actor, r *Referral) bool {
-	if isParticipant(a, r) {
-		return true
-	}
-	return a.isTherapist() && r.TherapistID == nil && r.Status == StatusPending
 }
 
 func isParticipant(a Actor, r *Referral) bool {

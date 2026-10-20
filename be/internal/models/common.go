@@ -100,37 +100,6 @@ type Notification struct {
 	UpdatedAt time.Time `json:"modified_date"`
 }
 
-// Asset represents medical assets/equipment
-type Asset struct {
-	ID               string     `json:"external_id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Name             string     `json:"name" gorm:"not null"`
-	AssetType        string     `json:"asset_type" gorm:"not null"`
-	AssetClass       string     `json:"asset_class"`
-	Description      *string    `json:"description"`
-	IsWorking        bool       `json:"is_working" gorm:"default:true"`
-	NotWorkingReason *string    `json:"not_working_reason"`
-	SerialNumber     *string    `json:"serial_number"`
-	WarrantyExpiry   *time.Time `json:"warranty_expiry"`
-	LastServicedOn   *time.Time `json:"last_serviced_on"`
-	QRCodeID         *string    `json:"qr_code_id"`
-	Manufacturer     *string    `json:"manufacturer"`
-	VendorName       *string    `json:"vendor_name"`
-	SupportName      *string    `json:"support_name"`
-	SupportPhone     *string    `json:"support_phone"`
-	SupportEmail     *string    `json:"support_email"`
-
-	// Foreign keys
-	FacilityID string  `json:"-"`
-	LocationID *string `json:"-"`
-
-	// Relationships
-	Facility Facility  `json:"facility" gorm:"foreignKey:FacilityID"`
-	Location *Location `json:"location" gorm:"foreignKey:LocationID"`
-
-	CreatedAt time.Time `json:"created_date"`
-	UpdatedAt time.Time `json:"modified_date"`
-}
-
 // Inventory represents facility inventory items
 type InventoryItem struct {
 	ID          uint    `json:"id" gorm:"primaryKey"`
@@ -156,39 +125,6 @@ type InventoryLog struct {
 	Facility  Facility        `json:"-" gorm:"foreignKey:FacilityID"`
 	Item      InventoryItem   `json:"item" gorm:"foreignKey:ItemID"`
 	CreatedBy UserBareMinimum `json:"created_by" gorm:"foreignKey:CreatedByID"`
-
-	CreatedAt time.Time `json:"created_date"`
-	UpdatedAt time.Time `json:"modified_date"`
-}
-
-// Shifting represents patient shifting requests
-type ShiftingRequest struct {
-	ID                          string  `json:"external_id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	PatientID                   string  `json:"-"`
-	OriginFacilityID            string  `json:"-"`
-	ShiftingApprovingFacilityID *string `json:"-"`
-	AssignedFacilityID          *string `json:"-"`
-	EmergencyShiftReason        string  `json:"emergency_shift_reason" gorm:"not null"`
-	ShiftReason                 *string `json:"shift_reason"`
-	VehiclePreference           *string `json:"vehicle_preference"`
-	PreferredVehicleChoice      *string `json:"preferred_vehicle_choice"`
-	Status                      int     `json:"status" gorm:"default:20"` // APPROVED
-	BreathlessnessLevel         *int    `json:"breathlessness_level"`
-	IsKasp                      bool    `json:"is_kasp" gorm:"default:false"`
-	IsUpShift                   bool    `json:"is_up_shift" gorm:"default:true"`
-	Comments                    *string `json:"comments"`
-	RefusingReason              *string `json:"refusing_reason"`
-	CreatedByID                 uint    `json:"-"`
-	LastEditedByID              *uint   `json:"-"`
-	AssignedToID                *uint   `json:"-"`
-
-	Patient                   Patient          `json:"patient" gorm:"foreignKey:PatientID"`
-	OriginFacility            Facility         `json:"origin_facility" gorm:"foreignKey:OriginFacilityID"`
-	ShiftingApprovingFacility *Facility        `json:"shifting_approving_facility" gorm:"foreignKey:ShiftingApprovingFacilityID"`
-	AssignedFacility          *Facility        `json:"assigned_facility" gorm:"foreignKey:AssignedFacilityID"`
-	CreatedBy                 UserBareMinimum  `json:"created_by" gorm:"foreignKey:CreatedByID"`
-	LastEditedBy              *UserBareMinimum `json:"last_edited_by" gorm:"foreignKey:LastEditedByID"`
-	AssignedTo                *User            `json:"assigned_to" gorm:"foreignKey:AssignedToID"`
 
 	CreatedAt time.Time `json:"created_date"`
 	UpdatedAt time.Time `json:"modified_date"`

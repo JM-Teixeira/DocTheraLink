@@ -33,13 +33,6 @@ const (
 	FacilityTypeOther                       FacilityType = 3
 )
 
-type SpokeRelationship int
-
-const (
-	SpokeRelationshipRegular SpokeRelationship = 1
-	SpokeRelationshipTeleICU SpokeRelationship = 2
-)
-
 type State struct {
 	ID   uint   `json:"id" gorm:"primaryKey"`
 	Name string `json:"name" gorm:"not null"`
@@ -108,51 +101,10 @@ type Facility struct {
 
 	// Computed fields
 	PatientCount *int `json:"patient_count" gorm:"-"`
-	BedCount     *int `json:"bed_count" gorm:"-"`
 
 	CreatedAt time.Time      `json:"created_date"`
 	UpdatedAt time.Time      `json:"modified_date"`
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
-}
-
-type FacilitySpoke struct {
-	ID           string            `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	HubID        string            `json:"-"`
-	SpokeID      string            `json:"-"`
-	Relationship SpokeRelationship `json:"relationship"`
-
-	Hub   Facility `json:"hub_object" gorm:"foreignKey:HubID"`
-	Spoke Facility `json:"spoke_object" gorm:"foreignKey:SpokeID"`
-
-	CreatedAt time.Time `json:"created_date"`
-	UpdatedAt time.Time `json:"modified_date"`
-}
-
-type Location struct {
-	ID          string  `json:"external_id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Name        string  `json:"name" gorm:"not null"`
-	Description *string `json:"description"`
-	FacilityID  string  `json:"-"`
-
-	Facility Facility `json:"-" gorm:"foreignKey:FacilityID"`
-
-	CreatedAt time.Time `json:"created_date"`
-	UpdatedAt time.Time `json:"modified_date"`
-}
-
-type Bed struct {
-	ID          string  `json:"external_id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Name        string  `json:"name" gorm:"not null"`
-	Description *string `json:"description"`
-	BedType     string  `json:"bed_type"`
-	FacilityID  string  `json:"-"`
-	LocationID  *string `json:"-"`
-
-	Facility Facility  `json:"-" gorm:"foreignKey:FacilityID"`
-	Location *Location `json:"location_object" gorm:"foreignKey:LocationID"`
-
-	CreatedAt time.Time `json:"created_date"`
-	UpdatedAt time.Time `json:"modified_date"`
 }
 
 // FacilityRequest represents facility creation/update request
@@ -170,37 +122,10 @@ type FacilityRequest struct {
 	Features          []int        `json:"features"`
 }
 
-// FacilitySpokeRequest represents facility spoke creation/update request
-type FacilitySpokeRequest struct {
-	SpokeID      *string            `json:"spoke"`
-	Relationship *SpokeRelationship `json:"relationship"`
-}
-
-// BeforeCreate hook to set UUID
+// BeforeCreate assigns a UUID so the ID is known before the insert returns.
 func (f *Facility) BeforeCreate(tx *gorm.DB) error {
 	if f.ID == "" {
 		f.ID = uuid.New().String()
-	}
-	return nil
-}
-
-func (fs *FacilitySpoke) BeforeCreate(tx *gorm.DB) error {
-	if fs.ID == "" {
-		fs.ID = uuid.New().String()
-	}
-	return nil
-}
-
-func (l *Location) BeforeCreate(tx *gorm.DB) error {
-	if l.ID == "" {
-		l.ID = uuid.New().String()
-	}
-	return nil
-}
-
-func (b *Bed) BeforeCreate(tx *gorm.DB) error {
-	if b.ID == "" {
-		b.ID = uuid.New().String()
 	}
 	return nil
 }
