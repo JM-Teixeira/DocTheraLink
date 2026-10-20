@@ -32,7 +32,7 @@ func main() {
 
 	// Run seeding if requested
 	if *seed {
-		if err := database.SeedData(); err != nil {
+		if err := database.SeedData(cfg.Seed.DemoUsers); err != nil {
 			log.Fatalf("Failed to seed database: %v", err)
 		}
 		log.Println("Database seeding completed successfully")

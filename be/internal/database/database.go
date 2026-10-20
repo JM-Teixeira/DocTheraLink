@@ -7,6 +7,7 @@ import (
 
 	"care-backend/internal/config"
 	"care-backend/internal/models"
+	"care-backend/internal/modules/referral"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -14,8 +15,6 @@ import (
 )
 
 var DB *gorm.DB
-
-
 
 // Connect initializes the database connection
 func Connect(cfg *config.Config) error {
@@ -138,8 +137,21 @@ func Migrate() error {
 		return fmt.Errorf("failed to migrate Phase 6 models: %w", err)
 	}
 
+	// Phase 7: Staff scheduling (previously only created by scripts/fix_timetable_tables.sql)
+	log.Println("Migrating Phase 7: Time log and timetable models...")
+	err = DB.AutoMigrate(
+		&models.TimeLog{},
+		&models.TimetableSection{},
+		&models.TimetableSlot{},
+	)
 	if err != nil {
-		return fmt.Errorf("failed to migrate database: %w", err)
+		return fmt.Errorf("failed to migrate Phase 7 models: %w", err)
+	}
+
+	// Phase 8: Doctor → physiotherapist referrals (the core DocTheraLink workflow)
+	log.Println("Migrating Phase 8: Referral models...")
+	if err := DB.AutoMigrate(referral.Models()...); err != nil {
+		return fmt.Errorf("failed to migrate Phase 8 models: %w", err)
 	}
 
 	log.Println("Database migration completed")
@@ -151,8 +163,9 @@ func ptr(s string) *string {
 	return &s
 }
 
-// SeedData inserts initial data into the database
-func SeedData() error {
+// SeedData inserts initial data into the database. Demo users share a
+// publicly known password, so they are only inserted when includeDemoUsers is set.
+func SeedData(includeDemoUsers bool) error {
 	if DB == nil {
 		return fmt.Errorf("database not initialized")
 	}
@@ -220,8 +233,6 @@ func SeedData() error {
 		}
 	}
 
-	
-
 	// Seed basic skills
 	skills := []models.Skill{
 		{Name: "Critical Care", Description: ptr("Intensive care and critical patient management")},
@@ -233,7 +244,6 @@ func SeedData() error {
 		{Name: "Laboratory", Description: ptr("Laboratory testing and diagnostics")},
 		{Name: "Radiology", Description: ptr("Medical imaging and interpretation")},
 	}
-
 
 	for _, skill := range skills {
 		if err := DB.FirstOrCreate(&skill, models.Skill{Name: skill.Name}).Error; err != nil {
@@ -261,9 +271,13 @@ func SeedData() error {
 		}
 	}
 
-	// TODO: Remove these test users in production - they are for development/testing only
-	// Create bootstrap users with test credentials
-	// Password for all test users: 1234@1
+	if !includeDemoUsers {
+		log.Println("Database seeding completed (demo users skipped)")
+		return nil
+	}
+
+	// Demo users for development/testing only (disabled in release mode by config.Validate)
+	// Password for all demo users: 1234@1
 	testUsers := []models.User{
 		{
 			Username:  "stateadmin",

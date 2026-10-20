@@ -4,7 +4,10 @@ import (
 	"care-backend/internal/api/handlers"
 	"care-backend/internal/auth"
 	"care-backend/internal/config"
+	"care-backend/internal/database"
 	"care-backend/internal/models"
+	"care-backend/internal/modules/patient"
+	"care-backend/internal/modules/referral"
 
 	"github.com/gin-gonic/gin"
 )
@@ -58,22 +61,22 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			users.PATCH("/:username/", userHandler.PartialUpdateUser)
 			users.DELETE("/:username/", userHandler.DeleteUser)
 			users.GET("/:username/check_availability/", userHandler.CheckUsername)
-			
+
 			// User skills
 			users.GET("/:username/skill/", userHandler.ListUserSkills)
 			users.POST("/:username/skill/", userHandler.AddUserSkill)
 			users.DELETE("/:username/skill/:id/", userHandler.DeleteUserSkill)
-			
+
 			// User facilities
 			users.GET("/:username/get_facilities/", userHandler.ListUserFacilities)
 			users.PUT("/:username/add_facility/", userHandler.AddUserFacility)
 			users.DELETE("/:username/delete_facility/", userHandler.DeleteUserFacility)
 			users.DELETE("/:username/clear_home_facility/", userHandler.ClearHomeFacility)
-			
+
 			// Profile picture
 			users.PATCH("/:username/profile_picture/", userHandler.UpdateProfilePicture)
 			users.DELETE("/:username/profile_picture/", userHandler.DeleteProfilePicture)
-			
+
 			// Push notifications
 			users.GET("/:username/pnconfig/", userHandler.GetPNConfig)
 			users.PATCH("/:username/pnconfig/", userHandler.UpdatePNConfig)
@@ -94,10 +97,10 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			facilities.PUT("/:id/", facilityHandler.UpdateFacility)
 			facilities.PATCH("/:id/", facilityHandler.PartialUpdateFacility)
 			facilities.DELETE("/:id/", facilityHandler.DeleteFacility)
-			
+
 			// Facility users
 			facilities.GET("/:id/users/", facilityHandler.GetFacilityUsers)
-			
+
 			// Facility spokes
 			facilities.GET("/:id/hubs/", facilityHandler.GetFacilityHubs)
 			facilities.GET("/:id/spokes/", facilityHandler.GetFacilitySpokes)
@@ -105,7 +108,7 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			facilities.GET("/:id/spokes/:spoke_id/", facilityHandler.GetFacilitySpoke)
 			facilities.PATCH("/:id/spokes/:spoke_id/", facilityHandler.UpdateFacilitySpoke)
 			facilities.DELETE("/:id/spokes/:spoke_id/", facilityHandler.DeleteFacilitySpoke)
-			
+
 			// Asset locations
 			facilities.GET("/:id/asset_location/", facilityHandler.ListAssetLocations)
 			facilities.POST("/:id/asset_location/", facilityHandler.CreateAssetLocation)
@@ -113,7 +116,7 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			facilities.PUT("/:id/asset_location/:location_id/", facilityHandler.UpdateAssetLocation)
 			facilities.PATCH("/:id/asset_location/:location_id/", facilityHandler.PartialUpdateAssetLocation)
 			facilities.DELETE("/:id/asset_location/:location_id/", facilityHandler.DeleteAssetLocation)
-			
+
 			// Inventory
 			facilities.GET("/:id/inventory/", facilityHandler.GetInventoryLog)
 			facilities.POST("/:id/inventory/", facilityHandler.CreateInventory)
@@ -124,13 +127,13 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			facilities.GET("/:id/inventorysummary/", facilityHandler.GetInventorySummary)
 			facilities.PUT("/:id/inventory/:inventory_id/flag/", facilityHandler.FlagInventoryItem)
 			facilities.DELETE("/:id/inventory/delete_last/", facilityHandler.DeleteLastInventoryLog)
-			
+
 			// Discharged patients
 			facilities.GET("/:id/discharged_patients/", facilityHandler.ListDischargedPatients)
-			
+
 			// Patient asset beds
 			facilities.GET("/:id/patient_asset_beds/", facilityHandler.ListPatientAssetBeds)
-			
+
 			// Facility sections for timetable
 			facilities.GET("/:id/sections/", timetableHandler.ListSections)
 			facilities.POST("/:id/sections/", timetableHandler.CreateSection)
@@ -143,20 +146,16 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 		// Patients
 		patients := protected.Group("/patient")
 		{
-			patients.GET("/", patientHandler.ListPatients)
-			patients.POST("/", patientHandler.CreatePatient)
-			patients.GET("/search/", patientHandler.SearchPatients)
-			patients.GET("/:id/", patientHandler.GetPatient)
-			patients.PUT("/:id/", patientHandler.UpdatePatient)
-			patients.PATCH("/:id/", patientHandler.PatchPatient)
+			// List/create/search/get/update live in the patient module
+			patient.RegisterRoutes(patients, database.GetDB())
 			patients.POST("/:id/transfer/", patientHandler.TransferPatient)
-			
+
 			// Patient notes - TEMPORARILY DISABLED due to model conflicts
 			// patients.GET("/:patientId/notes/", patientHandler.GetPatientNotes)
 			// patients.POST("/:patientId/notes/", patientHandler.AddPatientNote)
 			// patients.PUT("/:patientId/notes/:noteId/", patientHandler.UpdatePatientNote)
 			// patients.GET("/:patientId/notes/:noteId/edits/", patientHandler.GetPatientNoteEditHistory)
-			
+
 			// Patient investigations
 			patients.GET("/:id/investigation/", patientHandler.GetPatientInvestigation)
 		}
@@ -170,7 +169,7 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			consultations.PUT("/:id/", consultationHandler.UpdateConsultation)
 			consultations.PATCH("/:id/", consultationHandler.PartialUpdateConsultation)
 			consultations.DELETE("/:id/", consultationHandler.DeleteConsultation)
-			
+
 			// Daily rounds
 			consultations.GET("/:id/daily_rounds/", consultationHandler.GetDailyReports)
 			consultations.POST("/:id/daily_rounds/", consultationHandler.CreateDailyRounds)
@@ -178,22 +177,22 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			consultations.PUT("/:id/daily_rounds/:round_id/", consultationHandler.UpdateDailyReport)
 			consultations.PATCH("/:id/daily_rounds/:round_id/", consultationHandler.UpdateDailyRound)
 			consultations.POST("/:id/daily_rounds/analyse/", consultationHandler.AnalyseDailyRounds)
-			
+
 			// Events
 			consultations.GET("/:id/events/", consultationHandler.GetEvents)
-			
+
 			// Discharge
 			consultations.POST("/:id/discharge_patient/", consultationHandler.DischargePatient)
 			consultations.POST("/:id/generate_discharge_summary/", consultationHandler.GenerateDischargeSummary)
 			consultations.GET("/:id/preview_discharge_summary/", consultationHandler.PreviewDischargeSummary)
 			consultations.POST("/:id/email_discharge_summary/", consultationHandler.EmailDischargeSummary)
-			
+
 			// Consents
 			consultations.GET("/:id/consents/", consultationHandler.ListConsents)
 			consultations.POST("/:id/consents/", consultationHandler.CreateConsent)
 			consultations.GET("/:id/consents/:consent_id/", consultationHandler.GetConsent)
 			consultations.PATCH("/:id/consents/:consent_id/", consultationHandler.PartialUpdateConsent)
-			
+
 			// Investigations
 			consultations.GET("/:id/investigation/", consultationHandler.GetInvestigation)
 			consultations.POST("/:id/investigation/", consultationHandler.CreateInvestigation)
@@ -212,12 +211,12 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			assets.DELETE("/:external_id/", assetHandler.DeleteAsset)
 			assets.GET("/:external_id/availability/", assetHandler.ListAssetAvailability)
 			assets.POST("/:external_id/operate_assets/", assetHandler.OperateAsset)
-			
+
 			// Asset service records
 			assets.GET("/:external_id/service_records/", assetHandler.ListAssetService)
 			assets.GET("/:external_id/service_records/:service_id/", assetHandler.GetAssetService)
 			assets.PUT("/:external_id/service_records/:service_id/", assetHandler.UpdateAssetService)
-			
+
 			// User location
 			assets.GET("/get_default_user_location/", assetHandler.GetAssetUserLocation)
 			assets.POST("/set_default_user_location/", assetHandler.CreateAssetUserLocation)
@@ -343,13 +342,16 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 			sections.DELETE("/:id", timetableHandler.DeleteSection)
 		}
 
+		// Doctor → physiotherapist referrals (core DocTheraLink workflow)
+		referral.RegisterRoutes(protected, database.GetDB())
+
 		// Physical Therapy routes - TEMPORARILY DISABLED due to model conflicts
 		// All therapy-related functionality is disabled until database migration issues are resolved
 		/*
-		therapy := protected.Group("/therapy")
-		{
-			// All therapy routes temporarily disabled - see notes_disabled.go for details
-		}
+			therapy := protected.Group("/therapy")
+			{
+				// All therapy routes temporarily disabled - see notes_disabled.go for details
+			}
 		*/
 
 		// Admin routes (require admin privileges)

@@ -14,6 +14,9 @@ const (
 	AuthorizationTypeBearer = "bearer"
 	AuthorizationPayloadKey = "authorization_payload"
 	CurrentUserKey          = "current_user"
+	// UserIDKey holds the authenticated user's ID (uint) for handlers that
+	// only need the ID, such as the time-log handlers.
+	UserIDKey = "user_id"
 )
 
 // AuthMiddleware creates a gin middleware for authorization
@@ -61,6 +64,7 @@ func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 		}
 
 		ctx.Set(AuthorizationPayloadKey, payload)
+		ctx.Set(UserIDKey, payload.UserID)
 		ctx.Next()
 	}
 }

@@ -2,19 +2,21 @@ package models
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // TimeLog represents a user's clock in/out record
 type TimeLog struct {
-	ID       uint      `json:"id" gorm:"primaryKey"`
-	UserID   uint      `json:"user_id" gorm:"not null;index"`
-	User     User      `json:"user" gorm:"foreignKey:UserID"`
-	ClockIn  time.Time `json:"clock_in" gorm:"not null"`
+	ID       uint       `json:"id" gorm:"primaryKey"`
+	UserID   uint       `json:"user_id" gorm:"not null;index"`
+	User     User       `json:"user" gorm:"foreignKey:UserID"`
+	ClockIn  time.Time  `json:"clock_in" gorm:"not null"`
 	ClockOut *time.Time `json:"clock_out"`
-	Date     time.Time `json:"date" gorm:"type:date;not null;index"`
-	Duration int       `json:"duration" gorm:"default:0"` // in minutes
-	Notes    string    `json:"notes" gorm:"type:text"`
-	
+	Date     time.Time  `json:"date" gorm:"type:date;not null;index"`
+	Duration int        `json:"duration" gorm:"default:0"` // in minutes
+	Notes    string     `json:"notes" gorm:"type:text"`
+
 	CreatedAt time.Time `json:"created_date"`
 	UpdatedAt time.Time `json:"modified_date"`
 }
@@ -42,8 +44,9 @@ func (tl *TimeLog) CalculateDuration() int {
 	return int(duration.Minutes())
 }
 
-// BeforeSave hook to calculate duration before saving
-func (tl *TimeLog) BeforeSave() error {
+// BeforeSave hook to calculate duration before saving.
+// GORM only calls hooks with the exact (*gorm.DB) error signature.
+func (tl *TimeLog) BeforeSave(*gorm.DB) error {
 	if tl.ClockOut != nil {
 		tl.Duration = tl.CalculateDuration()
 	}

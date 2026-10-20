@@ -63,6 +63,9 @@ func main() {
 	// Load configuration from environment variables and .env file
 	// This allows the same binary to work in different environments
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
 
 	// Set Gin framework mode (debug, release, test)
 	// In production, this should be "release" for better performance
@@ -81,9 +84,8 @@ func main() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
-	// Seed initial data including states, districts, skills, and test users
-	// TODO: Remove test users in production (they have #TODO tags in database.go)
-	if err := database.SeedData(); err != nil {
+	// Seed initial data including states, districts, skills and (outside release mode) demo users
+	if err := database.SeedData(cfg.Seed.DemoUsers); err != nil {
 		log.Printf("Warning: Failed to seed data: %v", err)
 	}
 
@@ -105,7 +107,7 @@ func main() {
 		AllowMethods:     cfg.CORS.AllowedMethods, // HTTP methods
 		AllowHeaders:     cfg.CORS.AllowedHeaders, // Request headers
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,    // Allow cookies and auth headers
+		AllowCredentials: true,           // Allow cookies and auth headers
 		MaxAge:           12 * time.Hour, // Cache preflight requests
 	}
 	router.Use(cors.New(corsConfig))
@@ -118,6 +120,20 @@ func main() {
 			"timestamp": time.Now(),
 			"version":   "1.0.0",
 		})
+	})
+
+	// Readiness check: only report ready when the database answers, so
+	// Kubernetes stops routing traffic to a pod that lost its connection.
+	router.GET("/ready", func(c *gin.Context) {
+		sqlDB, err := database.GetDB().DB()
+		if err == nil {
+			err = sqlDB.PingContext(c.Request.Context())
+		}
+		if err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable", "database": "down"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ready", "database": "up"})
 	})
 
 	// Swagger API documentation endpoint (only in development)
