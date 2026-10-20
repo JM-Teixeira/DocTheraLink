@@ -44,7 +44,9 @@ Open testing work:
 - [ ] **Headers**: `Cache-Control: no-store` on API responses; tighten nginx CSP.
 - [ ] **Access-control review of legacy handlers** (users, facilities, timetable have little per-facility scoping, e.g. `GET /users/` lists everyone).
 - [ ] Encrypted backups; TLS to managed Postgres (`DB_SSLMODE=verify-full`).
-- [ ] Dependency & image scanning in CI (govulncheck, npm audit, Trivy).
+- [ ] Dependency & image scanning in CI (govulncheck, npm audit, Trivy). The IDE scan
+      flags critical CVEs in the local `nginx:1.29-alpine` base image — pin a patched
+      digest and rebuild regularly.
 
 ## 2. Engineering (P1/P2)
 

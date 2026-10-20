@@ -7,6 +7,13 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-20 — Klyniva rename, cleanup, local Kubernetes
 
+### 23:15 · CI green on GitHub (PR #1)
+- Fixed fresh-clone builds: git-ignored generated sources (`pluginMap.ts`,
+  `supportedBrowsers.ts`) are now produced by `npm run generate`, used by
+  `typecheck`, the Dockerfile and CI. All four CI jobs pass (backend,
+  frontend, Docker images, e2e on docker compose).
+- Verified locally: e2e suite green on the k3d cluster and on compose.
+
 ### 23:00 · Local Kubernetes (k3d) and end-to-end tests
 - `k8s/` reorganised into `base/` + `overlays/local` (k3d) + `overlays/production`
   (nginx-ingress, cert-manager, HPA). Restricted Pod Security Standard,
