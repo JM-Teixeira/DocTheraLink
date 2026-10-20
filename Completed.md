@@ -5,6 +5,30 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-21 — Roadmap decisions D1–D5 approved; D1–D3 implemented
+
+### 00:10 · D1 remove CARE ICU modules, new patient pages
+- Frontend: removed assets, beds/locations, camera/vitals, consultations/daily
+  rounds, prescriptions, shifting, resources, HCX insurance, death report,
+  external results, patient notes/consents, hub-spoke network (~100 route
+  entries, ~40k lines). Kept facilities (now "Clinic"), users, inventory,
+  notifications, time log/timetable, therapy WIP screens.
+- New Klyniva patient pages: list/search, detail (with referral history and
+  "Refer to physiotherapy" — first M1 item), create/edit form with validation
+  and server field errors (EN/PT). Shared `Utils/roles.ts`, `Utils/person.ts`.
+- Backend: removed asset/consultation handlers and models, bed/location/spoke/
+  shifting/transfer code; routes rewritten; migrations as named phases.
+- Consumables catalogue seeded for a physiotherapy clinic (inventory rebuilt in M5).
+
+### 00:10 · D2 clinic scoping, D3 Receptionist role
+- `internal/clinic` Resolver; patients and referrals scoped by clinic
+  (therapist inbox per clinic, no cross-clinic addressing or registration).
+- Demo clinic seeded; demo users assigned; seeded doctor name fixed.
+- `Receptionist` role (backend + frontend): registers/edits patients, no access
+  to referrals; sidebar shows only what the role can open.
+- Tests: clinic resolver, clinic isolation (unit + PostgreSQL integration),
+  receptionist e2e journey; e2e waits for readiness after rollouts.
+
 ## 2026-10-20 — Klyniva rename, cleanup, local Kubernetes
 
 ### 23:15 · CI green on GitHub (PR #1)
