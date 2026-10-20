@@ -16,7 +16,6 @@ import ButtonV2, { Cancel, Submit } from "@/components/Common/ButtonV2";
 import GLocationPicker from "@/components/Common/GLocationPicker";
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
-import SpokeFacilityEditor from "@/components/Facility/SpokeFacilityEditor";
 import { DistrictModel, FacilityRequest } from "@/components/Facility/models";
 import { PhoneNumberValidator } from "@/components/Form/FieldValidators";
 import PhoneNumberFormField from "@/components/Form/FormFields/PhoneNumberFormField";
@@ -454,14 +453,6 @@ export const FacilityCreate = (props: FacilityProps) => {
                 }}
               />
               <TextAreaFormField {...field("address")} required />
-              {facilityId && (
-                <div className="py-4 md:col-span-2">
-                  <h4 className="mb-4">{t("spokes")}</h4>
-                  <SpokeFacilityEditor
-                    facility={{ ...facilityQuery.data, id: facilityId }}
-                  />
-                </div>
-              )}
               {careConfig.kasp.enabled && (
                 <RadioFormField
                   {...field("kasp_empanelled")}

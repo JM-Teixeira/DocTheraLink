@@ -19,13 +19,9 @@ import { usePluginRoutes } from "@/hooks/useCareApps";
 
 import { BLACKLISTED_PATHS } from "@/common/constants";
 
-import AssetRoutes from "@/Routers/routes/AssetRoutes";
-import ConsultationRoutes from "@/Routers/routes/ConsultationRoutes";
 import FacilityRoutes from "@/Routers/routes/FacilityRoutes";
 import PatientRoutes from "@/Routers/routes/PatientRoutes";
 import ReferralRoutes from "@/Routers/routes/ReferralRoutes";
-import ResourceRoutes from "@/Routers/routes/ResourceRoutes";
-import ShiftingRoutes from "@/Routers/routes/ShiftingRoutes";
 import UserRoutes from "@/Routers/routes/UserRoutes";
 
 export type RouteParams<T extends string> =
@@ -44,15 +40,11 @@ export type AppRoutes = {
 };
 
 const Routes: AppRoutes = {
-  "/": () => <Redirect to="/facility" />,
+  "/": () => <Redirect to="/patients" />,
 
-  ...AssetRoutes,
-  ...ConsultationRoutes,
   ...FacilityRoutes,
   ...PatientRoutes,
   ...ReferralRoutes,
-  ...ResourceRoutes,
-  ...ShiftingRoutes,
   ...UserRoutes,
 
   "/notifications/:id": ({ id }) => <ShowPushNotification id={id} />,
