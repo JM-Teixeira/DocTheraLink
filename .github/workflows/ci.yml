@@ -56,7 +56,7 @@ jobs:
       - run: npx eslint --max-warnings=0 src/components/Referral src/test
       - run: npm test
       - name: Build
-        run: npm run build:meta && npm run supported-browsers && npm run build:react
+        run: npm run build:meta && npm run generate && npm run build:react
         env:
           REACT_CARE_API_URL: http://placeholder
 

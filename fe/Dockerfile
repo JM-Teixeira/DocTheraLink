@@ -15,7 +15,8 @@ COPY . .
 # The real API URL is injected at container start through /config.js
 # (see docker-entrypoint.sh); Vite only needs a value at build time.
 ENV REACT_CARE_API_URL=http://placeholder
-RUN npm run build:meta && npm run supported-browsers && npm run build:react
+# generate = git-ignored sources (pluginMap.ts, supportedBrowsers.ts)
+RUN npm run build:meta && npm run generate && npm run build:react
 
 # ---- Runtime stage --------------------------------------------------------
 FROM nginx:1.29-alpine
