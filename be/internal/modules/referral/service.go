@@ -87,19 +87,8 @@ func (s *Service) Create(ctx context.Context, actor Actor, req CreateRequest) (*
 	// A doctor may address the referral to a specific therapist of the same
 	// clinic; otherwise it lands in that clinic's therapist inbox.
 	if req.TherapistID != nil {
-		role, active, err := s.repo.UserRole(ctx, *req.TherapistID)
-		if err != nil {
+		if err := s.checkTherapist(ctx, *req.TherapistID, facility); err != nil {
 			return nil, err
-		}
-		if !active || models.UserRole(role) != models.RolePhysioTherapist {
-			return nil, &ValidationError{"therapist_id must be an active physiotherapist"}
-		}
-		therapistClinic, err := s.clinics.HomeClinic(ctx, *req.TherapistID)
-		if err != nil {
-			return nil, err
-		}
-		if !clinic.SameClinic(facility, therapistClinic) {
-			return nil, &ValidationError{"therapist_id must work in the referral's clinic"}
 		}
 	}
 
@@ -151,9 +140,9 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (*Referral, e
 	return nil, ErrNotFound
 }
 
-// List returns the referrals visible to the actor, scoped by role:
-// admins see everything, doctors their own referrals, therapists their inbox.
-func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referral, int64, error) {
+// scoped restricts f to what the actor may see: admins everything, doctors
+// their own referrals, therapists their inbox. Other roles are forbidden.
+func (s *Service) scoped(ctx context.Context, actor Actor, f ListFilter) (ListFilter, error) {
 	switch {
 	case actor.isAdmin():
 		// no scoping
@@ -164,11 +153,30 @@ func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referr
 		f.InboxForTherapist = true
 		mine, err := s.clinics.HomeClinic(ctx, actor.ID)
 		if err != nil {
-			return nil, 0, err
+			return f, err
 		}
 		f.ClinicID = mine
 	default:
-		return nil, 0, ErrForbidden
+		return f, ErrForbidden
+	}
+	return f, nil
+}
+
+// Counts returns how many visible referrals match f, per status (for the
+// status tabs). f.Status is ignored.
+func (s *Service) Counts(ctx context.Context, actor Actor, f ListFilter) (map[Status]int64, error) {
+	f, err := s.scoped(ctx, actor, f)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.Counts(ctx, f)
+}
+
+// List returns the referrals visible to the actor (see scoped).
+func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referral, int64, error) {
+	f, err := s.scoped(ctx, actor, f)
+	if err != nil {
+		return nil, 0, err
 	}
 	if f.Limit <= 0 {
 		f.Limit = defaultLimit
@@ -266,6 +274,84 @@ func (s *Service) Cancel(ctx context.Context, actor Actor, id, reason string) (*
 		r.CancelReason = &reason
 		return nil
 	}, "Referral cancelled: "+reason)
+}
+
+// Reassign hands an open referral over to another physiotherapist of the same
+// clinic (holiday cover, specialty, workload). Allowed for the referring
+// doctor, admins and the currently assigned therapist. Treatment status is
+// kept: an in-progress referral continues with the new therapist.
+func (s *Service) Reassign(ctx context.Context, actor Actor, id string, req ReassignRequest) (*Referral, error) {
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, &ValidationError{"a reason is required to hand over"}
+	}
+	r, err := s.Get(ctx, actor, id)
+	if err != nil {
+		return nil, err
+	}
+	if !(actor.isAdmin() || r.DoctorID == actor.ID || isAssignedTherapist(actor, r)) {
+		return nil, ErrForbidden
+	}
+	if r.Status.IsTerminal() {
+		return nil, ErrInvalidTransition
+	}
+	if r.TherapistID != nil && *r.TherapistID == req.TherapistID {
+		return nil, &ValidationError{"the referral is already assigned to this therapist"}
+	}
+	if err := s.checkTherapist(ctx, req.TherapistID, r.FacilityID); err != nil {
+		return nil, err
+	}
+	return s.transition(ctx, actor, id, r.Status, func(r *Referral) error {
+		r.TherapistID = &req.TherapistID
+		return nil
+	}, "Referral handed over: "+reason)
+}
+
+// Reopen sends a declined referral out again — to a named therapist of the
+// same clinic or back to the clinic's inbox. Referring doctor or admin only.
+func (s *Service) Reopen(ctx context.Context, actor Actor, id string, req ReopenRequest) (*Referral, error) {
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, &ValidationError{"a reason is required to re-open"}
+	}
+	r, err := s.Get(ctx, actor, id)
+	if err != nil {
+		return nil, err
+	}
+	if !(actor.isAdmin() || (actor.isDoctor() && r.DoctorID == actor.ID)) {
+		return nil, ErrForbidden
+	}
+	if req.TherapistID != nil {
+		if err := s.checkTherapist(ctx, *req.TherapistID, r.FacilityID); err != nil {
+			return nil, err
+		}
+	}
+	return s.transition(ctx, actor, id, StatusDeclined, func(r *Referral) error {
+		r.Status = StatusPending
+		r.TherapistID = req.TherapistID
+		r.DeclineReason = nil // the decline stays on the thread as history
+		return nil
+	}, "Referral re-opened: "+reason)
+}
+
+// checkTherapist validates that id is an active physiotherapist working in
+// the given clinic (or that either side has no clinic).
+func (s *Service) checkTherapist(ctx context.Context, id uint, facility *string) error {
+	role, active, err := s.repo.UserRole(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !active || models.UserRole(role) != models.RolePhysioTherapist {
+		return &ValidationError{"therapist_id must be an active physiotherapist"}
+	}
+	therapistClinic, err := s.clinics.HomeClinic(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !clinic.SameClinic(facility, therapistClinic) {
+		return &ValidationError{"therapist_id must work in the referral's clinic"}
+	}
+	return nil
 }
 
 // AddNote posts a message on the referral thread. Only the referring doctor,

@@ -6,6 +6,7 @@
 import {
   Referral,
   ReferralAction,
+  ReferralCounts,
   ReferralStatus,
   UserSummary,
 } from "@/components/Referral/types";
@@ -40,14 +41,25 @@ export function allowedActions(r: Referral, u: CurrentUser): ReferralAction[] {
       break;
   }
   const open = ["pending", "accepted", "in_progress"].includes(r.status);
-  if (open && (isAdmin(u) || (isDoctor(u) && r.doctor_id === u.id)))
-    actions.push("cancel");
+  const owner = isAdmin(u) || (isDoctor(u) && r.doctor_id === u.id);
+  // Hand-over: referring doctor, admin or the assigned therapist
+  if (open && (owner || isAssignedTherapist(r, u))) actions.push("reassign");
+  if (open && owner) actions.push("cancel");
+  if (r.status === "declined" && owner) actions.push("reopen");
   return actions;
 }
 
 /** Actions that require a free-text reason (or outcome summary). */
 export const actionNeedsReason = (a: ReferralAction) =>
   a === "decline" || a === "complete" || a === "cancel";
+
+/** Total of a per-status count map (for the "All" tab). */
+export const sumCounts = (counts: ReferralCounts) =>
+  Object.values(counts).reduce((a, b) => a + (b ?? 0), 0);
+
+/** Actions that pick a physiotherapist (handled by TherapistDialog). */
+export const actionNeedsTherapist = (a: ReferralAction) =>
+  a === "reassign" || a === "reopen";
 
 /** Only the referring doctor, assigned therapist and admins post on the thread. */
 export function canPostNote(r: Referral, u: CurrentUser) {

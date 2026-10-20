@@ -93,10 +93,25 @@ export interface NoteRequest {
   body: string;
 }
 
+export interface ReassignRequest {
+  therapist_id: number;
+  reason: string;
+}
+
+export interface ReopenRequest {
+  therapist_id?: number;
+  reason: string;
+}
+
+/** Number of referrals per status, from GET /referrals/counts/. */
+export type ReferralCounts = Partial<Record<ReferralStatus, number>>;
+
 /** Actions a user can take on a referral (see referralUtils.allowedActions). */
 export type ReferralAction =
   | "accept"
   | "decline"
   | "start"
   | "complete"
-  | "cancel";
+  | "cancel"
+  | "reassign"
+  | "reopen";

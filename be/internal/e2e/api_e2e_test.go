@@ -198,6 +198,55 @@ func TestReferralLifecycle(t *testing.T) {
 	expect(t, "refresh token as access", refreshClient.call("GET", "/referrals/", nil, nil), 401)
 }
 
+// userIDOf returns the numeric id of a user via GET /users/getcurrentuser/.
+func userIDOf(c *client) float64 {
+	var me map[string]any
+	c.call("GET", "/users/getcurrentuser/", nil, &me)
+	id, _ := me["id"].(float64)
+	return id
+}
+
+// TestHandOverAndReopen: a declined referral is re-opened to a colleague, who
+// later hands it back; the status counts follow along.
+func TestHandOverAndReopen(t *testing.T) {
+	doctor, _ := login(t, "doctor")
+	sarah, _ := login(t, "physiotherapist")
+	tiago, _ := login(t, "physiotherapist2")
+	sarahID, tiagoID := userIDOf(sarah), userIDOf(tiago)
+
+	var p map[string]any
+	expect(t, "patient", doctor.call("POST", "/patient/", map[string]any{"name": "Handover " + time.Now().Format("150405")}, &p), 201)
+	var ref map[string]any
+	expect(t, "referral to Sarah", doctor.call("POST", "/referrals/", map[string]any{
+		"patient_id": p["id"], "therapist_id": sarahID, "diagnosis": "Tennis elbow", "reason": "Eccentric loading",
+	}, &ref), 201)
+	rid := ref["id"].(string)
+
+	expect(t, "Sarah declines", sarah.call("POST", "/referrals/"+rid+"/decline/", map[string]string{"reason": "Full schedule"}, nil), 200)
+	var reopened map[string]any
+	expect(t, "doctor re-opens to Tiago", doctor.call("POST", "/referrals/"+rid+"/reopen/",
+		map[string]any{"therapist_id": tiagoID, "reason": "Tiago has availability"}, &reopened), 200)
+	if reopened["status"] != "pending" || reopened["therapist_id"] != tiagoID {
+		t.Fatalf("re-opened: %v", reopened)
+	}
+	expect(t, "Tiago accepts", tiago.call("POST", "/referrals/"+rid+"/accept/", map[string]any{}, nil), 200)
+	expect(t, "Sarah cannot act any more", sarah.call("POST", "/referrals/"+rid+"/start/", map[string]any{}, nil), 404)
+
+	var handed map[string]any
+	expect(t, "Tiago hands back to Sarah", tiago.call("POST", "/referrals/"+rid+"/reassign/",
+		map[string]any{"therapist_id": sarahID, "reason": "Holiday cover ends"}, &handed), 200)
+	if handed["status"] != "accepted" || handed["therapist_id"] != sarahID {
+		t.Fatalf("handed over: %v", handed)
+	}
+	expect(t, "Sarah starts", sarah.call("POST", "/referrals/"+rid+"/start/", map[string]any{}, nil), 200)
+
+	var counts map[string]float64
+	expect(t, "counts", sarah.call("GET", "/referrals/counts/?search=Handover", nil, &counts), 200)
+	if counts["in_progress"] < 1 {
+		t.Errorf("counts should include the in-progress referral: %v", counts)
+	}
+}
+
 // TestReceptionist covers the front-desk role: registers and edits patients,
 // but has no access to referrals (clinical content).
 func TestReceptionist(t *testing.T) {

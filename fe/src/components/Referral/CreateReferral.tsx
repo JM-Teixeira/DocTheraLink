@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 
 import Page from "@/components/Common/Page";
 import ReferralRoutes from "@/components/Referral/api";
+import { useTherapists } from "@/components/Referral/hooks";
 import { ageFromDob, initials } from "@/components/Referral/referralUtils";
 import {
   CreateReferralRequest,
@@ -18,19 +19,11 @@ import {
   ReferralPriority,
 } from "@/components/Referral/types";
 
+import useDebouncedValue from "@/hooks/useDebouncedValue";
+
 import * as Notification from "@/Utils/Notifications";
 import mutate from "@/Utils/request/mutate";
 import query from "@/Utils/request/query";
-
-/** Debounces a value so typing doesn't fire one request per keystroke. */
-function useDebounced<T>(value: T, ms = 300) {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(id);
-  }, [value, ms]);
-  return v;
-}
 
 const inputClass =
   "h-10 w-full rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500";
@@ -81,7 +74,7 @@ export function toRequest(patientId: string, f: Form): CreateReferralRequest {
 export default function CreateReferral({ patientId }: { patientId?: string }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
-  const debounced = useDebounced(search);
+  const debounced = useDebouncedValue(search);
   const [patient, setPatient] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -109,12 +102,7 @@ export default function CreateReferral({ patientId }: { patientId?: string }) {
     enabled: !patient && debounced.trim().length >= 2,
   });
 
-  const { data: therapists } = useQuery({
-    queryKey: ["physiotherapists"],
-    queryFn: query(ReferralRoutes.listTherapists, {
-      queryParams: { user_type: "PhysioTherapist", limit: 100 },
-    }),
-  });
+  const { data: therapists } = useTherapists();
 
   const { mutate: create, isPending } = useMutation({
     mutationFn: mutate(ReferralRoutes.create),

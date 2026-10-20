@@ -279,5 +279,13 @@
   "gender__other": "Outro",
   "gender__unknown": "Não indicado",
   "unknown": "Desconhecido",
-  "phone_placeholder": "+351 912 345 678"
+  "phone_placeholder": "+351 912 345 678",
+  "all_priorities": "Todas as prioridades",
+  "choose_physiotherapist": "Escolha um fisioterapeuta",
+  "referral_action__reassign": "Transferir",
+  "referral_action__reopen": "Reabrir encaminhamento",
+  "referral_action_hint__reassign": "O novo fisioterapeuta continua o tratamento. O motivo fica registado na conversa.",
+  "referral_action_hint__reopen": "Envie para outro fisioterapeuta, ou deixe vazio para voltar à caixa da clínica.",
+  "referral_action_done__reassign": "Encaminhamento transferido",
+  "referral_action_done__reopen": "Encaminhamento reaberto"
 }

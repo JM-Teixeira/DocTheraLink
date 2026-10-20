@@ -3,6 +3,7 @@ package referral
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -20,6 +21,8 @@ type Repository interface {
 	Create(ctx context.Context, r *Referral) error
 	Get(ctx context.Context, id string) (*Referral, error)
 	List(ctx context.Context, f ListFilter) ([]Referral, int64, error)
+	// Counts returns how many referrals per status match f (ignoring f.Status).
+	Counts(ctx context.Context, f ListFilter) (map[Status]int64, error)
 	// Transition saves r only if its stored status still equals from, and
 	// appends note in the same transaction. Returns ErrConflict otherwise.
 	Transition(ctx context.Context, r *Referral, from Status, note *Note) error
@@ -61,9 +64,10 @@ func (g *GormRepository) Get(ctx context.Context, id string) (*Referral, error) 
 	return &r, nil
 }
 
-func (g *GormRepository) List(ctx context.Context, f ListFilter) ([]Referral, int64, error) {
-	q := g.db.WithContext(ctx).Model(&Referral{})
-	if f.Status != "" {
+// filtered applies the scope and filters of f. The status filter is optional
+// so Counts can group by status over the same set.
+func filtered(q *gorm.DB, f ListFilter, withStatus bool) *gorm.DB {
+	if withStatus && f.Status != "" {
 		q = q.Where("status = ?", f.Status)
 	}
 	if f.PatientID != "" {
@@ -76,13 +80,54 @@ func (g *GormRepository) List(ctx context.Context, f ListFilter) ([]Referral, in
 	case f.TherapistID != 0 && f.InboxForTherapist && f.ClinicID != nil:
 		// A therapist's inbox: everything assigned to them plus open, unassigned
 		// referrals of their clinic (or without a clinic).
-		q = q.Where("therapist_id = ? OR (therapist_id IS NULL AND status = ? AND (facility_id IS NULL OR facility_id = ?))",
+		q = q.Where("(therapist_id = ? OR (therapist_id IS NULL AND status = ? AND (facility_id IS NULL OR facility_id = ?)))",
 			f.TherapistID, StatusPending, *f.ClinicID)
 	case f.TherapistID != 0 && f.InboxForTherapist:
-		q = q.Where("therapist_id = ? OR (therapist_id IS NULL AND status = ?)", f.TherapistID, StatusPending)
+		q = q.Where("(therapist_id = ? OR (therapist_id IS NULL AND status = ?))", f.TherapistID, StatusPending)
 	case f.TherapistID != 0:
 		q = q.Where("therapist_id = ?", f.TherapistID)
 	}
+	// Optional user-facing filters
+	if f.Priority != "" {
+		q = q.Where("priority = ?", f.Priority)
+	}
+	if f.AssignedTo != 0 {
+		q = q.Where("therapist_id = ?", f.AssignedTo)
+	}
+	if term := strings.TrimSpace(f.Search); term != "" {
+		// Subquery keeps column names unambiguous (both tables have status, created_at…)
+		q = q.Where("patient_id IN (SELECT id FROM patients WHERE name ILIKE ?)", "%"+escapeLike(term)+"%")
+	}
+	if f.From != nil {
+		q = q.Where("created_at >= ?", *f.From)
+	}
+	if f.To != nil {
+		q = q.Where("created_at < ?", f.To.AddDate(0, 0, 1)) // inclusive end date
+	}
+	return q
+}
+
+func (g *GormRepository) Counts(ctx context.Context, f ListFilter) (map[Status]int64, error) {
+	var rows []struct {
+		Status Status
+		N      int64
+	}
+	err := filtered(g.db.WithContext(ctx).Model(&Referral{}), f, false).
+		Select("status, COUNT(*) AS n").Group("status").Scan(&rows).Error
+	out := make(map[Status]int64, len(rows))
+	for _, r := range rows {
+		out[r.Status] = r.N
+	}
+	return out, err
+}
+
+// escapeLike escapes LIKE wildcards so user input is matched literally.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
+func (g *GormRepository) List(ctx context.Context, f ListFilter) ([]Referral, int64, error) {
+	q := filtered(g.db.WithContext(ctx).Model(&Referral{}), f, true)
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {

@@ -3,8 +3,11 @@ import {
   CreateReferralRequest,
   NoteRequest,
   ReasonRequest,
+  ReassignRequest,
   Referral,
+  ReferralCounts,
   ReferralNote,
+  ReopenRequest,
 } from "@/components/Referral/types";
 import { UserModel } from "@/components/Users/models";
 
@@ -25,6 +28,23 @@ const ReferralRoutes = {
     path: "/api/v1/referrals/",
     method: "POST",
     TBody: Type<CreateReferralRequest>(),
+    TRes: Type<Referral>(),
+  },
+  counts: {
+    path: "/api/v1/referrals/counts/",
+    method: "GET",
+    TRes: Type<ReferralCounts>(),
+  },
+  reassign: {
+    path: "/api/v1/referrals/{id}/reassign/",
+    method: "POST",
+    TBody: Type<ReassignRequest>(),
+    TRes: Type<Referral>(),
+  },
+  reopen: {
+    path: "/api/v1/referrals/{id}/reopen/",
+    method: "POST",
+    TBody: Type<ReopenRequest>(),
     TRes: Type<Referral>(),
   },
   get: {

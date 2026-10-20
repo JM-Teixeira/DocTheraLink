@@ -277,6 +277,7 @@ func seedDemoClinic() error {
 		{"facilitycoordinator", "Clinic", "Coordinator", models.RoleLocalBodyAdmin, false},
 		{"doctor", "John", "Smith", models.RoleDoctor, true},
 		{"physiotherapist", "Sarah", "Johnson", models.RolePhysioTherapist, true},
+		{"physiotherapist2", "Tiago", "Martins", models.RolePhysioTherapist, true},
 		{"nurse", "Mary", "Williams", models.RoleNurse, true},
 		{"receptionist", "Rita", "Lopes", models.RoleReceptionist, true},
 		{"staff", "General", "Staff", models.RoleStaff, true},
