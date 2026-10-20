@@ -222,3 +222,6 @@ fe/src/generated/
 
 # Stray empty files created by tools writing through a mangled WSL UNC path
 wsl.localhost/
+
+# Real Kubernetes secrets (use k8s/secrets.example.yaml as the template)
+k8s/secrets.yaml

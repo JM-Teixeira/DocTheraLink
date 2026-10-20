@@ -1,0 +1,83 @@
+# Continuous integration for DocTheraLink.
+# Runs on every push and pull request: backend tests (unit + PostgreSQL
+# integration), frontend typecheck/lint/tests/build, and Docker image builds.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: be
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: be/go.mod
+          cache-dependency-path: be/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./... && go vet -tags integration ./...
+      - name: Unit tests
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - name: Integration tests (PostgreSQL via testcontainers)
+        run: go test -tags integration -count=1 ./internal/integration/...
+
+  frontend:
+    name: Frontend (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fe
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: fe/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      # Strict lint for new modules; the inherited codebase still needs a
+      # formatting pass (see TODO.md) before linting all of src/.
+      - run: npx eslint --max-warnings=0 src/components/Referral src/test
+      - run: npm test
+      - name: Build
+        run: npm run build:meta && npm run supported-browsers && npm run build:react
+        env:
+          REACT_CARE_API_URL: http://placeholder
+
+  images:
+    name: Docker images
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend
+        uses: docker/build-push-action@v6
+        with:
+          context: be
+          push: false
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Build frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: fe
+          push: false
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend

@@ -1,0 +1,29 @@
+# kubectl apply -k k8s
+#
+# Secrets are NOT part of this kustomization. Create them first, e.g.:
+#   kubectl create namespace doctheralink
+#   kubectl -n doctheralink create secret generic doctheralink-secrets \
+#     --from-literal=DB_PASSWORD="$(openssl rand -base64 24)" \
+#     --from-literal=JWT_SECRET="$(openssl rand -base64 48)" \
+#     --from-literal=REDIS_PASSWORD=""
+# (see secrets.example.yaml for the expected keys and the TLS secret)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: doctheralink
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres.yaml
+  - redis.yaml
+  - backend.yaml
+  - frontend.yaml
+  - ingress.yaml
+
+# Pin image versions per environment here instead of editing the manifests
+images:
+  - name: doctheralink/backend
+    newTag: latest
+  - name: doctheralink/frontend
+    newTag: latest
