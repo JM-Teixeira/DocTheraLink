@@ -24,6 +24,20 @@ log() { printf '\033[36m==>\033[0m %s\n' "$*"; }
 
 cluster_exists() { k3d cluster list -o json | grep -q "\"name\":\"$CLUSTER\""; }
 
+# k3s needs many inotify instances; Docker Desktop's VM defaults to 128, which
+# is exhausted when several k3d clusters run ("too many open files" and the
+# node never registers). Raise it (only if lower) — not persistent across
+# Docker Desktop restarts, so this runs on every up/deploy.
+ensure_inotify() {
+  local want=1024
+  local cur
+  cur=$(docker run --rm alpine:3 cat /proc/sys/fs/inotify/max_user_instances)
+  if [[ "$cur" -lt "$want" ]]; then
+    log "Raising fs.inotify.max_user_instances in the Docker VM ($cur -> $want)"
+    docker run --rm --privileged alpine:3 sysctl -w fs.inotify.max_user_instances=$want >/dev/null
+  fi
+}
+
 create_cluster() {
   if cluster_exists; then
     log "Cluster $CLUSTER already exists"
@@ -70,8 +84,8 @@ deploy() {
 }
 
 case "${1:-up}" in
-  up) create_cluster; build_and_import; deploy ;;
-  deploy) build_and_import; deploy ;;
+  up) ensure_inotify; create_cluster; build_and_import; deploy ;;
+  deploy) ensure_inotify; build_and_import; deploy ;;
   e2e)
     log "Running end-to-end tests against $URL"
     (cd "$ROOT/be" && E2E_BASE_URL="$URL" GOTOOLCHAIN=auto go test -tags e2e -count=1 -v ./internal/e2e/)

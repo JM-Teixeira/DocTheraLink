@@ -281,6 +281,55 @@ func TestCountsAndFilters(t *testing.T) {
 	}
 }
 
+// recordingNotifier remembers the events it receives.
+type recordingNotifier struct{ events []Event }
+
+func (r *recordingNotifier) ReferralEvent(_ context.Context, e Event) {
+	r.events = append(r.events, e)
+}
+
+func (r *recordingNotifier) kinds() []EventKind {
+	out := make([]EventKind, len(r.events))
+	for i, e := range r.events {
+		out[i] = e.Kind
+	}
+	return out
+}
+
+func TestEventsAreEmittedOnSuccessOnly(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newTestService(t)
+	rec := &recordingNotifier{}
+	s.WithNotifier(rec)
+
+	r := mustCreate(t, s, ptrUint(physio.ID))
+	_, _ = s.Accept(ctx, otherPhysio, r.ID) // fails: not visible → no event
+	_, _ = s.Accept(ctx, physio, r.ID)
+	_, _ = s.AddNote(ctx, doctor, r.ID, NoteRequest{Body: "How is it going?"})
+	_, _ = s.Reassign(ctx, physio, r.ID, ReassignRequest{TherapistID: otherPhysio.ID, Reason: "Leave"})
+	_, _ = s.Start(ctx, otherPhysio, r.ID) // starting does not notify
+	_, _ = s.Complete(ctx, otherPhysio, r.ID, "Recovered")
+
+	want := []EventKind{EventCreated, EventAccepted, EventMessage, EventReassigned, EventCompleted}
+	got := rec.kinds()
+	if len(got) != len(want) {
+		t.Fatalf("events = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("events = %v, want %v", got, want)
+		}
+	}
+	hand := rec.events[3]
+	if hand.PreviousTherapistID == nil || *hand.PreviousTherapistID != physio.ID || hand.ActorID != physio.ID ||
+		hand.Excerpt != "Leave" || *hand.Referral.TherapistID != otherPhysio.ID {
+		t.Errorf("hand-over event: %+v", hand)
+	}
+	if rec.events[2].Excerpt != "How is it going?" {
+		t.Errorf("message excerpt: %q", rec.events[2].Excerpt)
+	}
+}
+
 func TestHappyPathLifecycle(t *testing.T) {
 	ctx := context.Background()
 	s, repo := newTestService(t)

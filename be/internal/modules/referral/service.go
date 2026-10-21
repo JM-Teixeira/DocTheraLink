@@ -42,9 +42,10 @@ const (
 
 // Service holds the referral business rules.
 type Service struct {
-	repo    Repository
-	clinics clinic.Resolver
-	now     func() time.Time
+	repo     Repository
+	clinics  clinic.Resolver
+	notifier Notifier
+	now      func() time.Time
 }
 
 // NewService builds a Service. now may be nil to use time.Now.
@@ -52,7 +53,25 @@ func NewService(repo Repository, clinics clinic.Resolver, now func() time.Time) 
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repo: repo, clinics: clinics, now: now}
+	return &Service{repo: repo, clinics: clinics, notifier: noopNotifier{}, now: now}
+}
+
+// WithNotifier sets who is told about referral events (default: nobody).
+func (s *Service) WithNotifier(n Notifier) *Service {
+	s.notifier = n
+	return s
+}
+
+// emitted passes (r, err) through and, when the operation succeeded,
+// publishes the event. Notification problems never fail the operation.
+func (s *Service) emitted(ctx context.Context, kind EventKind, actor Actor, prev *uint,
+	excerpt string, r *Referral, err error) (*Referral, error) {
+	if err == nil {
+		s.notifier.ReferralEvent(ctx, Event{
+			Kind: kind, Referral: r, ActorID: actor.ID, PreviousTherapistID: prev, Excerpt: excerpt,
+		})
+	}
+	return r, err
 }
 
 // Create opens a new referral. Only doctors and admins can refer patients.
@@ -114,7 +133,8 @@ func (s *Service) Create(ctx context.Context, actor Actor, req CreateRequest) (*
 	if err := s.repo.Create(ctx, r); err != nil {
 		return nil, err
 	}
-	return s.repo.Get(ctx, r.ID)
+	created, err := s.repo.Get(ctx, r.ID)
+	return s.emitted(ctx, EventCreated, actor, nil, "", created, err)
 }
 
 // Get returns a referral the actor is allowed to see.
@@ -193,7 +213,7 @@ func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referr
 // Accept lets a physiotherapist take a pending referral. Unassigned referrals
 // are claimed by whoever accepts first.
 func (s *Service) Accept(ctx context.Context, actor Actor, id string) (*Referral, error) {
-	return s.transition(ctx, actor, id, StatusPending, func(r *Referral) error {
+	r, err := s.transition(ctx, actor, id, StatusPending, func(r *Referral) error {
 		if !actor.isTherapist() || (r.TherapistID != nil && *r.TherapistID != actor.ID) {
 			return ErrForbidden
 		}
@@ -203,6 +223,7 @@ func (s *Service) Accept(ctx context.Context, actor Actor, id string) (*Referral
 		r.AcceptedAt = &now
 		return nil
 	}, "Referral accepted")
+	return s.emitted(ctx, EventAccepted, actor, nil, "", r, err)
 }
 
 // Decline lets the assigned therapist refuse a pending referral.
@@ -211,7 +232,7 @@ func (s *Service) Decline(ctx context.Context, actor Actor, id, reason string) (
 	if reason == "" {
 		return nil, &ValidationError{"a reason is required to decline"}
 	}
-	return s.transition(ctx, actor, id, StatusPending, func(r *Referral) error {
+	r, err := s.transition(ctx, actor, id, StatusPending, func(r *Referral) error {
 		if !isAssignedTherapist(actor, r) {
 			return ErrForbidden
 		}
@@ -219,6 +240,7 @@ func (s *Service) Decline(ctx context.Context, actor Actor, id, reason string) (
 		r.DeclineReason = &reason
 		return nil
 	}, "Referral declined: "+reason)
+	return s.emitted(ctx, EventDeclined, actor, nil, reason, r, err)
 }
 
 // Start marks the first treatment session.
@@ -240,7 +262,7 @@ func (s *Service) Complete(ctx context.Context, actor Actor, id, summary string)
 	if summary == "" {
 		return nil, &ValidationError{"an outcome summary is required to complete"}
 	}
-	return s.transition(ctx, actor, id, StatusInProgress, func(r *Referral) error {
+	r, err := s.transition(ctx, actor, id, StatusInProgress, func(r *Referral) error {
 		if !isAssignedTherapist(actor, r) {
 			return ErrForbidden
 		}
@@ -250,6 +272,7 @@ func (s *Service) Complete(ctx context.Context, actor Actor, id, summary string)
 		r.CompletedAt = &now
 		return nil
 	}, "Treatment completed: "+summary)
+	return s.emitted(ctx, EventCompleted, actor, nil, summary, r, err)
 }
 
 // Cancel lets the referring doctor (or an admin) withdraw an open referral.
@@ -263,7 +286,7 @@ func (s *Service) Cancel(ctx context.Context, actor Actor, id, reason string) (*
 		return nil, err
 	}
 	// Cancel is valid from any open status, so pass the current one as "from".
-	return s.transition(ctx, actor, id, r.Status, func(r *Referral) error {
+	r, err = s.transition(ctx, actor, id, r.Status, func(r *Referral) error {
 		if !(actor.isAdmin() || (actor.isDoctor() && r.DoctorID == actor.ID)) {
 			return ErrForbidden
 		}
@@ -274,6 +297,7 @@ func (s *Service) Cancel(ctx context.Context, actor Actor, id, reason string) (*
 		r.CancelReason = &reason
 		return nil
 	}, "Referral cancelled: "+reason)
+	return s.emitted(ctx, EventCancelled, actor, nil, reason, r, err)
 }
 
 // Reassign hands an open referral over to another physiotherapist of the same
@@ -301,10 +325,12 @@ func (s *Service) Reassign(ctx context.Context, actor Actor, id string, req Reas
 	if err := s.checkTherapist(ctx, req.TherapistID, r.FacilityID); err != nil {
 		return nil, err
 	}
-	return s.transition(ctx, actor, id, r.Status, func(r *Referral) error {
+	previous := r.TherapistID
+	r, err = s.transition(ctx, actor, id, r.Status, func(r *Referral) error {
 		r.TherapistID = &req.TherapistID
 		return nil
 	}, "Referral handed over: "+reason)
+	return s.emitted(ctx, EventReassigned, actor, previous, reason, r, err)
 }
 
 // Reopen sends a declined referral out again — to a named therapist of the
@@ -326,12 +352,13 @@ func (s *Service) Reopen(ctx context.Context, actor Actor, id string, req Reopen
 			return nil, err
 		}
 	}
-	return s.transition(ctx, actor, id, StatusDeclined, func(r *Referral) error {
+	r, err = s.transition(ctx, actor, id, StatusDeclined, func(r *Referral) error {
 		r.Status = StatusPending
 		r.TherapistID = req.TherapistID
 		r.DeclineReason = nil // the decline stays on the thread as history
 		return nil
 	}, "Referral re-opened: "+reason)
+	return s.emitted(ctx, EventReopened, actor, nil, reason, r, err)
 }
 
 // checkTherapist validates that id is an active physiotherapist working in
@@ -376,6 +403,7 @@ func (s *Service) AddNote(ctx context.Context, actor Actor, id string, req NoteR
 	if err := s.repo.AddNote(ctx, n); err != nil {
 		return nil, err
 	}
+	_, _ = s.emitted(ctx, EventMessage, actor, nil, body, r, nil)
 	return n, nil
 }
 

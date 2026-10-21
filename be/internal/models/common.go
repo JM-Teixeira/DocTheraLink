@@ -85,21 +85,6 @@ type FileUpload struct {
 	UpdatedAt time.Time `json:"modified_date"`
 }
 
-// Notification represents system notifications
-type Notification struct {
-	ID               string `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Title            string `json:"title" gorm:"not null"`
-	Message          string `json:"message" gorm:"not null"`
-	NotificationType string `json:"notification_type" gorm:"not null"`
-	IsRead           bool   `json:"is_read" gorm:"default:false"`
-	UserID           uint   `json:"-"`
-
-	User User `json:"-" gorm:"foreignKey:UserID"`
-
-	CreatedAt time.Time `json:"created_date"`
-	UpdatedAt time.Time `json:"modified_date"`
-}
-
 // Inventory represents facility inventory items
 type InventoryItem struct {
 	ID          uint    `json:"id" gorm:"primaryKey"`

@@ -7,6 +7,7 @@ import (
 
 	"klyniva/internal/config"
 	"klyniva/internal/models"
+	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/referral"
 
 	"gorm.io/driver/postgres"
@@ -111,6 +112,7 @@ func Migrate() error {
 		{"inventory", []any{&models.InventoryItem{}}},
 		{"staff scheduling", []any{&models.TimeLog{}, &models.TimetableSection{}, &models.TimetableSlot{}}},
 		{"referrals", referral.Models()},
+		{"notifications", notification.Models()},
 	}
 	for i, p := range phases {
 		log.Printf("Migrating phase %d: %s...", i+1, p.name)

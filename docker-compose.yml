@@ -52,6 +52,14 @@ services:
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-168h}
       SEED_DEMO_USERS: ${SEED_DEMO_USERS:-true}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4000}
+      # Browser-facing URL, used for links in notification e-mails
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4000}
+      # Optional SMTP; without SMTP_HOST e-mails are only logged
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@klyniva.com}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "9000:9000"

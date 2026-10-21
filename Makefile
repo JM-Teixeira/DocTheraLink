@@ -41,19 +41,19 @@ check: ## Everything CI runs (except image builds)
 	cd fe && npm run typecheck && npm run lint:strict
 
 k8s-up: ## Local Kubernetes (k3d): create cluster, build, deploy → http://localhost:8088
-	scripts/k8s-local.sh up
+	bash scripts/k8s-local.sh up
 
 k8s-deploy: ## Rebuild images and roll out to the local cluster
-	scripts/k8s-local.sh deploy
+	bash scripts/k8s-local.sh deploy
 
 k8s-e2e: ## End-to-end API tests against the local cluster
-	scripts/k8s-local.sh e2e
+	bash scripts/k8s-local.sh e2e
 
 k8s-status: ## Pods/services of the local cluster
-	scripts/k8s-local.sh status
+	bash scripts/k8s-local.sh status
 
 k8s-down: ## Delete the local cluster (and its data)
-	scripts/k8s-local.sh down
+	bash scripts/k8s-local.sh down
 
 e2e-compose: ## End-to-end API tests against the docker compose stack
 	cd be && E2E_BASE_URL=http://localhost:4000 go test -tags e2e -count=1 -v ./internal/e2e/

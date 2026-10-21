@@ -287,5 +287,20 @@
   "referral_action_hint__reassign": "O novo fisioterapeuta continua o tratamento. O motivo fica registado na conversa.",
   "referral_action_hint__reopen": "Envie para outro fisioterapeuta, ou deixe vazio para voltar à caixa da clínica.",
   "referral_action_done__reassign": "Encaminhamento transferido",
-  "referral_action_done__reopen": "Encaminhamento reaberto"
+  "referral_action_done__reopen": "Encaminhamento reaberto",
+  "notifications": "Notificações",
+  "n_unread": "{{count}} por ler",
+  "unread": "Por ler",
+  "mark_all_as_read": "Marcar tudo como lido",
+  "no_notifications": "Não há notificações.",
+  "no_unread_notifications": "Sem notificações por ler.",
+  "notification__referral_created": "Novo encaminhamento de {{patient}} por {{actor}}",
+  "notification__referral_accepted": "{{actor}} aceitou o encaminhamento de {{patient}}",
+  "notification__referral_declined": "{{actor}} recusou o encaminhamento de {{patient}}",
+  "notification__referral_completed": "{{actor}} concluiu o tratamento de {{patient}}",
+  "notification__referral_cancelled": "{{actor}} cancelou o encaminhamento de {{patient}}",
+  "notification__referral_reassigned": "{{actor}} transferiu o encaminhamento de {{patient}}",
+  "notification__referral_reopened": "{{actor}} reabriu o encaminhamento de {{patient}}",
+  "notification__referral_message": "{{actor}} enviou uma mensagem sobre {{patient}}",
+  "open_clinic": "Abrir"
 }

@@ -22,22 +22,27 @@ import (
 
 const demoPassword = "1234@1"
 
-// TestMain waits until the target answers through its proxy/ingress (no 5xx)
-// before running the tests, so a just-finished rollout does not cause
-// spurious 502s while the old pod drains.
+// TestMain waits until the target answers through its proxy/ingress without
+// 5xx several times in a row before running the tests, so a just-finished
+// rollout (old pod still draining behind the ingress) causes no spurious 502s.
 func TestMain(m *testing.M) {
 	if base := strings.TrimRight(os.Getenv("E2E_BASE_URL"), "/"); base != "" {
-		deadline := time.Now().Add(90 * time.Second)
-		for {
-			resp, err := http.Get(base + "/api/v1/referrals/")
+		const needed = 5 // consecutive healthy answers
+		deadline := time.Now().Add(120 * time.Second)
+		healthy := 0
+		var lastErr error
+		for healthy < needed {
+			resp, err := http.Get(base + "/api/v1/auth/login/")
 			if err == nil {
 				resp.Body.Close()
-				if resp.StatusCode < 500 {
-					break
-				}
+			}
+			if err == nil && resp.StatusCode < 500 {
+				healthy++
+			} else {
+				healthy, lastErr = 0, err
 			}
 			if time.Now().After(deadline) {
-				fmt.Fprintf(os.Stderr, "e2e: %s not ready after 90s (last err %v)\n", base, err)
+				fmt.Fprintf(os.Stderr, "e2e: %s not stable after 120s (last err %v)\n", base, lastErr)
 				os.Exit(1)
 			}
 			time.Sleep(time.Second)
@@ -244,6 +249,64 @@ func TestHandOverAndReopen(t *testing.T) {
 	expect(t, "counts", sarah.call("GET", "/referrals/counts/?search=Handover", nil, &counts), 200)
 	if counts["in_progress"] < 1 {
 		t.Errorf("counts should include the in-progress referral: %v", counts)
+	}
+}
+
+// notificationFor finds the user's notification of a kind for a referral.
+func notificationFor(c *client, referralID, event string) map[string]any {
+	var page struct {
+		Results []map[string]any `json:"results"`
+	}
+	c.call("GET", "/notifications/?limit=100", nil, &page)
+	for _, n := range page.Results {
+		if n["referral_id"] == referralID && n["event"] == event {
+			return n
+		}
+	}
+	return nil
+}
+
+// TestNotifications: a new open referral notifies the clinic's physios (not
+// the doctor who created it); accepting notifies the doctor; read state works.
+func TestNotifications(t *testing.T) {
+	doctor, _ := login(t, "doctor")
+	sarah, _ := login(t, "physiotherapist")
+	tiago, _ := login(t, "physiotherapist2")
+
+	var p, ref map[string]any
+	expect(t, "patient", doctor.call("POST", "/patient/", map[string]any{"name": "Notify " + time.Now().Format("150405")}, &p), 201)
+	expect(t, "open referral", doctor.call("POST", "/referrals/", map[string]any{
+		"patient_id": p["id"], "diagnosis": "Neck pain", "reason": "Mobility",
+	}, &ref), 201)
+	rid := ref["id"].(string)
+
+	for name, c := range map[string]*client{"sarah": sarah, "tiago": tiago} {
+		n := notificationFor(c, rid, "referral_created")
+		if n == nil || n["read_at"] != nil || n["patient_name"] != p["name"] {
+			t.Fatalf("%s should have an unread referral_created notification, got %v", name, n)
+		}
+	}
+	if notificationFor(doctor, rid, "referral_created") != nil {
+		t.Error("the doctor must not be notified about their own referral")
+	}
+
+	expect(t, "accept", sarah.call("POST", "/referrals/"+rid+"/accept/", map[string]any{}, nil), 200)
+	n := notificationFor(doctor, rid, "referral_accepted")
+	if n == nil || n["actor_name"] != "Sarah Johnson" {
+		t.Fatalf("doctor should be told Sarah accepted: %v", n)
+	}
+	expect(t, "mark read", doctor.call("POST", "/notifications/"+n["id"].(string)+"/read/", map[string]any{}, nil), 204)
+	if n := notificationFor(doctor, rid, "referral_accepted"); n["read_at"] == nil {
+		t.Error("read state not saved")
+	}
+	expect(t, "cannot read someone else's", tiago.call("POST", "/notifications/"+n["id"].(string)+"/read/", map[string]any{}, nil), 404)
+
+	var count map[string]float64
+	expect(t, "unread count", sarah.call("GET", "/notifications/unread-count/", nil, &count), 200)
+	expect(t, "read all", sarah.call("POST", "/notifications/read-all/", map[string]any{}, nil), 204)
+	sarah.call("GET", "/notifications/unread-count/", nil, &count)
+	if count["unread"] != 0 {
+		t.Errorf("unread after read-all: %v", count)
 	}
 }
 
