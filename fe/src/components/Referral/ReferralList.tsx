@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 
 import Page from "@/components/Common/Page";
 import ReferralCard from "@/components/Referral/ReferralCard";
+import ReferralHelp from "@/components/Referral/ReferralHelp";
 import ReferralRoutes from "@/components/Referral/api";
 import {
   canCreateReferral,
@@ -91,6 +92,7 @@ export default function ReferralList() {
         )
       }
     >
+      <ReferralHelp />
       <p className="mb-5 max-w-2xl text-sm text-gray-600">
         {isTherapist(user)
           ? t("referral_inbox_description")

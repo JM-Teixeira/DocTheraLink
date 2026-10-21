@@ -99,10 +99,13 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [ ] Patient timeline: referrals, sessions, notes and documents in one view.
 - [ ] Consent records (GDPR) per patient.
 
-### M3 — Scheduling (P1)
-- [ ] Appointments linked to referrals; book the whole series of N sessions at once; receptionists manage them.
+### M3 — Scheduling (P1) — started early on request (time board)
+- [x] **Time board** (`/time-board`): divisions of the clinic (gym, rooms, pool…) with a capacity of patients per physio per hour; physio shifts per day per division; patients assigned per physio-hour (capacity, on-shift and double-booking checks, safe under concurrency); views by physio and by division; copy a day's shifts; attended / missed.
+- [x] **Coordinator** role (decision D6, pending user feedback): plans divisions and shifts and sees each physio's load; coordinators, admins and receptionists assign patients; everyone in the clinic sees the board; a physio marks their own patients attended/missed.
+- [ ] Waiting for user feedback on the time board (which roles do what, week view, recurring weekly pattern instead of copy-day).
+- [ ] Link board appointments to referrals (field exists) and book the whole series of N sessions at once; receptionists manage them.
 - [ ] Therapist availability from the timetable; room/section capacity; conflict checks.
-- [ ] Wire the existing (unrouted) WIP screens: `Facility/TimetableGrid`, `Therapy/*` (timetables, section manager) — rebuild on the module pattern where needed.
+- [x] Old unrouted WIP screens (`Facility/TimetableGrid`, `Therapy/*`) and the legacy `/timetable` + `/sections` API removed — superseded by the time board.
 - [ ] Day/week calendar per therapist and per section; drag to reschedule.
 - [ ] Waiting list, cancellations, no-show tracking.
 - [ ] SMS/e-mail reminders to patients.
@@ -115,7 +118,8 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [ ] Discharge summary generated from the record and sent to the referring doctor automatically.
 
 ### M5 — Clinic administration (P2)
-- [ ] **Inventory of consumables** (D1): catalogue (seeded: masks, gloves, gels, tape, electrodes…), stock in/out per clinic, minimum levels with low-stock alerts, usage per session (link to M2). Replaces the CARE inventory screens and `/facility/:id/inventory` stubs.
+- [x] **Inventory of consumables** (D1), done early on request (`/inventory`, sidebar): items per clinic with alert levels, use / restock / count with history, low and out-of-stock filters, demo stock seeded. Replaced the CARE inventory screens and 501 stubs.
+- [ ] Waiting for user feedback on inventory (who may add/remove items, suppliers, reorder list/export, usage per session → M2).
 - [ ] Wire the existing clock in/out button and time-log history (`Users/ClockInOutButton`, `Users/TimeLogHistory` — built but never shown); time-tracking reports and exports.
 - [ ] Organisations with several clinics (switch clinic, per-clinic admins) on top of `internal/clinic`.
 - [ ] Dashboards: referrals by status, waiting time to first session, therapist load, outcomes.

@@ -8,9 +8,11 @@ import (
 	"klyniva/internal/config"
 	"klyniva/internal/models"
 	"klyniva/internal/modules/attachment"
+	"klyniva/internal/modules/inventory"
 	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/patient"
 	"klyniva/internal/modules/referral"
+	"klyniva/internal/modules/schedule"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -111,8 +113,9 @@ func Migrate() error {
 		{"clinics", []any{&models.Facility{}}},
 		{"users", []any{&models.User{}, &models.Skill{}, &models.UserSkill{}}},
 		{"patients", []any{&models.Patient{}}},
-		{"inventory", []any{&models.InventoryItem{}}},
-		{"staff scheduling", []any{&models.TimeLog{}, &models.TimetableSection{}, &models.TimetableSlot{}}},
+		{"staff time log", []any{&models.TimeLog{}}},
+		{"inventory", inventory.Models()},
+		{"time board", schedule.Models()},
 		{"referrals", referral.Models()},
 		{"notifications", notification.Models()},
 		{"attachments", attachment.Models()},
@@ -227,29 +230,6 @@ func SeedData(includeDemoUsers bool) error {
 		}
 	}
 
-	// Seed the consumables catalogue of a physiotherapy clinic
-	const ppe, hygiene, treatment = "PPE", "Hygiene", "Treatment consumables"
-	inventoryItems := []models.InventoryItem{
-		{Name: "Surgical Mask", Category: ppe, Unit: "units"},
-		{Name: "Gloves", Category: ppe, Unit: "pairs"},
-		{Name: "Hand Sanitizer", Category: hygiene, Unit: "bottles"},
-		{Name: "Disinfectant Wipes", Category: hygiene, Unit: "packs"},
-		{Name: "Disposable Couch Roll", Category: hygiene, Unit: "rolls"},
-		{Name: "Towels", Category: hygiene, Unit: "units"},
-		{Name: "Ultrasound Gel", Category: treatment, Unit: "bottles"},
-		{Name: "Massage Oil", Category: treatment, Unit: "bottles"},
-		{Name: "Kinesiology Tape", Category: treatment, Unit: "rolls"},
-		{Name: "Electrode Pads (TENS)", Category: treatment, Unit: "packs"},
-		{Name: "Dry Needling Needles", Category: treatment, Unit: "boxes"},
-		{Name: "Ice / Cold Packs", Category: treatment, Unit: "units"},
-	}
-
-	for _, item := range inventoryItems {
-		if err := DB.FirstOrCreate(&item, models.InventoryItem{Name: item.Name}).Error; err != nil {
-			return fmt.Errorf("failed to seed inventory item %s: %w", item.Name, err)
-		}
-	}
-
 	if !includeDemoUsers {
 		log.Println("Database seeding completed (demo users skipped)")
 		return nil
@@ -291,6 +271,7 @@ func seedDemoClinic() error {
 		{"physiotherapist2", "Tiago", "Martins", models.RolePhysioTherapist, true},
 		{"nurse", "Mary", "Williams", models.RoleNurse, true},
 		{"receptionist", "Rita", "Lopes", models.RoleReceptionist, true},
+		{"coordinator", "Marta", "Ribeiro", models.RoleCoordinator, true},
 		{"staff", "General", "Staff", models.RoleStaff, true},
 	}
 	for _, d := range users {
@@ -315,7 +296,11 @@ func seedDemoClinic() error {
 			return fmt.Errorf("failed to update demo user %s: %w", d.username, err)
 		}
 	}
-	return nil
+	// Demo stock and a time board with divisions and shifts
+	if err := inventory.SeedDemo(DB, DemoClinicID); err != nil {
+		return err
+	}
+	return schedule.SeedDemo(DB, DemoClinicID, time.Now())
 }
 
 // Close closes the database connection

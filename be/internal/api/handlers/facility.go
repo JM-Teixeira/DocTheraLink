@@ -401,42 +401,6 @@ func (h *FacilityHandler) GetFacilityUsers(c *gin.Context) {
 	})
 }
 
-func (h *FacilityHandler) GetInventoryLog(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) CreateInventory(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetMinQuantity(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) SetMinQuantity(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetMinQuantityItem(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) UpdateMinQuantity(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetInventorySummary(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) FlagInventoryItem(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) DeleteLastInventoryLog(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
 func (h *FacilityHandler) GetDistrictsByState(c *gin.Context) {
 	stateID := c.Param("id")
 
@@ -509,10 +473,6 @@ func (h *FacilityHandler) GetWards(c *gin.Context) {
 }
 
 func (h *FacilityHandler) GetWard(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetItems(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
 }
 

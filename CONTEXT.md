@@ -32,14 +32,15 @@ be/                Go backend (Go module name: klyniva)
   cmd/migrate      migrations + seeding CLI
   internal/
     api/routes.go  all route registration (/api/v1)
-    api/handlers/  legacy handlers (users, facilities, time log, timetable;
-                   inventory endpoints are still 501 stubs)
+    api/handlers/  legacy handlers (users, facilities, time log)
     modules/       NEW layered modules — use this pattern for new features
       referral/    model → repository → service → handler → routes (+ tests)
       patient/     same layout
       notification/ in-app + e-mail notifications fed by referral events
       attachment/  files on referrals; access follows the referral
       catalog/     embedded ICD-10 subset + referral templates (EN/PT, read-only)
+      inventory/   clinic consumables: items, movements (use/restock/count), alerts
+      schedule/    time board: divisions, shifts, appointments per physio-hour
     storage/       file Store interface (Local today, S3 later)
     mailer/        SMTP or log-only mailer (no patient data in e-mails)
     clinic/        which clinic a user works in (Resolver) — scope new data with it
@@ -103,8 +104,10 @@ context. Roles are strings on `users.user_type`. Admin = State/District/LocalBod
 admin (organisation-wide, no clinic).
 
 **Roles in use:** `Doctor` (refers), `PhysioTherapist` (treats), `Nurse`,
-`Receptionist` (front desk: registers/edits patients, appointments in M3, **no**
-referrals/clinical notes), `Staff`, read-only variants, admins. Frontend checks
+`Receptionist` (front desk: registers/edits patients, assigns patients on the
+time board, **no** referrals/clinical notes), `Coordinator` (runs the clinic
+day: plans divisions and physio shifts, sees physio load, removes stock items;
+no referrals), `Staff`, read-only variants, admins. Frontend checks
 live in `fe/src/Utils/roles.ts` and mirror the backend.
 
 **Clinics (decision D2):** single clinic today, built for many. A clinic is a
@@ -188,7 +191,7 @@ the repo ownership).
 
 ## 7. Known gaps (details in TODO.md)
 
-Inventory endpoints still return 501 (rebuilt in M5); attachments live on
+Attachments live on
 the backend's PVC (`UPLOAD_PATH`), so S3 is needed before scaling out;
 password reset is a stub; no audit log; no rate limiting; inherited frontend
 code still has many (mostly formatting) lint errors, so CI lints new code via

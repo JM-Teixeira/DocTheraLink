@@ -21,6 +21,14 @@ export const isAdmin = (u: RoleUser) => ADMIN_ROLES.includes(u.user_type);
 export const isDoctor = (u: RoleUser) => u.user_type === "Doctor";
 export const isTherapist = (u: RoleUser) => u.user_type === "PhysioTherapist";
 export const isReceptionist = (u: RoleUser) => u.user_type === "Receptionist";
+export const isCoordinator = (u: RoleUser) => u.user_type === "Coordinator";
+
+/** Divisions and physio shifts on the time board: coordinators and admins. */
+export const canManageBoard = (u: RoleUser) => isAdmin(u) || isCoordinator(u);
+
+/** Assigning patients to a physio's hour: the board managers and the front desk. */
+export const canBookPatients = (u: RoleUser) =>
+  canManageBoard(u) || isReceptionist(u);
 export const isReadOnly = (u: RoleUser) =>
   READ_ONLY_ROLES.includes(u.user_type);
 

@@ -65,6 +65,8 @@ const StatelessSidebar = ({
           } as const,
         ]
       : []),
+    { text: t("time_board"), to: "/time-board", icon: "l-schedule" },
+    { text: t("inventory"), to: "/inventory", icon: "l-box" },
     { text: t("clinic"), to: "/facility", icon: "d-hospital" },
     { text: t("users"), to: "/users", icon: "d-people" },
   ];

@@ -39,7 +39,6 @@ import { FeatureFlagsProvider } from "@/Utils/featureFlags";
 import { handleHttpError } from "@/Utils/request/errorHandler";
 
 import { PubSubProvider } from "./Utils/pubsubContext";
-import { createSampleData } from "./Utils/sampleData";
 
 // Configure React Query client optimized for healthcare data management
 // Healthcare data requires careful caching strategies due to:
@@ -86,13 +85,6 @@ const queryClient = new QueryClient({
  */
 const App = () => {
   // Initialize sample data for demo purposes
-  React.useEffect(() => {
-    if (import.meta.env.DEV) {
-      createSampleData().then(() => {
-        console.log('Klyniva sample data initialized');
-      });
-    }
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -5,7 +5,6 @@ import { FacilityList } from "@/components/Facility/FacilityList";
 import FacilityUsers from "@/components/Facility/FacilityUsers";
 
 import { AppRoutes } from "@/Routers/AppRouter";
-import FacilityInventoryRoutes from "@/Routers/routes/FacilityInventoryRoutes";
 
 const FacilityRoutes: AppRoutes = {
   "/facility": () => <FacilityList />,
@@ -22,7 +21,6 @@ const FacilityRoutes: AppRoutes = {
   "/facility/:facilityId/users": ({ facilityId }) => (
     <FacilityUsers facilityId={facilityId} />
   ),
-  ...FacilityInventoryRoutes,
 };
 
 export default FacilityRoutes;

@@ -93,7 +93,8 @@ print_access() {
     doctor            Dr. John Smith (refers patients)
     physiotherapist   Sarah Johnson
     physiotherapist2  Tiago Martins
-    receptionist      Rita Lopes (patients, no clinical referrals)
+    receptionist      Rita Lopes (patients, assigns patients on the time board)
+    coordinator       Marta Ribeiro (time board: divisions, shifts, physio load)
     nurse, staff      other clinic staff
     stateadmin        administrator (all clinics)
 

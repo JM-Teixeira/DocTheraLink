@@ -11,9 +11,11 @@ import (
 	"klyniva/internal/models"
 	"klyniva/internal/modules/attachment"
 	"klyniva/internal/modules/catalog"
+	"klyniva/internal/modules/inventory"
 	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/patient"
 	"klyniva/internal/modules/referral"
+	"klyniva/internal/modules/schedule"
 	"klyniva/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -28,7 +30,6 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	facilityHandler := handlers.NewFacilityHandler(cfg)
 	patientHandler := handlers.NewPatientHandler(cfg)
 	timeLogHandler := handlers.NewTimeLogHandler(cfg)
-	timetableHandler := handlers.NewTimetableHandler(cfg)
 
 	// Public routes (no authentication required)
 	public := router.Group("")
@@ -81,23 +82,9 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	facilities.PATCH("/:id/", facilityHandler.PartialUpdateFacility)
 	facilities.DELETE("/:id/", facilityHandler.DeleteFacility)
 	facilities.GET("/:id/users/", facilityHandler.GetFacilityUsers)
-	// Inventory: still stubs (501), to be rebuilt as a module (TODO M5)
-	facilities.GET("/:id/inventory/", facilityHandler.GetInventoryLog)
-	facilities.POST("/:id/inventory/", facilityHandler.CreateInventory)
-	facilities.GET("/:id/min_quantity/", facilityHandler.GetMinQuantity)
-	facilities.POST("/:id/min_quantity/", facilityHandler.SetMinQuantity)
-	facilities.GET("/:id/min_quantity/:inventory_id/", facilityHandler.GetMinQuantityItem)
-	facilities.PATCH("/:id/min_quantity/:inventory_id/", facilityHandler.UpdateMinQuantity)
-	facilities.GET("/:id/inventorysummary/", facilityHandler.GetInventorySummary)
-	facilities.PUT("/:id/inventory/:inventory_id/flag/", facilityHandler.FlagInventoryItem)
-	facilities.DELETE("/:id/inventory/delete_last/", facilityHandler.DeleteLastInventoryLog)
-	// Timetable sections
-	facilities.GET("/:id/sections/", timetableHandler.ListSections)
-	facilities.POST("/:id/sections/", timetableHandler.CreateSection)
 
 	protected.GET("/getallfacilities/", facilityHandler.ListAllFacilities)
 	protected.GET("/getallfacilities/:id/", facilityHandler.GetAnyFacility)
-	protected.GET("/items/", facilityHandler.GetItems)
 
 	// Geographic reference data (Portuguese districts/municipalities)
 	protected.GET("/state/", facilityHandler.ListStates)
@@ -144,17 +131,11 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	timelog.GET("/status", timeLogHandler.GetCurrentStatus)
 	timelog.GET("/user/:id", timeLogHandler.GetUserLogs)
 
-	// Timetable
-	timetable := protected.Group("/timetable")
-	timetable.GET("/:id", timetableHandler.GetTimetable)
-	timetable.POST("/:id/slot", timetableHandler.CreateSlot)
-	timetable.PUT("/slot/:id", timetableHandler.UpdateSlot)
-	timetable.DELETE("/slot/:id", timetableHandler.DeleteSlot)
+	// Clinic consumables (stock, use, restock, low-stock alerts)
+	inventory.RegisterRoutes(protected, db)
 
-	sections := protected.Group("/sections")
-	sections.GET("/:id", timetableHandler.GetSection)
-	sections.PUT("/:id", timetableHandler.UpdateSection)
-	sections.DELETE("/:id", timetableHandler.DeleteSection)
+	// Time board: divisions, physio shifts, patients per physio per hour
+	schedule.RegisterRoutes(protected, db)
 
 	// Admin-only CSV exports
 	admin := protected.Group("")

@@ -34,7 +34,8 @@ Demo logins (local demo data only), password **`1234@1`** for all:
 | `doctor` | Dr. John Smith | patients, create/follow referrals |
 | `physiotherapist` | Sarah Johnson | referral inbox, accept/treat/complete |
 | `physiotherapist2` | Tiago Martins | second therapist (hand-over) |
-| `receptionist` | Rita Lopes | register/edit patients, no clinical referrals |
+| `receptionist` | Rita Lopes | register/edit patients, assign patients on the time board |
+| `coordinator` | Marta Ribeiro | plans divisions and physio shifts, sees physio load, inventory |
 | `nurse`, `staff` | clinic staff | patients |
 | `stateadmin` | administrator | everything, all clinics |
 

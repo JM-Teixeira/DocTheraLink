@@ -51,7 +51,7 @@
     "cypress:install": "cross-env NODE_ENV=development cypress install",
     "prepare": "husky",
     "lint": "eslint ./src",
-    "lint:strict": "eslint --max-warnings=0 src/components/Referral src/components/Patient/PatientList.tsx src/components/Patient/PatientForm.tsx src/components/Patient/PatientDetail.tsx src/components/Patient/DuplicatePatientsDialog.tsx src/components/Patient/patientFormUtils.ts src/components/Patient/patientFormUtils.test.ts src/Utils/roles.ts src/Utils/person.ts src/hooks/useDebouncedValue.ts src/components/Notifications src/components/Facility/FacilityCard.tsx src/Routers src/test",
+    "lint:strict": "eslint --max-warnings=0 src/components/Referral src/components/Inventory src/components/TimeBoard src/Routers/routes/ClinicOpsRoutes.tsx src/components/Patient/PatientList.tsx src/components/Patient/PatientForm.tsx src/components/Patient/PatientDetail.tsx src/components/Patient/DuplicatePatientsDialog.tsx src/components/Patient/patientFormUtils.ts src/components/Patient/patientFormUtils.test.ts src/Utils/roles.ts src/Utils/person.ts src/hooks/useDebouncedValue.ts src/components/Notifications src/components/Facility/FacilityCard.tsx src/Routers src/test",
     "lint-fix": "eslint ./src --fix",
     "format": "prettier ./src ./cypress --write",
     "sort-locales": "node ./scripts/sort-locales.js"

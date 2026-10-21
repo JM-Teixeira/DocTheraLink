@@ -17,6 +17,7 @@ import { usePluginRoutes } from "@/hooks/useCareApps";
 
 import { BLACKLISTED_PATHS } from "@/common/constants";
 
+import ClinicOpsRoutes from "@/Routers/routes/ClinicOpsRoutes";
 import FacilityRoutes from "@/Routers/routes/FacilityRoutes";
 import PatientRoutes from "@/Routers/routes/PatientRoutes";
 import ReferralRoutes from "@/Routers/routes/ReferralRoutes";
@@ -43,6 +44,7 @@ const Routes: AppRoutes = {
   ...FacilityRoutes,
   ...PatientRoutes,
   ...ReferralRoutes,
+  ...ClinicOpsRoutes,
   ...UserRoutes,
 
   "/session-expired": () => <SessionExpired />,

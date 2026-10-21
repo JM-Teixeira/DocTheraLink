@@ -15,6 +15,7 @@ const (
 	RoleStaffReadOnly         UserRole = "StaffReadOnly"
 	RoleStaff                 UserRole = "Staff"
 	RoleReceptionist          UserRole = "Receptionist" // front desk: patients and appointments, no clinical notes
+	RoleCoordinator           UserRole = "Coordinator"  // runs the clinic day: time board, divisions, physio load, stock
 	RoleNurse                 UserRole = "Nurse"
 	RolePhysioTherapist       UserRole = "PhysioTherapist"
 	RoleDoctor                UserRole = "Doctor"

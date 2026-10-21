@@ -7,6 +7,24 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-21 — M4 patients (branch `feat/m4-patients`)
 
+### 13:30 · Time board, working inventory, Coordinator role (user request)
+- **Time board** (`modules/schedule`, `/time-board`): divisions with a
+  per-hour capacity per physio; daily shifts per physio and division (no
+  overlaps, edits cannot strand booked patients); patients assigned to a
+  physio-hour (must be on shift, capacity, patient not double-booked;
+  advisory locks make it safe under concurrency); board by physio (load per
+  hour, day total) and by division (who is where); copy a day's shifts;
+  attended/missed. Demo divisions and two weeks of weekday shifts seeded.
+- **Inventory** (`modules/inventory`, `/inventory` in the sidebar): items per
+  clinic with alert level, use/restock/count with history (row-locked, never
+  below zero), filters for low/out, demo stock seeded.
+- **Coordinator** role + demo user `coordinator` (Marta Ribeiro).
+- "How referrals work" explainer on the referrals page.
+- Removed: CARE inventory pages and 501 stubs, legacy timetable/sections
+  API and models, unrouted Therapy/TimetableGrid WIP, dev sample data.
+- Tests: service rules (unit), concurrency + SQL on PostgreSQL, e2e
+  `TestInventory` and `TestTimeBoard`, frontend helpers (80 tests).
+
 ### 11:40 · NIF / SNS number and duplicate-patient detection
 - Backend: `nif` and `sns_number` on patients (NIF check digit validated,
   both normalised to 9 digits); partial unique indexes per clinic.
