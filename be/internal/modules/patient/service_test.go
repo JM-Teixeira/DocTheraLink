@@ -57,6 +57,20 @@ func (f *fakeRepo) Update(_ context.Context, id string, fields map[string]any) e
 	return nil
 }
 
+// Candidates mirrors the SQL pre-filter of GormRepository.Candidates.
+func (f *fakeRepo) Candidates(_ context.Context, _ Scope, q DuplicateQuery) ([]models.Patient, error) {
+	var out []models.Patient
+	for _, p := range f.patients {
+		if (q.NIF != "" && p.NIF != nil && *p.NIF == q.NIF) ||
+			(q.SNS != "" && p.SNSNumber != nil && *p.SNSNumber == q.SNS) ||
+			(q.DateOfBirth != nil && p.DateOfBirth != nil && sameDay(*q.DateOfBirth, *p.DateOfBirth)) ||
+			(q.PhoneKey != "" && phoneKey(p.PhoneNumber) == q.PhoneKey) {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
 var (
 	nurse        = Actor{ID: 5, Role: models.RoleNurse}
 	receptionist = Actor{ID: 7, Role: models.RoleReceptionist}

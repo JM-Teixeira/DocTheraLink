@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"klyniva/internal/textutil"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -111,7 +113,7 @@ func TestHTTP(t *testing.T) {
 		t.Fatalf("icd10: %d %v", code, res)
 	}
 	for _, r := range res {
-		if !strings.Contains(fold(r.Description), "ombro") {
+		if !strings.Contains(textutil.Fold(r.Description), "ombro") {
 			t.Errorf("Accept-Language pt should give Portuguese descriptions: %v", r)
 		}
 	}

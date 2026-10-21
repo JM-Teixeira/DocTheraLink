@@ -125,3 +125,51 @@ func TestPatientVisibility(t *testing.T) {
 		t.Errorf("update not persisted: %+v", upd)
 	}
 }
+
+// TestPatientDuplicatesOnPostgres checks the SQL pre-filter (birth date,
+// phone by last 9 digits, identifiers), clinic scoping of duplicates and the
+// partial unique indexes that back the NIF/SNS rule.
+func TestPatientDuplicatesOnPostgres(t *testing.T) {
+	startDB(t)
+	ctx := context.Background()
+	db := database.GetDB()
+	svc := patient.NewService(patient.NewGormRepository(db), clinic.NewGormResolver(db), nil)
+	nurse := userID(t, "nurse")
+	as := patient.Actor{ID: nurse.ID, Role: nurse.Role}
+	s := func(v string) *string { return &v }
+
+	first, err := svc.Create(ctx, as, patient.CreateRequest{
+		Name: "Inês Conceição Ramos", DateOfBirth: s("1984-02-29"), PhoneNumber: s("+351 913 111 222"), NIF: s("123456789"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for name, req := range map[string]patient.CreateRequest{
+		"birth date": {Name: "ines ramos", DateOfBirth: s("1984-02-29")},
+		"phone":      {Name: "INES RAMOS", PhoneNumber: s("913111222")},
+		"NIF":        {Name: "Someone Else", NIF: s("123456789")},
+	} {
+		var dup *patient.DuplicateError
+		if _, err := svc.Create(ctx, as, req); !errors.As(err, &dup) || len(dup.Matches) != 1 || dup.Matches[0].ID != first.ID {
+			t.Errorf("%s: want one duplicate, got %v", name, err)
+		}
+	}
+
+	// Another clinic neither sees the patient as a duplicate nor clashes on NIF
+	other := models.Facility{Name: "Clinic B"}
+	if err := db.Create(&other).Error; err != nil {
+		t.Fatal(err)
+	}
+	far := newUser(t, "dup-far-nurse", models.RoleNurse, &other.ID)
+	if _, err := svc.Create(ctx, patient.Actor{ID: far.ID, Role: far.Role},
+		patient.CreateRequest{Name: "Inês Ramos", DateOfBirth: s("1984-02-29"), NIF: s("123456789")}); err != nil {
+		t.Errorf("other clinic: %v", err)
+	}
+
+	// The unique index stops a second NIF in the same clinic even without the service check
+	dupRow := models.Patient{Name: "Raw insert", NIF: s("123456789"), FacilityID: first.FacilityID, IsActive: true}
+	if err := patient.NewGormRepository(db).Create(ctx, &dupRow); !errors.Is(err, patient.ErrDuplicateIdentifier) {
+		t.Errorf("unique index: want ErrDuplicateIdentifier, got %v", err)
+	}
+}

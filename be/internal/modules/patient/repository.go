@@ -15,11 +15,16 @@ import (
 
 	"klyniva/internal/models"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
 // ErrNotFound is returned when a patient does not exist or is not visible.
 var ErrNotFound = errors.New("patient not found")
+
+// ErrDuplicateIdentifier is returned when the clinic already has a patient
+// with the same NIF or SNS number (unique index; races the service check).
+var ErrDuplicateIdentifier = errors.New("a patient with this identifier already exists")
 
 // Scope restricts which patients a query may return.
 type Scope struct {
@@ -44,6 +49,9 @@ type Repository interface {
 	Get(ctx context.Context, s Scope, id string) (*models.Patient, error)
 	Create(ctx context.Context, p *models.Patient) error
 	Update(ctx context.Context, id string, fields map[string]any) error
+	// Candidates returns visible patients sharing an identifier, the birth
+	// date or the phone number with q (at most 50); see classify.
+	Candidates(ctx context.Context, s Scope, q DuplicateQuery) ([]models.Patient, error)
 }
 
 // GormRepository implements Repository on PostgreSQL via GORM.
@@ -109,19 +117,57 @@ func (g *GormRepository) Get(ctx context.Context, s Scope, id string) (*models.P
 
 func (g *GormRepository) Create(ctx context.Context, p *models.Patient) error {
 	// Omit associations so a client-supplied nested object never writes other tables.
-	return g.db.WithContext(ctx).Omit("Facility", "State", "District", "LocalBody", "Ward",
+	err := g.db.WithContext(ctx).Omit("Facility", "State", "District", "LocalBody", "Ward",
 		"AssignedTo", "CreatedBy", "LastEdited").Create(p).Error
+	return translate(err)
 }
 
 func (g *GormRepository) Update(ctx context.Context, id string, fields map[string]any) error {
 	res := g.db.WithContext(ctx).Model(&models.Patient{}).Where("id = ?", id).Updates(fields)
 	if res.Error != nil {
-		return res.Error
+		return translate(res.Error)
 	}
 	if res.RowsAffected == 0 {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (g *GormRepository) Candidates(ctx context.Context, s Scope, q DuplicateQuery) ([]models.Patient, error) {
+	fresh := g.db.Session(&gorm.Session{NewDB: true})
+	cond := fresh.Where("1 = 0")
+	if q.NIF != "" {
+		cond = cond.Or("patients.nif = ?", q.NIF)
+	}
+	if q.SNS != "" {
+		cond = cond.Or("patients.sns_number = ?", q.SNS)
+	}
+	if q.DateOfBirth != nil {
+		cond = cond.Or("(patients.date_of_birth AT TIME ZONE 'UTC')::date = ?", q.DateOfBirth.UTC().Format(dateLayout))
+	}
+	if q.PhoneKey != "" {
+		cond = cond.Or("RIGHT(regexp_replace(COALESCE(patients.phone_number, ''), '[^0-9]', '', 'g'), 9) = ?", q.PhoneKey)
+	}
+	var out []models.Patient
+	err := scoped(g.db.WithContext(ctx).Model(&models.Patient{}), s).
+		Where(cond).Order("created_at DESC").Limit(50).Find(&out).Error
+	return out, err
+}
+
+// translate maps unique-index violations to ErrDuplicateIdentifier.
+func translate(err error) error {
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "23505" {
+		return ErrDuplicateIdentifier
+	}
+	return err
+}
+
+// UniqueIndexes are created after AutoMigrate: one NIF / SNS number per
+// clinic (partial, so patients without them and deleted ones don't count).
+var UniqueIndexes = []string{
+	`CREATE UNIQUE INDEX IF NOT EXISTS uniq_patients_clinic_nif ON patients (facility_id, nif) WHERE nif IS NOT NULL AND deleted_at IS NULL`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS uniq_patients_clinic_sns ON patients (facility_id, sns_number) WHERE sns_number IS NOT NULL AND deleted_at IS NULL`,
 }
 
 // escapeLike escapes LIKE wildcards so user input is matched literally.

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
+import DuplicatePatientsDialog from "@/components/Patient/DuplicatePatientsDialog";
 import {
   useCreatePatient,
   usePatchPatient,
@@ -20,6 +21,8 @@ import {
   GENDERS,
   PatientFormErrors,
   PatientFormState,
+  PossibleDuplicate,
+  duplicatesFromError,
   formToPayload,
   patientToForm,
   serverErrorsToForm,
@@ -40,6 +43,10 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
   const editing = !!patientId;
   const [form, setForm] = useState<PatientFormState>(EMPTY_PATIENT_FORM);
   const [errors, setErrors] = useState<PatientFormErrors>({});
+  const [dupes, setDupes] = useState<{
+    blocking: boolean;
+    matches: PossibleDuplicate[];
+  } | null>(null);
 
   const existing = usePatient(patientId ?? "", { enabled: editing });
   useEffect(() => {
@@ -62,6 +69,14 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
     navigate(`/patients/${p.id}`);
   };
   const onError = (err: Error) => {
+    const found =
+      err instanceof HTTPError
+        ? duplicatesFromError(err.status, err.cause)
+        : null;
+    if (found) {
+      setDupes(found);
+      return;
+    }
     const fieldErrors =
       err instanceof HTTPError ? serverErrorsToForm(err.cause) : {};
     setErrors(fieldErrors);
@@ -69,8 +84,7 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
       Notification.Error({ msg: t("patient_save_failed") });
   };
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = (allowDuplicate = false) => {
     const v = validatePatientForm(form);
     setErrors(v);
     if (Object.keys(v).length) return;
@@ -80,7 +94,15 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
         { id: patientId, data: body },
         { onSuccess: onSaved, onError },
       );
-    else create.mutate(body, { onSuccess: onSaved, onError });
+    else
+      create.mutate(
+        allowDuplicate ? { ...body, allow_duplicate: true } : body,
+        { onSuccess: onSaved, onError },
+      );
+  };
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    save();
   };
 
   if (editing && existing.isLoading) return <Loading />;
@@ -136,6 +158,27 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
           </Field>
           <Field label={t("nationality")} id="nationality">
             <input {...fieldProps("nationality")} className={inputClass} />
+          </Field>
+          <Field label={t("nif")} id="nif" error={errors.nif}>
+            <input
+              {...fieldProps("nif")}
+              inputMode="numeric"
+              maxLength={11}
+              placeholder={t("nif_placeholder")}
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            label={t("sns_number")}
+            id="sns_number"
+            error={errors.sns_number}
+          >
+            <input
+              {...fieldProps("sns_number")}
+              inputMode="numeric"
+              maxLength={11}
+              className={inputClass}
+            />
           </Field>
           <fieldset className="sm:col-span-2">
             <legend className="text-sm font-medium text-gray-700">
@@ -245,6 +288,18 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
           </Button>
         </div>
       </form>
+      <DuplicatePatientsDialog
+        open={!!dupes}
+        blocking={dupes?.blocking ?? false}
+        matches={dupes?.matches ?? []}
+        pending={saving}
+        onOpenPatient={(id) => navigate(`/patients/${id}`)}
+        onConfirmDifferent={() => {
+          setDupes(null);
+          save(true);
+        }}
+        onClose={() => setDupes(null)}
+      />
     </Page>
   );
 }

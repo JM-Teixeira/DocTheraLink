@@ -108,6 +108,10 @@ export interface PatientModel {
   district?: number;
   state?: number;
   nationality?: string;
+  nif?: string | null;
+  sns_number?: string | null;
+  /** Create only: confirm a name-based possible duplicate is another person. */
+  allow_duplicate?: boolean;
   passport_no?: string;
   ration_card_category?: (typeof RATION_CARD_CATEGORY)[number] | null;
   date_of_test?: string;

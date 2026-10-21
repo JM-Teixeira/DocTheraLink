@@ -5,6 +5,29 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-21 — M4 patients (branch `feat/m4-patients`)
+
+### 11:40 · NIF / SNS number and duplicate-patient detection
+- Backend: `nif` and `sns_number` on patients (NIF check digit validated,
+  both normalised to 9 digits); partial unique indexes per clinic.
+  Registering returns 409 `duplicate_patient` with the matching visible
+  patients: same NIF/SNS always blocks; similar name (accent/case
+  insensitive, same first and last name) + same birth date or phone
+  (last 9 digits) needs `allow_duplicate`. Editing to another patient's
+  NIF/SNS is blocked. Shared `internal/textutil` (fold, words, digits).
+- Frontend: NIF / SNS fields with inline validation, shown on the patient
+  page; "may already be registered" dialog (open existing / register as a
+  different person).
+- Tests: identifiers, name similarity, duplicate rules (unit), SQL
+  pre-filter + unique index + clinic isolation (PostgreSQL), e2e
+  `TestPatientIdentifiersAndDuplicates`, form helpers.
+
+### 11:00 · Local access
+- `make k8s-start` / `scripts/start-klyniva.cmd` start the cluster after a
+  reboot and keep WSL alive; README lists every demo login.
+
+---
+
 ## 2026-10-21 — M1 referral loop (branch `feat/m1-referral-loop`)
 
 ### 10:45 · Printable referral letter / discharge summary — M1 complete

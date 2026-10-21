@@ -31,6 +31,8 @@ export interface PatientFormState {
   phone_number: string;
   emergency_phone_number: string;
   nationality: string;
+  nif: string;
+  sns_number: string;
   address: string;
   blood_group: string;
   allergies: string;
@@ -45,6 +47,8 @@ export const EMPTY_PATIENT_FORM: PatientFormState = {
   phone_number: "",
   emergency_phone_number: "",
   nationality: "",
+  nif: "",
+  sns_number: "",
   address: "",
   blood_group: "",
   allergies: "",
@@ -61,6 +65,8 @@ export function patientToForm(p: PatientModel): PatientFormState {
     phone_number: p.phone_number ?? "",
     emergency_phone_number: p.emergency_phone_number ?? "",
     nationality: p.nationality ?? "",
+    nif: p.nif ?? "",
+    sns_number: p.sns_number ?? "",
     address: p.address ?? "",
     blood_group: p.blood_group ?? "",
     allergies: p.allergies ?? "",
@@ -82,6 +88,8 @@ export function formToPayload(f: PatientFormState): Record<string, unknown> {
     phone_number: opt(f.phone_number),
     emergency_phone_number: opt(f.emergency_phone_number),
     nationality: opt(f.nationality),
+    nif: opt(normalizeId(f.nif)),
+    sns_number: opt(normalizeId(f.sns_number)),
     address: opt(f.address),
     blood_group: opt(f.blood_group),
     allergies: opt(f.allergies),
@@ -89,6 +97,29 @@ export function formToPayload(f: PatientFormState): Record<string, unknown> {
     ongoing_medication: opt(f.ongoing_medication),
   };
 }
+
+/** Removes the separators people type in identifiers ("123 456 789"). */
+export const normalizeId = (s: string) => s.replace(/[\s.-]/g, "");
+
+/**
+ * Portuguese NIF: 9 digits, the last a mod-11 check digit (weights 9..2).
+ * Mirrors ValidNIF in be/internal/modules/patient/identifiers.go.
+ */
+export function validNif(raw: string) {
+  const nif = normalizeId(raw);
+  if (!/^\d{9}$/.test(nif)) return false;
+  let sum = 0;
+  for (let i = 0; i < 8; i++) sum += Number(nif[i]) * (9 - i);
+  const check = 11 - (sum % 11);
+  return Number(nif[8]) === (check >= 10 ? 0 : check);
+}
+
+/** Groups a stored 9-digit identifier for display: "123 456 789". */
+export const formatId = (id?: string | null) =>
+  id ? id.replace(/^(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3") : id;
+
+/** SNS number (nº de utente): 9 digits; its check rule is not public. */
+export const validSns = (raw: string) => /^\d{9}$/.test(normalizeId(raw));
 
 /** Same pattern as the backend's phone validation. */
 const PHONE_RE = /^\+?[0-9 ()\-.]{6,20}$/;
@@ -107,6 +138,9 @@ export function validatePatientForm(
     if (Number.isNaN(d.getTime())) errors.date_of_birth = "error__invalid_date";
     else if (d > today) errors.date_of_birth = "error__date_in_future";
   }
+  if (f.nif.trim() && !validNif(f.nif)) errors.nif = "error__invalid_nif";
+  if (f.sns_number.trim() && !validSns(f.sns_number))
+    errors.sns_number = "error__invalid_sns";
   for (const k of ["phone_number", "emergency_phone_number"] as const) {
     if (f[k].trim() && !PHONE_RE.test(f[k].trim()))
       errors[k] = "error__invalid_phone";
@@ -127,6 +161,28 @@ export function serverErrorsToForm(cause: unknown): PatientFormErrors {
     if (field in EMPTY_PATIENT_FORM) out[field as keyof PatientFormState] = msg;
   }
   return out;
+}
+
+/** An existing patient the backend thinks may be the same person (409). */
+export interface PossibleDuplicate {
+  id: string;
+  name: string;
+  date_of_birth?: string | null;
+  phone_number?: string | null;
+  reason: "nif" | "sns_number" | "name_dob" | "name_phone";
+  blocking: boolean;
+}
+
+/** Reads the 409 duplicate_patient answer; null for any other error. */
+export function duplicatesFromError(
+  status: number | undefined,
+  cause: unknown,
+): { blocking: boolean; matches: PossibleDuplicate[] } | null {
+  const c = cause as
+    | { error?: string; blocking?: boolean; duplicates?: PossibleDuplicate[] }
+    | undefined;
+  if (status !== 409 || c?.error !== "duplicate_patient") return null;
+  return { blocking: !!c.blocking, matches: c.duplicates ?? [] };
 }
 
 /** Translation key for a gender code. */

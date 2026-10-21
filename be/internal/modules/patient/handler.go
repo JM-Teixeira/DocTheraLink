@@ -29,7 +29,17 @@ func actorFrom(c *gin.Context) (Actor, bool) {
 // writeError maps service errors onto HTTP status codes.
 func writeError(c *gin.Context, err error) {
 	var verr *ValidationError
+	var dup *DuplicateError
 	switch {
+	case errors.As(err, &dup):
+		matches := dup.Matches
+		if matches == nil {
+			matches = []Duplicate{}
+		}
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "duplicate_patient", "message": dup.Error(),
+			"blocking": dup.Blocking() || len(matches) == 0, "duplicates": matches,
+		})
 	case errors.As(err, &verr):
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error: "validation_error", Message: verr.Error(),

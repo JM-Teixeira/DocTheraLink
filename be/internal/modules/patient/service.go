@@ -54,11 +54,16 @@ type CreateRequest struct {
 	PermanentAddress      *string `json:"permanent_address"`
 	Pincode               *int    `json:"pincode"`
 	Nationality           *string `json:"nationality"`
+	NIF                   *string `json:"nif"`
+	SNSNumber             *string `json:"sns_number"`
 	Allergies             *string `json:"allergies"`
 	MedicalHistoryDetails *string `json:"medical_history_details"`
 	OngoingMedication     *string `json:"ongoing_medication"`
 	PresentHealth         *string `json:"present_health"`
 	FacilityID            *string `json:"facility" binding:"omitempty,uuid"`
+	// AllowDuplicate confirms the user checked the name-based possible
+	// duplicates and this is a different person. Same NIF/SNS is never allowed.
+	AllowDuplicate bool `json:"allow_duplicate"`
 }
 
 // Service holds the patient business rules.
@@ -133,6 +138,24 @@ func (s *Service) Create(ctx context.Context, a Actor, req CreateRequest) (*mode
 	if err != nil {
 		return nil, err
 	}
+	nif, err := identifier("nif", req.NIF)
+	if err != nil {
+		return nil, err
+	}
+	sns, err := identifier("sns_number", req.SNSNumber)
+	if err != nil {
+		return nil, err
+	}
+	dupes, err := s.findDuplicates(ctx, a, DuplicateQuery{
+		Name: name, DateOfBirth: dob, PhoneKey: phoneKey(req.PhoneNumber),
+		NIF: deref(nif), SNS: deref(sns),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if de := (&DuplicateError{Matches: dupes}); len(dupes) > 0 && (de.Blocking() || !req.AllowDuplicate) {
+		return nil, de
+	}
 
 	// Patients belong to the registering user's clinic so colleagues see them.
 	// Non-admins cannot register patients into another clinic.
@@ -159,6 +182,8 @@ func (s *Service) Create(ctx context.Context, a Actor, req CreateRequest) (*mode
 		PermanentAddress:      req.PermanentAddress,
 		Pincode:               req.Pincode,
 		Nationality:           req.Nationality,
+		NIF:                   nif,
+		SNSNumber:             sns,
 		Allergies:             req.Allergies,
 		MedicalHistoryDetails: req.MedicalHistoryDetails,
 		OngoingMedication:     req.OngoingMedication,
@@ -173,6 +198,9 @@ func (s *Service) Create(ctx context.Context, a Actor, req CreateRequest) (*mode
 		p.YearOfBirth = &y
 	}
 	if err := s.repo.Create(ctx, p); err != nil {
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			return nil, &DuplicateError{}
+		}
 		return nil, err
 	}
 	return s.Get(ctx, a, p.ID)
@@ -188,6 +216,7 @@ const (
 	kindDate
 	kindUUID
 	kindPhone
+	kindIdentifier
 )
 
 // editable maps JSON keys accepted by PUT/PATCH to their column and type.
@@ -207,6 +236,8 @@ var editable = map[string]struct {
 	"permanent_address":       {"permanent_address", kindString},
 	"pincode":                 {"pincode", kindInt},
 	"nationality":             {"nationality", kindString},
+	"nif":                     {"nif", kindIdentifier},
+	"sns_number":              {"sns_number", kindIdentifier},
 	"allergies":               {"allergies", kindString},
 	"medical_history_details": {"medical_history_details", kindString},
 	"ongoing_medication":      {"ongoing_medication", kindString},
@@ -244,8 +275,24 @@ func (s *Service) Update(ctx context.Context, a Actor, id string, body map[strin
 	if len(fields) == 0 {
 		return s.Get(ctx, a, id)
 	}
+	// A new NIF / SNS number must not belong to another patient
+	q := DuplicateQuery{ExcludeID: id}
+	q.NIF, _ = fields["nif"].(string)
+	q.SNS, _ = fields["sns_number"].(string)
+	if q.NIF != "" || q.SNS != "" {
+		dupes, err := s.findDuplicates(ctx, a, q)
+		if err != nil {
+			return nil, err
+		}
+		if len(dupes) > 0 {
+			return nil, &DuplicateError{Matches: dupes}
+		}
+	}
 	fields["last_edited_id"] = a.ID
 	if err := s.repo.Update(ctx, id, fields); err != nil {
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			return nil, &DuplicateError{}
+		}
 		return nil, err
 	}
 	return s.Get(ctx, a, id)
@@ -291,6 +338,16 @@ func (s *Service) coerce(key string, kind fieldKind, raw any) (any, error) {
 			return nil, bad
 		}
 		return str, nil
+	case kindIdentifier:
+		str, ok := raw.(string)
+		if !ok {
+			return nil, bad
+		}
+		v, err := identifier(key, &str)
+		if err != nil || v == nil {
+			return nil, err // empty string clears the field
+		}
+		return *v, nil
 	case kindPhone:
 		str, ok := raw.(string)
 		if !ok {
@@ -319,6 +376,13 @@ func (s *Service) parseBirthDate(v *string) (*time.Time, error) {
 		return nil, &ValidationError{"date_of_birth", "cannot be in the future"}
 	}
 	return &t, nil
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func validatePhone(field string, v *string) error {

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
 import { usePatient } from "@/components/Patient/api";
-import { genderKey } from "@/components/Patient/patientFormUtils";
+import { formatId, genderKey } from "@/components/Patient/patientFormUtils";
 import ReferralCard from "@/components/Referral/ReferralCard";
 import ReferralRoutes from "@/components/Referral/api";
 import { canCreateReferral } from "@/components/Referral/referralUtils";
@@ -119,6 +119,11 @@ export default function PatientDetail({ id }: { id: string }) {
             />
             <Item label={t("address")} value={patient.address} wide />
             <Item label={t("nationality")} value={patient.nationality} />
+            <Item label={t("nif")} value={formatId(patient.nif)} />
+            <Item
+              label={t("sns_number")}
+              value={formatId(patient.sns_number)}
+            />
           </Card>
           <Card title={t("clinical_background")}>
             <Item label={t("blood_group")} value={patient.blood_group} />

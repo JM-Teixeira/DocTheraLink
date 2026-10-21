@@ -53,6 +53,8 @@ type Patient struct {
 	Village              *string             `json:"village"`
 	Pincode              *int                `json:"pincode"`
 	Nationality          *string             `json:"nationality"`
+	NIF                  *string             `json:"nif" gorm:"size:9;index"`        // Portuguese tax number (validated)
+	SNSNumber            *string             `json:"sns_number" gorm:"size:9;index"` // número de utente do SNS
 	PassportNo           *string             `json:"passport_no"`
 	RationCardCategory   *RationCardCategory `json:"ration_card_category"`
 

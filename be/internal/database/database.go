@@ -9,6 +9,7 @@ import (
 	"klyniva/internal/models"
 	"klyniva/internal/modules/attachment"
 	"klyniva/internal/modules/notification"
+	"klyniva/internal/modules/patient"
 	"klyniva/internal/modules/referral"
 
 	"gorm.io/driver/postgres"
@@ -120,6 +121,12 @@ func Migrate() error {
 		log.Printf("Migrating phase %d: %s...", i+1, p.name)
 		if err := DB.AutoMigrate(p.models...); err != nil {
 			return fmt.Errorf("failed to migrate %s: %w", p.name, err)
+		}
+	}
+
+	for _, stmt := range patient.UniqueIndexes {
+		if err := DB.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("failed to create patient indexes: %w", err)
 		}
 	}
 

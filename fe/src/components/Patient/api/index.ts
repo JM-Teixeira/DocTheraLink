@@ -23,7 +23,8 @@ export function useCreatePatient() {
 
   return useMutation({
     mutationFn: (body: Partial<PatientModel>) =>
-      callApi(PatientRoutes.createPatient, { body }),
+      // silent: the form shows field errors and the duplicate dialog itself
+      callApi(PatientRoutes.createPatient, { body, silent: true }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: patientKeys.lists() });
     },
@@ -78,10 +79,7 @@ export function usePatientList(
   });
 }
 
-export function usePatient(
-  patientId: string,
-  options?: { enabled?: boolean },
-) {
+export function usePatient(patientId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: patientKeys.detail(patientId),
     queryFn: query(PatientRoutes.getPatient, {
@@ -97,13 +95,8 @@ export function useUpdatePatient() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: Partial<PatientModel>;
-    }) => callApi(PatientRoutes.updatePatient, { pathParams: { id }, body: data }),
+    mutationFn: ({ id, data }: { id: string; data: Partial<PatientModel> }) =>
+      callApi(PatientRoutes.updatePatient, { pathParams: { id }, body: data }),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
         queryKey: patientKeys.detail(variables.id),
@@ -127,13 +120,12 @@ export function usePatchPatient() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: Partial<PatientModel>;
-    }) => callApi(PatientRoutes.patchPatient, { pathParams: { id }, body: data }),
+    mutationFn: ({ id, data }: { id: string; data: Partial<PatientModel> }) =>
+      callApi(PatientRoutes.patchPatient, {
+        pathParams: { id },
+        body: data,
+        silent: true,
+      }),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
         queryKey: patientKeys.detail(variables.id),

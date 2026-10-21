@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   EMPTY_PATIENT_FORM,
+  duplicatesFromError,
   formToPayload,
+  formatId,
   genderKey,
   patientToForm,
   serverErrorsToForm,
+  validNif,
+  validSns,
   validatePatientForm,
 } from "@/components/Patient/patientFormUtils";
 
@@ -102,5 +106,55 @@ describe("helpers", () => {
   it("returns translation keys for gender codes", () => {
     expect(genderKey(2)).toBe("gender__female");
     expect(genderKey(undefined)).toBe("gender__unknown");
+  });
+});
+
+describe("Portuguese identifiers", () => {
+  it("validates the NIF check digit", () => {
+    for (const ok of ["123456789", "501964843", "100000010", "123 456 789"])
+      expect(validNif(ok)).toBe(true);
+    for (const bad of ["123456780", "12345678", "12345678a", ""])
+      expect(validNif(bad)).toBe(false);
+  });
+
+  it("checks the SNS number format and formats for display", () => {
+    expect(validSns("987.654.321")).toBe(true);
+    expect(validSns("98765")).toBe(false);
+    expect(formatId("123456789")).toBe("123 456 789");
+    expect(formatId(null)).toBe(null);
+  });
+
+  it("flags invalid identifiers and sends them normalised", () => {
+    const f = { ...EMPTY_PATIENT_FORM, name: "Ana Costa" };
+    expect(validatePatientForm({ ...f, nif: "123456780" }).nif).toBe(
+      "error__invalid_nif",
+    );
+    expect(validatePatientForm({ ...f, sns_number: "12" }).sns_number).toBe(
+      "error__invalid_sns",
+    );
+    const body = formToPayload({ ...f, nif: "123 456 789", sns_number: "" });
+    expect(body.nif).toBe("123456789");
+    expect(body.sns_number).toBeNull();
+  });
+});
+
+describe("duplicatesFromError", () => {
+  const cause = {
+    error: "duplicate_patient",
+    blocking: false,
+    duplicates: [
+      { id: "p1", name: "Ana", reason: "name_dob", blocking: false },
+    ],
+  };
+  it("reads the 409 answer", () => {
+    expect(duplicatesFromError(409, cause)).toEqual({
+      blocking: false,
+      matches: cause.duplicates,
+    });
+  });
+  it("ignores other errors", () => {
+    expect(duplicatesFromError(400, cause)).toBeNull();
+    expect(duplicatesFromError(409, { error: "conflict" })).toBeNull();
+    expect(duplicatesFromError(409, undefined)).toBeNull();
   });
 });

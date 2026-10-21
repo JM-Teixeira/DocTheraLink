@@ -443,3 +443,47 @@ func TestCatalog(t *testing.T) {
 	anon := &client{t: t, base: doctor.base}
 	expect(t, "catalog needs login", anon.call("GET", "/catalog/icd10/?search=m54", nil, nil), 401)
 }
+
+// TestPatientIdentifiersAndDuplicates: NIF is validated and unique per
+// clinic; a similar name with the same birth date needs confirmation.
+func TestPatientIdentifiersAndDuplicates(t *testing.T) {
+	rec, _ := login(t, "receptionist")
+	// A fresh valid NIF per run: 8 digits from the clock + check digit
+	base := fmt.Sprintf("2%07d", time.Now().UnixNano()%10_000_000)
+	sum := 0
+	for i := 0; i < 8; i++ {
+		sum += int(base[i]-'0') * (9 - i)
+	}
+	check := 11 - sum%11
+	if check >= 10 {
+		check = 0
+	}
+	nif := fmt.Sprintf("%s%d", base, check)
+	name := "Duplicate Check " + time.Now().Format("150405.000")
+
+	expect(t, "invalid NIF", rec.call("POST", "/patient/", map[string]any{"name": name, "nif": "123456780"}, nil), 400)
+	var p map[string]any
+	expect(t, "register with NIF", rec.call("POST", "/patient/", map[string]any{
+		"name": name, "date_of_birth": "1970-01-15", "nif": nif[:3] + " " + nif[3:6] + " " + nif[6:],
+	}, &p), 201)
+	if p["nif"] != nif {
+		t.Fatalf("NIF stored normalised: %v", p["nif"])
+	}
+
+	var conflict struct {
+		Error      string           `json:"error"`
+		Blocking   bool             `json:"blocking"`
+		Duplicates []map[string]any `json:"duplicates"`
+	}
+	expect(t, "same NIF", rec.call("POST", "/patient/", map[string]any{"name": "Someone Else", "nif": nif, "allow_duplicate": true}, &conflict), 409)
+	if !conflict.Blocking || len(conflict.Duplicates) != 1 || conflict.Duplicates[0]["id"] != p["id"] {
+		t.Fatalf("NIF conflict: %+v", conflict)
+	}
+	similar := map[string]any{"name": strings.ToLower(name), "date_of_birth": "1970-01-15"}
+	expect(t, "similar name + birth date", rec.call("POST", "/patient/", similar, &conflict), 409)
+	if conflict.Blocking || conflict.Duplicates[0]["reason"] != "name_dob" {
+		t.Fatalf("soft duplicate: %+v", conflict)
+	}
+	similar["allow_duplicate"] = true
+	expect(t, "confirmed different person", rec.call("POST", "/patient/", similar, nil), 201)
+}

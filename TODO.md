@@ -93,8 +93,9 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 
 ### M4 — Patients (P1) ← next
 - [x] New Klyniva patient pages: list/search, detail, create/edit (replace CARE's 3k-line pages).
-- [ ] Rest of the old "centralized patient creation" spec (from `.kiro`): **duplicate detection with confirmation** (reuse `Facility/DuplicatePatientDialog`), draft auto-save, retry on network errors, accessibility checks, browser E2E of the flow, ≥80 % coverage. Backend model grows to match: emergency contact (name/relationship), address parts, insurance, structured allergies/medications/conditions.
-- [ ] Portuguese identifiers: NIF and SNS number with validation.
+- [x] Duplicate detection with confirmation: same NIF/SNS in the clinic is blocked (also by a partial unique index); similar name + same birth date or phone asks "different person?".
+- [ ] Rest of the old "centralized patient creation" spec (from `.kiro`): draft auto-save, retry on network errors, accessibility checks, browser E2E of the flow, ≥80 % coverage. Backend model grows to match: emergency contact (name/relationship), address parts, insurance, structured allergies/medications/conditions.
+- [x] Portuguese identifiers: NIF (mod-11 check digit) and SNS number (9 digits), stored normalised.
 - [ ] Patient timeline: referrals, sessions, notes and documents in one view.
 - [ ] Consent records (GDPR) per patient.
 

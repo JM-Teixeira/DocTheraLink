@@ -328,5 +328,22 @@
   "print_or_save_pdf": "Imprimir / guardar PDF",
   "treatment_outcome": "Tratamento e resultado",
   "addressed_to": "Dirigido a",
-  "letter_confidential": "Confidencial: contém dados de saúde. Partilhar apenas com o utente e os profissionais envolvidos nos seus cuidados."
+  "letter_confidential": "Confidencial: contém dados de saúde. Partilhar apenas com o utente e os profissionais envolvidos nos seus cuidados.",
+  "nif": "NIF",
+  "sns_number": "Nº de utente (SNS)",
+  "error__invalid_nif": "NIF inválido (verifique os dígitos).",
+  "error__invalid_sns": "O nº de utente tem 9 dígitos.",
+  "duplicate_patient_title": "Este utente pode já estar registado",
+  "duplicate_patient_help": "Encontrámos utentes com nome semelhante e a mesma data de nascimento ou telefone. Abra o registo existente ou confirme que é outra pessoa.",
+  "duplicate_patient_blocking_title": "Este utente já está registado",
+  "duplicate_patient_blocking_help": "Outro utente desta clínica tem o mesmo NIF ou nº de utente. Abra esse registo em vez de criar um novo.",
+  "duplicate_reason__nif": "Mesmo NIF",
+  "duplicate_reason__sns_number": "Mesmo nº de utente",
+  "duplicate_reason__name_dob": "Nome semelhante, mesma data de nascimento",
+  "duplicate_reason__name_phone": "Nome semelhante, mesmo telefone",
+  "duplicate_identifier_exists": "Já existe um utente com este NIF ou nº de utente na sua clínica.",
+  "back_to_form": "Voltar ao formulário",
+  "register_as_different_person": "É outra pessoa — registar",
+  "open": "Abrir",
+  "nif_placeholder": "ex. 123 456 789"
 }
