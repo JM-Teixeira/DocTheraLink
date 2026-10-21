@@ -117,6 +117,65 @@ func TestReferralLifecycleOnPostgres(t *testing.T) {
 	}
 }
 
+// TestReferralFiltersOnPostgres covers the SQL-only parts of the list:
+// patient-name search (subquery, wildcard escaping), date range and counts.
+func TestReferralFiltersOnPostgres(t *testing.T) {
+	startDB(t)
+	ctx := context.Background()
+	db := database.GetDB()
+	svc := referral.NewService(referral.NewGormRepository(db), clinic.NewGormResolver(db), nil)
+	doctor := userID(t, "doctor")
+	physio := userID(t, "physiotherapist")
+
+	for _, name := range []string{"Ana Pereira", "Anabela Costa", "Bruno 100% Silva"} {
+		p := models.Patient{Name: name}
+		if err := db.Create(&p).Error; err != nil {
+			t.Fatal(err)
+		}
+		if _, err := svc.Create(ctx, doctor, referral.CreateRequest{
+			PatientID: p.ID, Diagnosis: "Low back pain", Reason: "Core work",
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	count := func(f referral.ListFilter) int64 {
+		_, total, err := svc.List(ctx, doctor, f)
+		if err != nil {
+			t.Fatalf("list %+v: %v", f, err)
+		}
+		return total
+	}
+	if n := count(referral.ListFilter{Search: "ana"}); n != 2 {
+		t.Errorf("search 'ana': want 2, got %d", n)
+	}
+	if n := count(referral.ListFilter{Search: "100%"}); n != 1 {
+		t.Errorf("search with literal %%: want 1, got %d", n)
+	}
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	yesterday := today.AddDate(0, 0, -1)
+	if n := count(referral.ListFilter{From: &today, To: &today}); n != 3 {
+		t.Errorf("today's range: want 3, got %d", n)
+	}
+	if n := count(referral.ListFilter{To: &yesterday}); n != 0 {
+		t.Errorf("until yesterday: want 0, got %d", n)
+	}
+
+	// Counts group by status within the same scope and filters
+	items, _, _ := svc.List(ctx, doctor, referral.ListFilter{Search: "bruno"})
+	if _, err := svc.Accept(ctx, physio, items[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	counts, err := svc.Counts(ctx, doctor, referral.ListFilter{})
+	if err != nil || counts[referral.StatusPending] != 2 || counts[referral.StatusAccepted] != 1 {
+		t.Fatalf("counts: %v %v", counts, err)
+	}
+	counts, _ = svc.Counts(ctx, doctor, referral.ListFilter{Search: "ana"})
+	if counts[referral.StatusPending] != 2 || counts[referral.StatusAccepted] != 0 {
+		t.Errorf("filtered counts: %v", counts)
+	}
+}
+
 // TestConcurrentAcceptHasOneWinner checks the compare-and-swap in Transition:
 // when two therapists accept the same open referral, exactly one succeeds.
 func TestConcurrentAcceptHasOneWinner(t *testing.T) {

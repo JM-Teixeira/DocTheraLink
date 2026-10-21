@@ -33,10 +33,15 @@ be/                Go backend (Go module name: klyniva)
   internal/
     api/routes.go  all route registration (/api/v1)
     api/handlers/  legacy handlers (users, facilities, time log, timetable;
-                   inventory + file upload endpoints are still 501 stubs)
+                   inventory endpoints are still 501 stubs)
     modules/       NEW layered modules — use this pattern for new features
       referral/    model → repository → service → handler → routes (+ tests)
       patient/     same layout
+      notification/ in-app + e-mail notifications fed by referral events
+      attachment/  files on referrals; access follows the referral
+      catalog/     embedded ICD-10 subset + referral templates (EN/PT, read-only)
+    storage/       file Store interface (Local today, S3 later)
+    mailer/        SMTP or log-only mailer (no patient data in e-mails)
     clinic/        which clinic a user works in (Resolver) — scope new data with it
     auth/          JWT (access/refresh with `typ` claim), middleware, role helpers
     config/        env config + Validate() (release-mode guards)
@@ -182,7 +187,8 @@ the repo ownership).
 
 ## 7. Known gaps (details in TODO.md)
 
-Inventory and file-upload endpoints still return 501 (rebuilt in M5 / M1);
+Inventory endpoints still return 501 (rebuilt in M5); attachments live on
+the backend's PVC (`UPLOAD_PATH`), so S3 is needed before scaling out;
 password reset is a stub; no audit log; no rate limiting; inherited frontend
 code still has many (mostly formatting) lint errors, so CI lints new code via
 `npm run lint:strict`. Existing databases keep the tables of removed CARE

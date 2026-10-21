@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Inbox, Plus } from "lucide-react";
+import { Inbox, Plus, Search } from "lucide-react";
 import { navigate } from "raviger";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
@@ -14,10 +14,12 @@ import ReferralRoutes from "@/components/Referral/api";
 import {
   canCreateReferral,
   isTherapist,
+  sumCounts,
 } from "@/components/Referral/referralUtils";
-import { ReferralStatus } from "@/components/Referral/types";
+import { ReferralPriority, ReferralStatus } from "@/components/Referral/types";
 
 import useAuthUser from "@/hooks/useAuthUser";
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 import query from "@/Utils/request/query";
 
@@ -42,17 +44,35 @@ export default function ReferralList() {
   const { t } = useTranslation();
   const user = useAuthUser();
   const [status, setStatus] = useState<ReferralStatus | "">("");
+  const [priority, setPriority] = useState<ReferralPriority | "">("");
+  const [search, setSearch] = useState("");
+  const term = useDebouncedValue(search.trim());
   const [page, setPage] = useState(0);
 
+  // Any filter change goes back to the first page
+  useEffect(() => setPage(0), [status, priority, term]);
+
+  // Shared by the list and the per-status counts
+  const filters = {
+    search: term || undefined,
+    priority: priority || undefined,
+  };
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["referrals", status, page],
+    queryKey: ["referrals", status, filters, page],
     queryFn: query(ReferralRoutes.list, {
       queryParams: {
+        ...filters,
         status: status || undefined,
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
       },
     }),
+  });
+
+  const { data: counts } = useQuery({
+    queryKey: ["referrals", "counts", filters],
+    queryFn: query(ReferralRoutes.counts, { queryParams: filters }),
   });
 
   const total = data?.count ?? 0;
@@ -77,7 +97,35 @@ export default function ReferralList() {
           : t("referrals_description")}
       </p>
 
-      {/* Status filter chips */}
+      {/* Search and priority */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search
+            className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400"
+            aria-hidden
+          />
+          <input
+            type="search"
+            aria-label={t("search_patient")}
+            placeholder={t("search_patient_by_name")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10 w-full rounded-lg border border-gray-300 pl-9 pr-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+          />
+        </div>
+        <select
+          aria-label={t("priority")}
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as ReferralPriority | "")}
+          className="h-10 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+        >
+          <option value="">{t("all_priorities")}</option>
+          <option value="urgent">{t("referral_priority__urgent")}</option>
+          <option value="routine">{t("referral_priority__routine")}</option>
+        </select>
+      </div>
+
+      {/* Status filter chips with counts */}
       <div
         role="tablist"
         aria-label={t("filter_by_status")}
@@ -88,10 +136,7 @@ export default function ReferralList() {
             key={f || "all"}
             role="tab"
             aria-selected={status === f}
-            onClick={() => {
-              setStatus(f);
-              setPage(0);
-            }}
+            onClick={() => setStatus(f)}
             className={cn(
               "rounded-full px-3.5 py-1.5 text-sm font-medium transition",
               status === f
@@ -100,6 +145,16 @@ export default function ReferralList() {
             )}
           >
             {f ? t(`referral_status__${f}`) : t("all")}
+            {counts && (
+              <span
+                className={cn(
+                  "ml-1.5 rounded-full px-1.5 text-xs tabular-nums",
+                  status === f ? "bg-white/20" : "bg-gray-100 text-gray-600",
+                )}
+              >
+                {f ? (counts[f] ?? 0) : sumCounts(counts)}
+              </span>
+            )}
           </button>
         ))}
       </div>

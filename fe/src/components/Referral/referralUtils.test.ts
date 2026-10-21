@@ -8,7 +8,10 @@ import {
   fullName,
   hasDoctorTitle,
   initials,
+  letterKind,
+  letterReference,
   stepIndex,
+  sumCounts,
 } from "@/components/Referral/referralUtils";
 import { Referral } from "@/components/Referral/types";
 
@@ -42,7 +45,11 @@ describe("allowedActions", () => {
 
   it("only the addressed therapist acts on an addressed referral", () => {
     const r = referral({ therapist_id: physio.id });
-    expect(allowedActions(r, physio)).toEqual(["accept", "decline"]);
+    expect(allowedActions(r, physio)).toEqual([
+      "accept",
+      "decline",
+      "reassign",
+    ]);
     expect(allowedActions(r, otherPhysio)).toEqual([]);
   });
 
@@ -52,22 +59,30 @@ describe("allowedActions", () => {
         referral({ status: "accepted", therapist_id: physio.id }),
         physio,
       ),
-    ).toEqual(["start"]);
+    ).toEqual(["start", "reassign"]);
     expect(
       allowedActions(
         referral({ status: "in_progress", therapist_id: physio.id }),
         physio,
       ),
-    ).toEqual(["complete"]);
+    ).toEqual(["complete", "reassign"]);
   });
 
-  it("lets the referring doctor and admins cancel open referrals only", () => {
-    expect(allowedActions(referral(), doctor)).toEqual(["cancel"]);
-    expect(allowedActions(referral(), admin)).toEqual(["cancel"]);
+  it("lets the referring doctor and admins hand over and cancel open referrals", () => {
+    expect(allowedActions(referral(), doctor)).toEqual(["reassign", "cancel"]);
+    expect(allowedActions(referral(), admin)).toEqual(["reassign", "cancel"]);
     expect(allowedActions(referral(), otherDoctor)).toEqual([]);
     expect(allowedActions(referral({ status: "completed" }), doctor)).toEqual(
       [],
     );
+  });
+
+  it("lets the referring doctor re-open a declined referral", () => {
+    const r = referral({ status: "declined", therapist_id: physio.id });
+    expect(allowedActions(r, doctor)).toEqual(["reopen"]);
+    expect(allowedActions(r, admin)).toEqual(["reopen"]);
+    expect(allowedActions(r, physio)).toEqual([]);
+    expect(allowedActions(r, otherDoctor)).toEqual([]);
   });
 
   it("gives other roles nothing", () => {
@@ -88,6 +103,13 @@ describe("permissions", () => {
     expect(canPostNote(r, physio)).toBe(true);
     expect(canPostNote(r, otherPhysio)).toBe(false);
     expect(canPostNote(r, nurse)).toBe(false);
+  });
+});
+
+describe("sumCounts", () => {
+  it("adds up per-status counts", () => {
+    expect(sumCounts({ pending: 2, accepted: 1, completed: 4 })).toBe(7);
+    expect(sumCounts({})).toBe(0);
   });
 });
 
@@ -124,5 +146,19 @@ describe("formatting helpers", () => {
     expect(stepIndex("pending")).toBe(0);
     expect(stepIndex("completed")).toBe(3);
     expect(stepIndex("declined")).toBe(-1);
+  });
+});
+
+describe("letters", () => {
+  it("prints completed referrals as discharge summaries", () => {
+    expect(letterKind({ status: "completed" })).toBe("discharge");
+    expect(letterKind({ status: "in_progress" })).toBe("referral");
+    expect(letterKind({ status: "pending" })).toBe("referral");
+  });
+
+  it("builds a short reference from the id", () => {
+    expect(letterReference("6b1f3c1e-5a8e-4c1d-9a0e-000000000001")).toBe(
+      "REF-6B1F3C1E",
+    );
   });
 });

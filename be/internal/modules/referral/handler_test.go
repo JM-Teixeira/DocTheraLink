@@ -31,14 +31,7 @@ func newTestServer(t *testing.T) *testServer {
 	jwt := auth.NewJWTManager(cfg)
 
 	r := gin.New()
-	g := r.Group("/api/v1", auth.AuthMiddleware(jwt)).Group("/referrals")
-	g.GET("/", h.List)
-	g.POST("/", h.Create)
-	g.GET("/:id/", h.Get)
-	g.POST("/:id/accept/", h.Accept)
-	g.POST("/:id/decline/", h.Decline)
-	g.GET("/:id/notes/", h.ListNotes)
-	g.POST("/:id/notes/", h.AddNote)
+	mount(r.Group("/api/v1", auth.AuthMiddleware(jwt)).Group("/referrals"), h)
 	return &testServer{router: r, jwt: jwt}
 }
 
@@ -127,6 +120,39 @@ func TestHTTPErrorMapping(t *testing.T) {
 				t.Fatalf("want %d, got %d: %s", tc.want, w.Code, w.Body)
 			}
 		})
+	}
+}
+
+func TestHTTPCountsAndReassign(t *testing.T) {
+	s := newTestServer(t)
+	doctorTok := s.tokens(t, doctor).Access
+
+	w := s.do(t, http.MethodPost, "/api/v1/referrals/", doctorTok, validCreate())
+	var created Referral
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
+
+	// /counts/ must not be swallowed by the /:id/ route
+	w = s.do(t, http.MethodGet, "/api/v1/referrals/counts/", doctorTok, nil)
+	var counts map[Status]int64
+	_ = json.Unmarshal(w.Body.Bytes(), &counts)
+	if w.Code != http.StatusOK || counts[StatusPending] != 1 {
+		t.Fatalf("counts: %d %s", w.Code, w.Body)
+	}
+
+	w = s.do(t, http.MethodGet, "/api/v1/referrals/?status=bogus", doctorTok, nil)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("invalid status filter: want 400, got %d", w.Code)
+	}
+
+	w = s.do(t, http.MethodPost, "/api/v1/referrals/"+created.ID+"/reassign/", doctorTok,
+		ReassignRequest{TherapistID: physio.ID, Reason: "Specialist in knees"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("reassign: %d %s", w.Code, w.Body)
+	}
+	w = s.do(t, http.MethodPost, "/api/v1/referrals/"+created.ID+"/reopen/", doctorTok,
+		ReopenRequest{Reason: "x"})
+	if w.Code != http.StatusConflict {
+		t.Fatalf("reopen of a pending referral: want 409, got %d", w.Code)
 	}
 }
 

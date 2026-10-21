@@ -4,7 +4,6 @@ import {
   BloodPressure,
   DailyRoundsModel,
   FacilityNameModel,
-  FileUploadModel,
   PatientModel,
 } from "@/components/Patient/models";
 import { UserBareMinimum } from "@/components/Users/models";

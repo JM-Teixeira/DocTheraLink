@@ -12,8 +12,6 @@ import {
 } from "@/components/Common/Sidebar/Sidebar";
 import Error404 from "@/components/ErrorPages/404";
 import SessionExpired from "@/components/ErrorPages/SessionExpired";
-import { NoticeBoard } from "@/components/Notifications/NoticeBoard";
-import ShowPushNotification from "@/components/Notifications/ShowPushNotification";
 
 import { usePluginRoutes } from "@/hooks/useCareApps";
 
@@ -46,9 +44,6 @@ const Routes: AppRoutes = {
   ...PatientRoutes,
   ...ReferralRoutes,
   ...UserRoutes,
-
-  "/notifications/:id": ({ id }) => <ShowPushNotification id={id} />,
-  "/notice_board": () => <NoticeBoard />,
 
   "/session-expired": () => <SessionExpired />,
   "/not-found": () => <Error404 />,

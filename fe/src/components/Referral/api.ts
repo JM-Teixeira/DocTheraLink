@@ -1,10 +1,17 @@
+import { FacilityModel } from "@/components/Facility/models";
 import { PatientModel } from "@/components/Patient/models";
+import { Attachment } from "@/components/Referral/attachments";
 import {
   CreateReferralRequest,
+  IcdCode,
   NoteRequest,
   ReasonRequest,
+  ReassignRequest,
   Referral,
+  ReferralCounts,
   ReferralNote,
+  ReferralTemplate,
+  ReopenRequest,
 } from "@/components/Referral/types";
 import { UserModel } from "@/components/Users/models";
 
@@ -25,6 +32,23 @@ const ReferralRoutes = {
     path: "/api/v1/referrals/",
     method: "POST",
     TBody: Type<CreateReferralRequest>(),
+    TRes: Type<Referral>(),
+  },
+  counts: {
+    path: "/api/v1/referrals/counts/",
+    method: "GET",
+    TRes: Type<ReferralCounts>(),
+  },
+  reassign: {
+    path: "/api/v1/referrals/{id}/reassign/",
+    method: "POST",
+    TBody: Type<ReassignRequest>(),
+    TRes: Type<Referral>(),
+  },
+  reopen: {
+    path: "/api/v1/referrals/{id}/reopen/",
+    method: "POST",
+    TBody: Type<ReopenRequest>(),
     TRes: Type<Referral>(),
   },
   get: {
@@ -74,7 +98,33 @@ const ReferralRoutes = {
     TRes: Type<ReferralNote>(),
   },
 
+  listAttachments: {
+    path: "/api/v1/referrals/{id}/attachments/",
+    method: "GET",
+    TRes: Type<Attachment[]>(),
+  },
+  deleteAttachment: {
+    path: "/api/v1/attachments/{id}/",
+    method: "DELETE",
+    TRes: Type<void>(),
+  },
+
   // Lookups used by the create form
+  icd10: {
+    path: "/api/v1/catalog/icd10/",
+    method: "GET",
+    TRes: Type<IcdCode[]>(),
+  },
+  templates: {
+    path: "/api/v1/catalog/referral-templates/",
+    method: "GET",
+    TRes: Type<ReferralTemplate[]>(),
+  },
+  getClinic: {
+    path: "/api/v1/facility/{id}/",
+    method: "GET",
+    TRes: Type<FacilityModel>(),
+  },
   getPatient: {
     path: "/api/v1/patient/{id}/",
     method: "GET",

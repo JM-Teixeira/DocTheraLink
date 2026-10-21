@@ -93,10 +93,44 @@ export interface NoteRequest {
   body: string;
 }
 
+export interface ReassignRequest {
+  therapist_id: number;
+  reason: string;
+}
+
+export interface ReopenRequest {
+  therapist_id?: number;
+  reason: string;
+}
+
+/** Number of referrals per status, from GET /referrals/counts/. */
+export type ReferralCounts = Partial<Record<ReferralStatus, number>>;
+
 /** Actions a user can take on a referral (see referralUtils.allowedActions). */
 export type ReferralAction =
   | "accept"
   | "decline"
   | "start"
   | "complete"
-  | "cancel";
+  | "cancel"
+  | "reassign"
+  | "reopen";
+
+/** One ICD-10 code from GET /catalog/icd10/ (description in the UI language). */
+export interface IcdCode {
+  code: string;
+  description: string;
+}
+
+/** Built-in referral template from GET /catalog/referral-templates/. */
+export interface ReferralTemplate {
+  key: string;
+  name: string;
+  icd_code: string;
+  diagnosis: string;
+  reason: string;
+  goals: string;
+  precautions: string;
+  priority: ReferralPriority;
+  recommended_sessions: number;
+}

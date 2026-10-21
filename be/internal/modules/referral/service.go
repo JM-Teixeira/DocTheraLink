@@ -42,9 +42,10 @@ const (
 
 // Service holds the referral business rules.
 type Service struct {
-	repo    Repository
-	clinics clinic.Resolver
-	now     func() time.Time
+	repo     Repository
+	clinics  clinic.Resolver
+	notifier Notifier
+	now      func() time.Time
 }
 
 // NewService builds a Service. now may be nil to use time.Now.
@@ -52,7 +53,25 @@ func NewService(repo Repository, clinics clinic.Resolver, now func() time.Time) 
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repo: repo, clinics: clinics, now: now}
+	return &Service{repo: repo, clinics: clinics, notifier: noopNotifier{}, now: now}
+}
+
+// WithNotifier sets who is told about referral events (default: nobody).
+func (s *Service) WithNotifier(n Notifier) *Service {
+	s.notifier = n
+	return s
+}
+
+// emitted passes (r, err) through and, when the operation succeeded,
+// publishes the event. Notification problems never fail the operation.
+func (s *Service) emitted(ctx context.Context, kind EventKind, actor Actor, prev *uint,
+	excerpt string, r *Referral, err error) (*Referral, error) {
+	if err == nil {
+		s.notifier.ReferralEvent(ctx, Event{
+			Kind: kind, Referral: r, ActorID: actor.ID, PreviousTherapistID: prev, Excerpt: excerpt,
+		})
+	}
+	return r, err
 }
 
 // Create opens a new referral. Only doctors and admins can refer patients.
@@ -87,19 +106,8 @@ func (s *Service) Create(ctx context.Context, actor Actor, req CreateRequest) (*
 	// A doctor may address the referral to a specific therapist of the same
 	// clinic; otherwise it lands in that clinic's therapist inbox.
 	if req.TherapistID != nil {
-		role, active, err := s.repo.UserRole(ctx, *req.TherapistID)
-		if err != nil {
+		if err := s.checkTherapist(ctx, *req.TherapistID, facility); err != nil {
 			return nil, err
-		}
-		if !active || models.UserRole(role) != models.RolePhysioTherapist {
-			return nil, &ValidationError{"therapist_id must be an active physiotherapist"}
-		}
-		therapistClinic, err := s.clinics.HomeClinic(ctx, *req.TherapistID)
-		if err != nil {
-			return nil, err
-		}
-		if !clinic.SameClinic(facility, therapistClinic) {
-			return nil, &ValidationError{"therapist_id must work in the referral's clinic"}
 		}
 	}
 
@@ -125,7 +133,8 @@ func (s *Service) Create(ctx context.Context, actor Actor, req CreateRequest) (*
 	if err := s.repo.Create(ctx, r); err != nil {
 		return nil, err
 	}
-	return s.repo.Get(ctx, r.ID)
+	created, err := s.repo.Get(ctx, r.ID)
+	return s.emitted(ctx, EventCreated, actor, nil, "", created, err)
 }
 
 // Get returns a referral the actor is allowed to see.
@@ -151,9 +160,9 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (*Referral, e
 	return nil, ErrNotFound
 }
 
-// List returns the referrals visible to the actor, scoped by role:
-// admins see everything, doctors their own referrals, therapists their inbox.
-func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referral, int64, error) {
+// scoped restricts f to what the actor may see: admins everything, doctors
+// their own referrals, therapists their inbox. Other roles are forbidden.
+func (s *Service) scoped(ctx context.Context, actor Actor, f ListFilter) (ListFilter, error) {
 	switch {
 	case actor.isAdmin():
 		// no scoping
@@ -164,11 +173,30 @@ func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referr
 		f.InboxForTherapist = true
 		mine, err := s.clinics.HomeClinic(ctx, actor.ID)
 		if err != nil {
-			return nil, 0, err
+			return f, err
 		}
 		f.ClinicID = mine
 	default:
-		return nil, 0, ErrForbidden
+		return f, ErrForbidden
+	}
+	return f, nil
+}
+
+// Counts returns how many visible referrals match f, per status (for the
+// status tabs). f.Status is ignored.
+func (s *Service) Counts(ctx context.Context, actor Actor, f ListFilter) (map[Status]int64, error) {
+	f, err := s.scoped(ctx, actor, f)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.Counts(ctx, f)
+}
+
+// List returns the referrals visible to the actor (see scoped).
+func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referral, int64, error) {
+	f, err := s.scoped(ctx, actor, f)
+	if err != nil {
+		return nil, 0, err
 	}
 	if f.Limit <= 0 {
 		f.Limit = defaultLimit
@@ -185,7 +213,7 @@ func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referr
 // Accept lets a physiotherapist take a pending referral. Unassigned referrals
 // are claimed by whoever accepts first.
 func (s *Service) Accept(ctx context.Context, actor Actor, id string) (*Referral, error) {
-	return s.transition(ctx, actor, id, StatusPending, func(r *Referral) error {
+	r, err := s.transition(ctx, actor, id, StatusPending, func(r *Referral) error {
 		if !actor.isTherapist() || (r.TherapistID != nil && *r.TherapistID != actor.ID) {
 			return ErrForbidden
 		}
@@ -195,6 +223,7 @@ func (s *Service) Accept(ctx context.Context, actor Actor, id string) (*Referral
 		r.AcceptedAt = &now
 		return nil
 	}, "Referral accepted")
+	return s.emitted(ctx, EventAccepted, actor, nil, "", r, err)
 }
 
 // Decline lets the assigned therapist refuse a pending referral.
@@ -203,7 +232,7 @@ func (s *Service) Decline(ctx context.Context, actor Actor, id, reason string) (
 	if reason == "" {
 		return nil, &ValidationError{"a reason is required to decline"}
 	}
-	return s.transition(ctx, actor, id, StatusPending, func(r *Referral) error {
+	r, err := s.transition(ctx, actor, id, StatusPending, func(r *Referral) error {
 		if !isAssignedTherapist(actor, r) {
 			return ErrForbidden
 		}
@@ -211,6 +240,7 @@ func (s *Service) Decline(ctx context.Context, actor Actor, id, reason string) (
 		r.DeclineReason = &reason
 		return nil
 	}, "Referral declined: "+reason)
+	return s.emitted(ctx, EventDeclined, actor, nil, reason, r, err)
 }
 
 // Start marks the first treatment session.
@@ -232,7 +262,7 @@ func (s *Service) Complete(ctx context.Context, actor Actor, id, summary string)
 	if summary == "" {
 		return nil, &ValidationError{"an outcome summary is required to complete"}
 	}
-	return s.transition(ctx, actor, id, StatusInProgress, func(r *Referral) error {
+	r, err := s.transition(ctx, actor, id, StatusInProgress, func(r *Referral) error {
 		if !isAssignedTherapist(actor, r) {
 			return ErrForbidden
 		}
@@ -242,6 +272,7 @@ func (s *Service) Complete(ctx context.Context, actor Actor, id, summary string)
 		r.CompletedAt = &now
 		return nil
 	}, "Treatment completed: "+summary)
+	return s.emitted(ctx, EventCompleted, actor, nil, summary, r, err)
 }
 
 // Cancel lets the referring doctor (or an admin) withdraw an open referral.
@@ -255,7 +286,7 @@ func (s *Service) Cancel(ctx context.Context, actor Actor, id, reason string) (*
 		return nil, err
 	}
 	// Cancel is valid from any open status, so pass the current one as "from".
-	return s.transition(ctx, actor, id, r.Status, func(r *Referral) error {
+	r, err = s.transition(ctx, actor, id, r.Status, func(r *Referral) error {
 		if !(actor.isAdmin() || (actor.isDoctor() && r.DoctorID == actor.ID)) {
 			return ErrForbidden
 		}
@@ -266,6 +297,88 @@ func (s *Service) Cancel(ctx context.Context, actor Actor, id, reason string) (*
 		r.CancelReason = &reason
 		return nil
 	}, "Referral cancelled: "+reason)
+	return s.emitted(ctx, EventCancelled, actor, nil, reason, r, err)
+}
+
+// Reassign hands an open referral over to another physiotherapist of the same
+// clinic (holiday cover, specialty, workload). Allowed for the referring
+// doctor, admins and the currently assigned therapist. Treatment status is
+// kept: an in-progress referral continues with the new therapist.
+func (s *Service) Reassign(ctx context.Context, actor Actor, id string, req ReassignRequest) (*Referral, error) {
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, &ValidationError{"a reason is required to hand over"}
+	}
+	r, err := s.Get(ctx, actor, id)
+	if err != nil {
+		return nil, err
+	}
+	if !(actor.isAdmin() || r.DoctorID == actor.ID || isAssignedTherapist(actor, r)) {
+		return nil, ErrForbidden
+	}
+	if r.Status.IsTerminal() {
+		return nil, ErrInvalidTransition
+	}
+	if r.TherapistID != nil && *r.TherapistID == req.TherapistID {
+		return nil, &ValidationError{"the referral is already assigned to this therapist"}
+	}
+	if err := s.checkTherapist(ctx, req.TherapistID, r.FacilityID); err != nil {
+		return nil, err
+	}
+	previous := r.TherapistID
+	r, err = s.transition(ctx, actor, id, r.Status, func(r *Referral) error {
+		r.TherapistID = &req.TherapistID
+		return nil
+	}, "Referral handed over: "+reason)
+	return s.emitted(ctx, EventReassigned, actor, previous, reason, r, err)
+}
+
+// Reopen sends a declined referral out again — to a named therapist of the
+// same clinic or back to the clinic's inbox. Referring doctor or admin only.
+func (s *Service) Reopen(ctx context.Context, actor Actor, id string, req ReopenRequest) (*Referral, error) {
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, &ValidationError{"a reason is required to re-open"}
+	}
+	r, err := s.Get(ctx, actor, id)
+	if err != nil {
+		return nil, err
+	}
+	if !(actor.isAdmin() || (actor.isDoctor() && r.DoctorID == actor.ID)) {
+		return nil, ErrForbidden
+	}
+	if req.TherapistID != nil {
+		if err := s.checkTherapist(ctx, *req.TherapistID, r.FacilityID); err != nil {
+			return nil, err
+		}
+	}
+	r, err = s.transition(ctx, actor, id, StatusDeclined, func(r *Referral) error {
+		r.Status = StatusPending
+		r.TherapistID = req.TherapistID
+		r.DeclineReason = nil // the decline stays on the thread as history
+		return nil
+	}, "Referral re-opened: "+reason)
+	return s.emitted(ctx, EventReopened, actor, nil, reason, r, err)
+}
+
+// checkTherapist validates that id is an active physiotherapist working in
+// the given clinic (or that either side has no clinic).
+func (s *Service) checkTherapist(ctx context.Context, id uint, facility *string) error {
+	role, active, err := s.repo.UserRole(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !active || models.UserRole(role) != models.RolePhysioTherapist {
+		return &ValidationError{"therapist_id must be an active physiotherapist"}
+	}
+	therapistClinic, err := s.clinics.HomeClinic(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !clinic.SameClinic(facility, therapistClinic) {
+		return &ValidationError{"therapist_id must work in the referral's clinic"}
+	}
+	return nil
 }
 
 // AddNote posts a message on the referral thread. Only the referring doctor,
@@ -290,6 +403,7 @@ func (s *Service) AddNote(ctx context.Context, actor Actor, id string, req NoteR
 	if err := s.repo.AddNote(ctx, n); err != nil {
 		return nil, err
 	}
+	_, _ = s.emitted(ctx, EventMessage, actor, nil, body, r, nil)
 	return n, nil
 }
 
@@ -323,6 +437,11 @@ func (s *Service) transition(ctx context.Context, actor Actor, id string, from S
 	}
 	return s.repo.Get(ctx, r.ID)
 }
+
+// IsParticipant reports whether the actor takes part in the referral (admin,
+// referring doctor or assigned therapist). Other modules use it, e.g. to
+// decide who may attach files.
+func IsParticipant(a Actor, r *Referral) bool { return isParticipant(a, r) }
 
 func isParticipant(a Actor, r *Referral) bool {
 	return a.isAdmin() || r.DoctorID == a.ID || isAssignedTherapist(a, r)

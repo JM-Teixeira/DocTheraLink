@@ -177,16 +177,36 @@ type NoteRequest struct {
 	Body string   `json:"body" binding:"required"`
 }
 
-// ListFilter narrows GET /referrals/.
+// ReassignRequest is the body of POST /referrals/:id/reassign/ (hand-over).
+type ReassignRequest struct {
+	TherapistID uint   `json:"therapist_id" binding:"required"`
+	Reason      string `json:"reason" binding:"required"`
+}
+
+// ReopenRequest is the body of POST /referrals/:id/reopen/. Without a
+// therapist the referral goes back to the clinic's inbox.
+type ReopenRequest struct {
+	TherapistID *uint  `json:"therapist_id"`
+	Reason      string `json:"reason" binding:"required"`
+}
+
+// ListFilter narrows GET /referrals/ (query parameters in the form tags).
 type ListFilter struct {
-	Status      Status `form:"status"`
-	PatientID   string `form:"patient"`
-	DoctorID    uint   `form:"-"`
-	TherapistID uint   `form:"-"`
+	Status     Status     `form:"status" binding:"omitempty,oneof=pending accepted in_progress completed declined cancelled"`
+	PatientID  string     `form:"patient"`
+	Priority   Priority   `form:"priority" binding:"omitempty,oneof=routine urgent"`
+	Search     string     `form:"search"`    // patient name contains
+	AssignedTo uint       `form:"therapist"` // assigned physiotherapist
+	From       *time.Time `form:"from" time_format:"2006-01-02"`
+	To         *time.Time `form:"to" time_format:"2006-01-02"`
+	Limit      int        `form:"limit"`
+	Offset     int        `form:"offset"`
+
+	// Set by the service from the actor's role, never from the request.
+	DoctorID    uint `form:"-"`
+	TherapistID uint `form:"-"`
 	// InboxForTherapist also includes unassigned pending referrals
 	// (restricted to ClinicID when set).
 	InboxForTherapist bool    `form:"-"`
 	ClinicID          *string `form:"-"`
-	Limit             int     `form:"limit"`
-	Offset            int     `form:"offset"`
 }

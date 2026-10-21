@@ -13,7 +13,7 @@ import {
   SidebarItem,
 } from "@/components/Common/Sidebar/SidebarItem";
 import SidebarUserCard from "@/components/Common/Sidebar/SidebarUserCard";
-import NotificationItem from "@/components/Notifications/NotificationsList";
+import NotificationsPanel from "@/components/Notifications/NotificationsPanel";
 
 import useActiveLink from "@/hooks/useActiveLink";
 import useAuthUser from "@/hooks/useAuthUser";
@@ -67,7 +67,6 @@ const StatelessSidebar = ({
       : []),
     { text: t("clinic"), to: "/facility", icon: "d-hospital" },
     { text: t("users"), to: "/users", icon: "d-people" },
-    { text: t("notice_board"), to: "/notice_board", icon: "d-notice-board" },
   ];
 
   const PluginNavItems = useCareAppNavItems();
@@ -183,7 +182,7 @@ const StatelessSidebar = ({
             );
           })}
 
-          <NotificationItem
+          <NotificationsPanel
             shrinked={shrinked}
             handleOverflow={handleOverflow}
             onClickCB={() => onItemClick && onItemClick(false)}

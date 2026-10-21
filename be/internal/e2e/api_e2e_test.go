@@ -13,6 +13,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
@@ -22,22 +24,27 @@ import (
 
 const demoPassword = "1234@1"
 
-// TestMain waits until the target answers through its proxy/ingress (no 5xx)
-// before running the tests, so a just-finished rollout does not cause
-// spurious 502s while the old pod drains.
+// TestMain waits until the target answers through its proxy/ingress without
+// 5xx several times in a row before running the tests, so a just-finished
+// rollout (old pod still draining behind the ingress) causes no spurious 502s.
 func TestMain(m *testing.M) {
 	if base := strings.TrimRight(os.Getenv("E2E_BASE_URL"), "/"); base != "" {
-		deadline := time.Now().Add(90 * time.Second)
-		for {
-			resp, err := http.Get(base + "/api/v1/referrals/")
+		const needed = 5 // consecutive healthy answers
+		deadline := time.Now().Add(120 * time.Second)
+		healthy := 0
+		var lastErr error
+		for healthy < needed {
+			resp, err := http.Get(base + "/api/v1/auth/login/")
 			if err == nil {
 				resp.Body.Close()
-				if resp.StatusCode < 500 {
-					break
-				}
+			}
+			if err == nil && resp.StatusCode < 500 {
+				healthy++
+			} else {
+				healthy, lastErr = 0, err
 			}
 			if time.Now().After(deadline) {
-				fmt.Fprintf(os.Stderr, "e2e: %s not ready after 90s (last err %v)\n", base, err)
+				fmt.Fprintf(os.Stderr, "e2e: %s not stable after 120s (last err %v)\n", base, lastErr)
 				os.Exit(1)
 			}
 			time.Sleep(time.Second)
@@ -198,6 +205,113 @@ func TestReferralLifecycle(t *testing.T) {
 	expect(t, "refresh token as access", refreshClient.call("GET", "/referrals/", nil, nil), 401)
 }
 
+// userIDOf returns the numeric id of a user via GET /users/getcurrentuser/.
+func userIDOf(c *client) float64 {
+	var me map[string]any
+	c.call("GET", "/users/getcurrentuser/", nil, &me)
+	id, _ := me["id"].(float64)
+	return id
+}
+
+// TestHandOverAndReopen: a declined referral is re-opened to a colleague, who
+// later hands it back; the status counts follow along.
+func TestHandOverAndReopen(t *testing.T) {
+	doctor, _ := login(t, "doctor")
+	sarah, _ := login(t, "physiotherapist")
+	tiago, _ := login(t, "physiotherapist2")
+	sarahID, tiagoID := userIDOf(sarah), userIDOf(tiago)
+
+	var p map[string]any
+	expect(t, "patient", doctor.call("POST", "/patient/", map[string]any{"name": "Handover " + time.Now().Format("150405")}, &p), 201)
+	var ref map[string]any
+	expect(t, "referral to Sarah", doctor.call("POST", "/referrals/", map[string]any{
+		"patient_id": p["id"], "therapist_id": sarahID, "diagnosis": "Tennis elbow", "reason": "Eccentric loading",
+	}, &ref), 201)
+	rid := ref["id"].(string)
+
+	expect(t, "Sarah declines", sarah.call("POST", "/referrals/"+rid+"/decline/", map[string]string{"reason": "Full schedule"}, nil), 200)
+	var reopened map[string]any
+	expect(t, "doctor re-opens to Tiago", doctor.call("POST", "/referrals/"+rid+"/reopen/",
+		map[string]any{"therapist_id": tiagoID, "reason": "Tiago has availability"}, &reopened), 200)
+	if reopened["status"] != "pending" || reopened["therapist_id"] != tiagoID {
+		t.Fatalf("re-opened: %v", reopened)
+	}
+	expect(t, "Tiago accepts", tiago.call("POST", "/referrals/"+rid+"/accept/", map[string]any{}, nil), 200)
+	expect(t, "Sarah cannot act any more", sarah.call("POST", "/referrals/"+rid+"/start/", map[string]any{}, nil), 404)
+
+	var handed map[string]any
+	expect(t, "Tiago hands back to Sarah", tiago.call("POST", "/referrals/"+rid+"/reassign/",
+		map[string]any{"therapist_id": sarahID, "reason": "Holiday cover ends"}, &handed), 200)
+	if handed["status"] != "accepted" || handed["therapist_id"] != sarahID {
+		t.Fatalf("handed over: %v", handed)
+	}
+	expect(t, "Sarah starts", sarah.call("POST", "/referrals/"+rid+"/start/", map[string]any{}, nil), 200)
+
+	var counts map[string]float64
+	expect(t, "counts", sarah.call("GET", "/referrals/counts/?search=Handover", nil, &counts), 200)
+	if counts["in_progress"] < 1 {
+		t.Errorf("counts should include the in-progress referral: %v", counts)
+	}
+}
+
+// notificationFor finds the user's notification of a kind for a referral.
+func notificationFor(c *client, referralID, event string) map[string]any {
+	var page struct {
+		Results []map[string]any `json:"results"`
+	}
+	c.call("GET", "/notifications/?limit=100", nil, &page)
+	for _, n := range page.Results {
+		if n["referral_id"] == referralID && n["event"] == event {
+			return n
+		}
+	}
+	return nil
+}
+
+// TestNotifications: a new open referral notifies the clinic's physios (not
+// the doctor who created it); accepting notifies the doctor; read state works.
+func TestNotifications(t *testing.T) {
+	doctor, _ := login(t, "doctor")
+	sarah, _ := login(t, "physiotherapist")
+	tiago, _ := login(t, "physiotherapist2")
+
+	var p, ref map[string]any
+	expect(t, "patient", doctor.call("POST", "/patient/", map[string]any{"name": "Notify " + time.Now().Format("150405")}, &p), 201)
+	expect(t, "open referral", doctor.call("POST", "/referrals/", map[string]any{
+		"patient_id": p["id"], "diagnosis": "Neck pain", "reason": "Mobility",
+	}, &ref), 201)
+	rid := ref["id"].(string)
+
+	for name, c := range map[string]*client{"sarah": sarah, "tiago": tiago} {
+		n := notificationFor(c, rid, "referral_created")
+		if n == nil || n["read_at"] != nil || n["patient_name"] != p["name"] {
+			t.Fatalf("%s should have an unread referral_created notification, got %v", name, n)
+		}
+	}
+	if notificationFor(doctor, rid, "referral_created") != nil {
+		t.Error("the doctor must not be notified about their own referral")
+	}
+
+	expect(t, "accept", sarah.call("POST", "/referrals/"+rid+"/accept/", map[string]any{}, nil), 200)
+	n := notificationFor(doctor, rid, "referral_accepted")
+	if n == nil || n["actor_name"] != "Sarah Johnson" {
+		t.Fatalf("doctor should be told Sarah accepted: %v", n)
+	}
+	expect(t, "mark read", doctor.call("POST", "/notifications/"+n["id"].(string)+"/read/", map[string]any{}, nil), 204)
+	if n := notificationFor(doctor, rid, "referral_accepted"); n["read_at"] == nil {
+		t.Error("read state not saved")
+	}
+	expect(t, "cannot read someone else's", tiago.call("POST", "/notifications/"+n["id"].(string)+"/read/", map[string]any{}, nil), 404)
+
+	var count map[string]float64
+	expect(t, "unread count", sarah.call("GET", "/notifications/unread-count/", nil, &count), 200)
+	expect(t, "read all", sarah.call("POST", "/notifications/read-all/", map[string]any{}, nil), 204)
+	sarah.call("GET", "/notifications/unread-count/", nil, &count)
+	if count["unread"] != 0 {
+		t.Errorf("unread after read-all: %v", count)
+	}
+}
+
 // TestReceptionist covers the front-desk role: registers and edits patients,
 // but has no access to referrals (clinical content).
 func TestReceptionist(t *testing.T) {
@@ -224,4 +338,108 @@ func TestClockInOut(t *testing.T) {
 	}
 	expect(t, "clock in", staff.call("POST", "/timelog/clock-in", map[string]string{"notes": "e2e"}, nil), 201)
 	expect(t, "clock out", staff.call("POST", "/timelog/clock-out", map[string]string{}, nil), 200)
+}
+
+// upload sends one file as multipart form field "file" and decodes the answer.
+func (c *client) upload(path, name string, content []byte, out any) int {
+	c.t.Helper()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	part, _ := w.CreateFormFile("file", name)
+	_, _ = part.Write(content)
+	_ = w.Close()
+	req, _ := http.NewRequest("POST", c.base+"/api/v1"+path, &buf)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		c.t.Fatalf("upload %s: %v", path, err)
+	}
+	defer resp.Body.Close()
+	if out != nil {
+		_ = json.NewDecoder(resp.Body).Decode(out)
+	}
+	return resp.StatusCode
+}
+
+// download returns the status, body and headers of a raw GET.
+func (c *client) download(path string) (int, []byte, http.Header) {
+	c.t.Helper()
+	req, _ := http.NewRequest("GET", c.base+"/api/v1"+path, nil)
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		c.t.Fatalf("download %s: %v", path, err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, b, resp.Header
+}
+
+// TestAttachments: the doctor attaches an MRI report, the therapist downloads
+// it byte for byte; outsiders, disguised executables and deletes by the
+// other participant are refused.
+func TestAttachments(t *testing.T) {
+	doctor, _ := login(t, "doctor")
+	physio, _ := login(t, "physiotherapist")
+	nurse, _ := login(t, "nurse")
+
+	var p map[string]any
+	expect(t, "patient", doctor.call("POST", "/patient/", map[string]any{"name": "Files " + time.Now().Format("150405")}, &p), 201)
+	var ref map[string]any
+	expect(t, "referral", doctor.call("POST", "/referrals/", map[string]any{
+		"patient_id": p["id"], "therapist_id": userIDOf(physio), "diagnosis": "Rotator cuff tear", "reason": "Post-op rehab",
+	}, &ref), 201)
+	rid := ref["id"].(string)
+
+	pdf := []byte("%PDF-1.7\n1 0 obj << >> endobj\ntrailer\n%%EOF\n")
+	var a map[string]any
+	expect(t, "doctor uploads PDF", doctor.upload("/referrals/"+rid+"/attachments/", "MRI shoulder.pdf", pdf, &a), 201)
+	aid := a["id"].(string)
+	if a["file_name"] != "MRI shoulder.pdf" || a["content_type"] != "application/pdf" {
+		t.Fatalf("attachment: %v", a)
+	}
+
+	expect(t, "disguised executable", doctor.upload("/referrals/"+rid+"/attachments/", "scan.pdf",
+		append([]byte("MZ\x90\x00"), make([]byte, 64)...), nil), 415)
+	expect(t, "nurse cannot upload", nurse.upload("/referrals/"+rid+"/attachments/", "x.pdf", pdf, nil), 404)
+
+	var list []map[string]any
+	expect(t, "physio lists files", physio.call("GET", "/referrals/"+rid+"/attachments/", nil, &list), 200)
+	if len(list) != 1 || list[0]["id"] != aid {
+		t.Fatalf("list: %v", list)
+	}
+
+	code, body, h := physio.download("/attachments/" + aid + "/download/")
+	expect(t, "physio downloads", code, 200)
+	if !bytes.Equal(body, pdf) {
+		t.Fatal("downloaded content differs")
+	}
+	if !strings.HasPrefix(h.Get("Content-Disposition"), "attachment") || h.Get("X-Content-Type-Options") != "nosniff" {
+		t.Errorf("download headers: %v", h)
+	}
+	code, _, _ = nurse.download("/attachments/" + aid + "/download/")
+	expect(t, "nurse cannot download", code, 404)
+
+	expect(t, "physio cannot delete doctor's file", physio.call("DELETE", "/attachments/"+aid+"/", nil, nil), 403)
+	expect(t, "doctor deletes own file", doctor.call("DELETE", "/attachments/"+aid+"/", nil, nil), 204)
+	code, _, _ = physio.download("/attachments/" + aid + "/download/")
+	expect(t, "deleted file is gone", code, 404)
+}
+
+// TestCatalog: the referral form's ICD-10 search and templates, per language.
+func TestCatalog(t *testing.T) {
+	doctor, _ := login(t, "doctor")
+	var codes []map[string]string
+	expect(t, "icd search", doctor.call("GET", "/catalog/icd10/?search=lombalgia&lang=pt", nil, &codes), 200)
+	if len(codes) == 0 || codes[0]["code"] != "M54.5" || codes[0]["description"] != "Lombalgia" {
+		t.Fatalf("icd search: %v", codes)
+	}
+	var tpls []map[string]any
+	expect(t, "templates", doctor.call("GET", "/catalog/referral-templates/?lang=en", nil, &tpls), 200)
+	if len(tpls) == 0 || tpls[0]["name"] == "" || tpls[0]["icd_code"] == "" {
+		t.Fatalf("templates: %v", tpls)
+	}
+	anon := &client{t: t, base: doctor.base}
+	expect(t, "catalog needs login", anon.call("GET", "/catalog/icd10/?search=m54", nil, nil), 401)
 }

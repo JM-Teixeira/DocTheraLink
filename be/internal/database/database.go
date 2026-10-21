@@ -7,6 +7,8 @@ import (
 
 	"klyniva/internal/config"
 	"klyniva/internal/models"
+	"klyniva/internal/modules/attachment"
+	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/referral"
 
 	"gorm.io/driver/postgres"
@@ -111,6 +113,8 @@ func Migrate() error {
 		{"inventory", []any{&models.InventoryItem{}}},
 		{"staff scheduling", []any{&models.TimeLog{}, &models.TimetableSection{}, &models.TimetableSlot{}}},
 		{"referrals", referral.Models()},
+		{"notifications", notification.Models()},
+		{"attachments", attachment.Models()},
 	}
 	for i, p := range phases {
 		log.Printf("Migrating phase %d: %s...", i+1, p.name)
@@ -277,6 +281,7 @@ func seedDemoClinic() error {
 		{"facilitycoordinator", "Clinic", "Coordinator", models.RoleLocalBodyAdmin, false},
 		{"doctor", "John", "Smith", models.RoleDoctor, true},
 		{"physiotherapist", "Sarah", "Johnson", models.RolePhysioTherapist, true},
+		{"physiotherapist2", "Tiago", "Martins", models.RolePhysioTherapist, true},
 		{"nurse", "Mary", "Williams", models.RoleNurse, true},
 		{"receptionist", "Rita", "Lopes", models.RoleReceptionist, true},
 		{"staff", "General", "Staff", models.RoleStaff, true},

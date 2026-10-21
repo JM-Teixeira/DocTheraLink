@@ -22,6 +22,13 @@ type Config struct {
 	Redis    RedisConfig
 	Security SecurityConfig
 	Seed     SeedConfig
+	App      AppConfig
+}
+
+// AppConfig holds settings about how users reach the app.
+type AppConfig struct {
+	// PublicURL is the browser-facing URL, used for links in e-mails.
+	PublicURL string
 }
 
 // SeedConfig controls which bootstrap data is inserted on startup.
@@ -123,6 +130,9 @@ func Load() *Config {
 	return &Config{
 		Seed: SeedConfig{
 			DemoUsers: getEnvBool("SEED_DEMO_USERS", mode != "release"),
+		},
+		App: AppConfig{
+			PublicURL: strings.TrimRight(getEnv("PUBLIC_URL", "http://localhost:4000"), "/"),
 		},
 		Server: ServerConfig{
 			Port:    getEnv("PORT", "9000"),

@@ -141,6 +141,195 @@ func TestClinicIsolation(t *testing.T) {
 	assertErr(t, err, &ValidationError{})
 }
 
+func TestReassign(t *testing.T) {
+	ctx := context.Background()
+	handOver := func(to uint) ReassignRequest { return ReassignRequest{TherapistID: to, Reason: "Holiday cover"} }
+
+	t.Run("doctor addresses an open referral to a therapist", func(t *testing.T) {
+		s, _ := newTestService(t)
+		r := mustCreate(t, s, nil)
+		r, err := s.Reassign(ctx, doctor, r.ID, handOver(physio.ID))
+		if err != nil || r.TherapistID == nil || *r.TherapistID != physio.ID || r.Status != StatusPending {
+			t.Fatalf("err=%v r=%+v", err, r)
+		}
+	})
+
+	t.Run("assigned therapist hands over mid-treatment; status is kept", func(t *testing.T) {
+		s, repo := newTestService(t)
+		r := mustCreate(t, s, ptrUint(physio.ID))
+		_, _ = s.Accept(ctx, physio, r.ID)
+		_, _ = s.Start(ctx, physio, r.ID)
+		r, err := s.Reassign(ctx, physio, r.ID, handOver(otherPhysio.ID))
+		if err != nil || *r.TherapistID != otherPhysio.ID || r.Status != StatusInProgress {
+			t.Fatalf("err=%v r=%+v", err, r)
+		}
+		// The new therapist can now act; the old one no longer sees it.
+		if _, err := s.Complete(ctx, otherPhysio, r.ID, "done"); err != nil {
+			t.Fatalf("new therapist complete: %v", err)
+		}
+		notes, _ := repo.ListNotes(ctx, r.ID)
+		if notes[len(notes)-2].Body != "Referral handed over: Holiday cover" {
+			t.Errorf("hand-over not recorded on thread: %+v", notes)
+		}
+	})
+
+	cases := []struct {
+		name  string
+		actor Actor
+		to    uint
+		setup func(*Service, string)
+		want  any
+	}{
+		{"nurse cannot hand over", nurse, otherPhysio.ID, nil, ErrNotFound},
+		{"unrelated therapist cannot hand over", otherPhysio, physio.ID, nil, ErrNotFound},
+		{"must be a physiotherapist", doctor, nurse.ID, nil, &ValidationError{}},
+		{"must be in the same clinic", doctor, farPhysio.ID, nil, &ValidationError{}},
+		{"not to the same therapist", doctor, physio.ID, nil, &ValidationError{}},
+		{"not after completion", doctor, otherPhysio.ID, func(s *Service, id string) {
+			_, _ = s.Accept(ctx, physio, id)
+			_, _ = s.Start(ctx, physio, id)
+			_, _ = s.Complete(ctx, physio, id, "ok")
+		}, ErrInvalidTransition},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, _ := newTestService(t)
+			r := mustCreate(t, s, ptrUint(physio.ID))
+			if tc.setup != nil {
+				tc.setup(s, r.ID)
+			}
+			_, err := s.Reassign(ctx, tc.actor, r.ID, handOver(tc.to))
+			assertErr(t, err, tc.want)
+		})
+	}
+}
+
+func TestReopen(t *testing.T) {
+	ctx := context.Background()
+	declined := func(t *testing.T, s *Service) *Referral {
+		r := mustCreate(t, s, ptrUint(physio.ID))
+		r, err := s.Decline(ctx, physio, r.ID, "No capacity")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+
+	t.Run("doctor sends a declined referral back to the clinic inbox", func(t *testing.T) {
+		s, _ := newTestService(t)
+		r := declined(t, s)
+		r, err := s.Reopen(ctx, doctor, r.ID, ReopenRequest{Reason: "Try another therapist"})
+		if err != nil || r.Status != StatusPending || r.TherapistID != nil || r.DeclineReason != nil {
+			t.Fatalf("err=%v r=%+v", err, r)
+		}
+		// Any therapist of the clinic can now accept it.
+		if _, err := s.Accept(ctx, otherPhysio, r.ID); err != nil {
+			t.Fatalf("accept after reopen: %v", err)
+		}
+	})
+
+	t.Run("doctor re-opens to a named therapist", func(t *testing.T) {
+		s, _ := newTestService(t)
+		r := declined(t, s)
+		r, err := s.Reopen(ctx, doctor, r.ID, ReopenRequest{TherapistID: ptrUint(otherPhysio.ID), Reason: "x"})
+		if err != nil || *r.TherapistID != otherPhysio.ID {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("rules", func(t *testing.T) {
+		s, _ := newTestService(t)
+		r := declined(t, s)
+		_, err := s.Reopen(ctx, physio, r.ID, ReopenRequest{Reason: "x"})
+		assertErr(t, err, ErrForbidden)
+		_, err = s.Reopen(ctx, doctor, r.ID, ReopenRequest{Reason: " "})
+		assertErr(t, err, &ValidationError{})
+		_, err = s.Reopen(ctx, doctor, r.ID, ReopenRequest{TherapistID: ptrUint(farPhysio.ID), Reason: "x"})
+		assertErr(t, err, &ValidationError{})
+
+		open := mustCreate(t, s, nil)
+		_, err = s.Reopen(ctx, doctor, open.ID, ReopenRequest{Reason: "x"})
+		assertErr(t, err, ErrInvalidTransition)
+	})
+}
+
+func TestCountsAndFilters(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newTestService(t)
+	a := mustCreate(t, s, ptrUint(physio.ID))
+	_, _ = s.Accept(ctx, physio, a.ID)
+	mustCreate(t, s, nil) // open inbox item
+
+	urgent := validCreate()
+	urgent.Priority = PriorityUrgent
+	if _, err := s.Create(ctx, doctor, urgent); err != nil {
+		t.Fatal(err)
+	}
+
+	counts, err := s.Counts(ctx, physio, ListFilter{})
+	if err != nil || counts[StatusAccepted] != 1 || counts[StatusPending] != 2 {
+		t.Fatalf("physio counts: %v %v", counts, err)
+	}
+	if _, err := s.Counts(ctx, nurse, ListFilter{}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("nurse counts: want forbidden, got %v", err)
+	}
+	if _, total, _ := s.List(ctx, doctor, ListFilter{Priority: PriorityUrgent}); total != 1 {
+		t.Errorf("priority filter: want 1, got %d", total)
+	}
+	if _, total, _ := s.List(ctx, doctor, ListFilter{AssignedTo: physio.ID}); total != 1 {
+		t.Errorf("therapist filter: want 1, got %d", total)
+	}
+}
+
+// recordingNotifier remembers the events it receives.
+type recordingNotifier struct{ events []Event }
+
+func (r *recordingNotifier) ReferralEvent(_ context.Context, e Event) {
+	r.events = append(r.events, e)
+}
+
+func (r *recordingNotifier) kinds() []EventKind {
+	out := make([]EventKind, len(r.events))
+	for i, e := range r.events {
+		out[i] = e.Kind
+	}
+	return out
+}
+
+func TestEventsAreEmittedOnSuccessOnly(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newTestService(t)
+	rec := &recordingNotifier{}
+	s.WithNotifier(rec)
+
+	r := mustCreate(t, s, ptrUint(physio.ID))
+	_, _ = s.Accept(ctx, otherPhysio, r.ID) // fails: not visible → no event
+	_, _ = s.Accept(ctx, physio, r.ID)
+	_, _ = s.AddNote(ctx, doctor, r.ID, NoteRequest{Body: "How is it going?"})
+	_, _ = s.Reassign(ctx, physio, r.ID, ReassignRequest{TherapistID: otherPhysio.ID, Reason: "Leave"})
+	_, _ = s.Start(ctx, otherPhysio, r.ID) // starting does not notify
+	_, _ = s.Complete(ctx, otherPhysio, r.ID, "Recovered")
+
+	want := []EventKind{EventCreated, EventAccepted, EventMessage, EventReassigned, EventCompleted}
+	got := rec.kinds()
+	if len(got) != len(want) {
+		t.Fatalf("events = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("events = %v, want %v", got, want)
+		}
+	}
+	hand := rec.events[3]
+	if hand.PreviousTherapistID == nil || *hand.PreviousTherapistID != physio.ID || hand.ActorID != physio.ID ||
+		hand.Excerpt != "Leave" || *hand.Referral.TherapistID != otherPhysio.ID {
+		t.Errorf("hand-over event: %+v", hand)
+	}
+	if rec.events[2].Excerpt != "How is it going?" {
+		t.Errorf("message excerpt: %q", rec.events[2].Excerpt)
+	}
+}
+
 func TestHappyPathLifecycle(t *testing.T) {
 	ctx := context.Background()
 	s, repo := newTestService(t)

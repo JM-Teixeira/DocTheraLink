@@ -53,12 +53,30 @@ func (f *fakeRepo) Get(_ context.Context, id string) (*Referral, error) {
 	return &r, nil
 }
 
+func (f *fakeRepo) Counts(ctx context.Context, flt ListFilter) (map[Status]int64, error) {
+	flt.Status = ""
+	items, _, _ := f.List(ctx, flt)
+	out := map[Status]int64{}
+	for _, r := range items {
+		out[r.Status]++
+	}
+	return out, nil
+}
+
+// List mirrors the SQL filters except the patient-name search, which needs
+// the patients table and is covered by the PostgreSQL integration tests.
 func (f *fakeRepo) List(_ context.Context, flt ListFilter) ([]Referral, int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var out []Referral
 	for _, r := range f.referrals {
 		if flt.Status != "" && r.Status != flt.Status {
+			continue
+		}
+		if flt.Priority != "" && r.Priority != flt.Priority {
+			continue
+		}
+		if flt.AssignedTo != 0 && (r.TherapistID == nil || *r.TherapistID != flt.AssignedTo) {
 			continue
 		}
 		if flt.DoctorID != 0 && r.DoctorID != flt.DoctorID {

@@ -180,7 +180,8 @@ cypress/screenshots/
 # ============================================
 uploads/
 public/uploads/
-storage/
+/storage/
+/be/storage/
 
 # ============================================
 # What SHOULD be committed:

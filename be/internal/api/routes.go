@@ -1,13 +1,20 @@
 package api
 
 import (
+	"log"
+
 	"klyniva/internal/api/handlers"
 	"klyniva/internal/auth"
 	"klyniva/internal/config"
 	"klyniva/internal/database"
+	"klyniva/internal/mailer"
 	"klyniva/internal/models"
+	"klyniva/internal/modules/attachment"
+	"klyniva/internal/modules/catalog"
+	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/patient"
 	"klyniva/internal/modules/referral"
+	"klyniva/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,7 +27,6 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	userHandler := handlers.NewUserHandler(cfg)
 	facilityHandler := handlers.NewFacilityHandler(cfg)
 	patientHandler := handlers.NewPatientHandler(cfg)
-	notificationHandler := handlers.NewNotificationHandler(cfg)
 	timeLogHandler := handlers.NewTimeLogHandler(cfg)
 	timetableHandler := handlers.NewTimetableHandler(cfg)
 
@@ -106,26 +112,29 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	protected.GET("/ward/", facilityHandler.GetWards)
 	protected.GET("/ward/:id/", facilityHandler.GetWard)
 
+	db := database.GetDB()
+
 	// Patients (module)
-	patient.RegisterRoutes(protected.Group("/patient"), database.GetDB())
+	patient.RegisterRoutes(protected.Group("/patient"), db)
+
+	// In-app + e-mail notifications (module); referrals publish events to it
+	notifications := notification.NewService(notification.NewGormRepository(db),
+		mailer.New(cfg.Email), cfg.App.PublicURL, nil)
+	notification.RegisterRoutes(protected, notifications)
 
 	// Doctor → physiotherapist referrals (module, core Klyniva workflow)
-	referral.RegisterRoutes(protected, database.GetDB())
+	referrals := referral.RegisterRoutes(protected, db, notifications)
 
-	// Notifications
-	notifications := protected.Group("/notification")
-	notifications.GET("/", notificationHandler.GetNotifications)
-	notifications.GET("/:id/", notificationHandler.GetNotificationData)
-	notifications.PATCH("/:id/", notificationHandler.MarkNotificationAsRead)
-	notifications.GET("/public_key/", notificationHandler.GetPublicKey)
-	notifications.POST("/notify/", notificationHandler.SendNotificationMessages)
+	// Reference data for the referral form (ICD-10 subset, templates)
+	catalog.RegisterRoutes(protected, catalog.MustLoad())
 
-	// File uploads: still stubs (501), replaced by attachments (TODO M1)
-	files := protected.Group("/files")
-	files.GET("/", facilityHandler.ViewUpload)
-	files.POST("/", facilityHandler.CreateUpload)
-	files.GET("/:id/", facilityHandler.RetrieveUpload)
-	files.PATCH("/:id/", facilityHandler.EditUpload)
+	// Files attached to referrals (access follows the referral)
+	uploads, err := storage.NewLocal(cfg.Upload.Path)
+	if err != nil {
+		log.Fatalf("attachments: %v", err)
+	}
+	attachment.RegisterRoutes(protected, attachment.NewService(
+		attachment.NewGormRepository(db), uploads, referrals, cfg.Upload.MaxSize))
 
 	// Staff time log (clock in/out)
 	timelog := protected.Group("/timelog")

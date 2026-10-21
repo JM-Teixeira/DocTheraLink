@@ -3,10 +3,12 @@ import dayjs from "dayjs";
 import {
   CalendarDays,
   ClipboardList,
+  Printer,
   ShieldAlert,
   Target,
   TriangleAlert,
 } from "lucide-react";
+import { navigate } from "raviger";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -15,9 +17,11 @@ import { Button } from "@/components/ui/button";
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
 import ReasonDialog from "@/components/Referral/ReasonDialog";
+import ReferralAttachments from "@/components/Referral/ReferralAttachments";
 import ReferralNotes from "@/components/Referral/ReferralNotes";
 import ReferralProgress from "@/components/Referral/ReferralProgress";
 import ReferralStatusBadge from "@/components/Referral/ReferralStatusBadge";
+import TherapistDialog from "@/components/Referral/TherapistDialog";
 import ReferralRoutes from "@/components/Referral/api";
 import {
   actionNeedsReason,
@@ -25,6 +29,7 @@ import {
   allowedActions,
   fullName,
   hasDoctorTitle,
+  letterKind,
 } from "@/components/Referral/referralUtils";
 import { Referral, ReferralAction } from "@/components/Referral/types";
 
@@ -34,9 +39,24 @@ import * as Notification from "@/Utils/Notifications";
 import { callApi } from "@/Utils/request/query";
 
 /** Runs one workflow action against the API. */
-function runAction(id: string, action: ReferralAction, reason?: string) {
+function runAction(
+  id: string,
+  action: ReferralAction,
+  reason?: string,
+  therapistId?: number,
+) {
   const pathParams = { id };
   switch (action) {
+    case "reassign":
+      return callApi(ReferralRoutes.reassign, {
+        pathParams,
+        body: { therapist_id: therapistId!, reason: reason! },
+      });
+    case "reopen":
+      return callApi(ReferralRoutes.reopen, {
+        pathParams,
+        body: { therapist_id: therapistId, reason: reason! },
+      });
     case "accept":
       return callApi(ReferralRoutes.accept, { pathParams, body: {} });
     case "start":
@@ -68,6 +88,8 @@ const ACTION_VARIANT: Record<
   complete: "primary",
   decline: "outline",
   cancel: "destructive",
+  reassign: "outline",
+  reopen: "primary",
 };
 
 export default function ReferralDetail({ id }: { id: string }) {
@@ -75,6 +97,9 @@ export default function ReferralDetail({ id }: { id: string }) {
   const user = useAuthUser();
   const queryClient = useQueryClient();
   const [reasonFor, setReasonFor] = useState<ReferralAction | null>(null);
+  const [therapistFor, setTherapistFor] = useState<
+    "reassign" | "reopen" | null
+  >(null);
 
   const {
     data: referral,
@@ -87,13 +112,17 @@ export default function ReferralDetail({ id }: { id: string }) {
   });
 
   const { mutate: act, isPending } = useMutation({
-    mutationFn: (v: { action: ReferralAction; reason?: string }) =>
-      runAction(id, v.action, v.reason),
+    mutationFn: (v: {
+      action: ReferralAction;
+      reason?: string;
+      therapistId?: number;
+    }) => runAction(id, v.action, v.reason, v.therapistId),
     onSuccess: (updated: Referral, v) => {
       queryClient.setQueryData(["referral", id], updated);
       queryClient.invalidateQueries({ queryKey: ["referral-notes", id] });
       queryClient.invalidateQueries({ queryKey: ["referrals"] });
       setReasonFor(null);
+      setTherapistFor(null);
       Notification.Success({ msg: t(`referral_action_done__${v.action}`) });
     },
     onError: () => Notification.Error({ msg: t("referral_action_failed") }),
@@ -118,6 +147,15 @@ export default function ReferralDetail({ id }: { id: string }) {
     <Page
       title={t("referral")}
       backUrl="/referrals"
+      options={
+        <Button
+          variant="outline"
+          onClick={() => navigate(`/referrals/${id}/letter`)}
+        >
+          <Printer className="mr-2 size-4" aria-hidden />
+          {t(`letter_button__${letterKind(referral)}`)}
+        </Button>
+      }
       // Show the patient's name in the breadcrumb instead of the referral UUID
       crumbsReplacements={{ [id]: { name: referral.patient?.name ?? "" } }}
     >
@@ -158,11 +196,12 @@ export default function ReferralDetail({ id }: { id: string }) {
                     key={a}
                     variant={ACTION_VARIANT[a]}
                     disabled={isPending}
-                    onClick={() =>
-                      actionNeedsReason(a)
-                        ? setReasonFor(a)
-                        : act({ action: a })
-                    }
+                    onClick={() => {
+                      if (a === "reassign" || a === "reopen")
+                        setTherapistFor(a);
+                      else if (actionNeedsReason(a)) setReasonFor(a);
+                      else act({ action: a });
+                    }}
                   >
                     {t(`referral_action__${a}`)}
                   </Button>
@@ -262,12 +301,22 @@ export default function ReferralDetail({ id }: { id: string }) {
           </section>
         </div>
 
-        {/* Right: conversation */}
-        <div className="lg:col-span-2">
+        {/* Right: conversation and shared files */}
+        <div className="flex flex-col gap-6 lg:col-span-2">
           <ReferralNotes referral={referral} user={user} />
+          <ReferralAttachments referral={referral} user={user} />
         </div>
       </div>
 
+      <TherapistDialog
+        mode={therapistFor}
+        currentTherapistId={referral.therapist_id}
+        pending={isPending}
+        onClose={() => setTherapistFor(null)}
+        onConfirm={({ therapistId, reason }) =>
+          therapistFor && act({ action: therapistFor, reason, therapistId })
+        }
+      />
       <ReasonDialog
         action={reasonFor}
         pending={isPending}

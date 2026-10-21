@@ -83,6 +83,82 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, models.PaginatedResponse{Count: int(total), Results: items})
 }
 
+// Counts godoc
+// @Summary Number of visible referrals per status (same filters as the list, status ignored)
+// @Tags referrals
+// @Security BearerAuth
+// @Success 200 {object} map[string]int
+// @Router /referrals/counts/ [get]
+func (h *Handler) Counts(c *gin.Context) {
+	actor, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var f ListFilter
+	if err := c.ShouldBindQuery(&f); err != nil {
+		badRequest(c, err)
+		return
+	}
+	counts, err := h.svc.Counts(c.Request.Context(), actor, f)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, counts)
+}
+
+// Reassign godoc
+// @Summary Hand an open referral over to another physiotherapist
+// @Tags referrals
+// @Security BearerAuth
+// @Param id path string true "Referral ID"
+// @Param body body ReassignRequest true "New therapist and reason"
+// @Success 200 {object} Referral
+// @Router /referrals/{id}/reassign/ [post]
+func (h *Handler) Reassign(c *gin.Context) {
+	actor, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var req ReassignRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		badRequest(c, err)
+		return
+	}
+	r, err := h.svc.Reassign(c.Request.Context(), actor, c.Param("id"), req)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, r)
+}
+
+// Reopen godoc
+// @Summary Re-open a declined referral (to a therapist or the clinic inbox)
+// @Tags referrals
+// @Security BearerAuth
+// @Param id path string true "Referral ID"
+// @Param body body ReopenRequest true "Optional therapist and reason"
+// @Success 200 {object} Referral
+// @Router /referrals/{id}/reopen/ [post]
+func (h *Handler) Reopen(c *gin.Context) {
+	actor, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var req ReopenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		badRequest(c, err)
+		return
+	}
+	r, err := h.svc.Reopen(c.Request.Context(), actor, c.Param("id"), req)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, r)
+}
+
 // Create godoc
 // @Summary Refer a patient to physiotherapy
 // @Tags referrals

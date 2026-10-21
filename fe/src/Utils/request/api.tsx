@@ -16,15 +16,8 @@ import {
 import {
   DupPatientModel,
 } from "@/components/Facility/models";
-import {
-  NotificationData,
-  PNconfigData,
-} from "@/components/Notifications/models";
 import { DailyRoundsModel, PatientModel } from "@/components/Patient/models";
 import {
-  CreateFileRequest,
-  CreateFileResponse,
-  FileUploadModel,
 } from "@/components/Patient/models";
 import {
   SkillModel,
@@ -219,18 +212,6 @@ const routes = {
 
   getOnlineDoctors: {
     path: "/api/v1/users/?user_type=Doctor&ordering=-last_login",
-  },
-
-  getUserPnconfig: {
-    path: "/api/v1/users/{username}/pnconfig/",
-    method: "GET",
-    TRes: Type<PNconfigData>(),
-  },
-
-  updateUserPnconfig: {
-    path: "/api/v1/users/{username}/pnconfig/",
-    method: "PATCH",
-    TRes: Type<PNconfigData>(),
   },
 
   // Skill Endpoints
@@ -493,62 +474,6 @@ const routes = {
     method: "PUT",
   },
 
-  // Notifications
-  getNotifications: {
-    path: "/api/v1/notification/",
-    method: "GET",
-    TRes: Type<PaginatedResponse<NotificationData>>(),
-  },
-  getNotificationData: {
-    path: "/api/v1/notification/{id}/",
-    method: "GET",
-    TRes: Type<NotificationData>(),
-  },
-  markNotificationAsRead: {
-    path: "/api/v1/notification/{id}/",
-    method: "PATCH",
-    TRes: Type<NotificationData>(),
-  },
-  markNotificationAsUnRead: {
-    path: "/api/v1/notification/{id}/",
-    method: "PATCH",
-    TRes: Type<NotificationData>(),
-  },
-  getPublicKey: {
-    path: "/api/v1/notification/public_key/",
-    method: "GET",
-    TRes: Type<NotificationData>(),
-  },
-  sendNotificationMessages: {
-    path: "/api/v1/notification/notify/",
-    method: "POST",
-    TRes: Type<IFacilityNotificationResponse>(),
-    TBody: Type<IFacilityNotificationRequest>(),
-  },
-
-  // FileUpload Create
-  createUpload: {
-    path: "/api/v1/files/",
-    method: "POST",
-    TBody: Type<CreateFileRequest>(),
-    TRes: Type<CreateFileResponse>(),
-  },
-  viewUpload: {
-    path: "/api/v1/files/",
-    method: "GET",
-    TRes: Type<PaginatedResponse<FileUploadModel>>(),
-  },
-  retrieveUpload: {
-    path: "/api/v1/files/{id}/",
-    method: "GET",
-    TRes: Type<FileUploadModel>(),
-  },
-  editUpload: {
-    path: "/api/v1/files/{id}/?file_type={fileType}&associating_id={associatingId}",
-    method: "PATCH",
-    TBody: Type<Partial<FileUploadModel>>(),
-    TRes: Type<FileUploadModel>(),
-  },
 
   // Assets endpoints
 

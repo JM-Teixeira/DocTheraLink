@@ -11,21 +11,12 @@ import { usePatientList } from "@/components/Patient/api";
 import { genderKey } from "@/components/Patient/patientFormUtils";
 
 import useAuthUser from "@/hooks/useAuthUser";
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 import { ageFromDob, initials } from "@/Utils/person";
 import { canWritePatients } from "@/Utils/roles";
 
 const PAGE_SIZE = 20;
-
-/** Debounces a value so typing doesn't fire one request per keystroke. */
-function useDebounced<T>(value: T, ms = 300) {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(id);
-  }, [value, ms]);
-  return v;
-}
 
 /** Patients visible to the current user (the backend applies clinic scoping). */
 export default function PatientList() {
@@ -33,7 +24,7 @@ export default function PatientList() {
   const user = useAuthUser();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const term = useDebounced(search.trim());
+  const term = useDebouncedValue(search.trim());
 
   // New search → back to the first page
   useEffect(() => setPage(0), [term]);
