@@ -64,6 +64,8 @@ type CreateRequest struct {
 	// AllowDuplicate confirms the user checked the name-based possible
 	// duplicates and this is a different person. Same NIF/SNS is never allowed.
 	AllowDuplicate bool `json:"allow_duplicate"`
+	// CareLevel 1–5 (default 1), see models.Patient.
+	CareLevel *int `json:"care_level" binding:"omitempty,min=1,max=5"`
 }
 
 // Service holds the patient business rules.
@@ -183,6 +185,7 @@ func (s *Service) Create(ctx context.Context, a Actor, req CreateRequest) (*mode
 		Pincode:               req.Pincode,
 		Nationality:           req.Nationality,
 		NIF:                   nif,
+		CareLevel:             careLevelOr(req.CareLevel),
 		SNSNumber:             sns,
 		Allergies:             req.Allergies,
 		MedicalHistoryDetails: req.MedicalHistoryDetails,
@@ -238,6 +241,7 @@ var editable = map[string]struct {
 	"nationality":             {"nationality", kindString},
 	"nif":                     {"nif", kindIdentifier},
 	"sns_number":              {"sns_number", kindIdentifier},
+	"care_level":              {"care_level", kindInt},
 	"allergies":               {"allergies", kindString},
 	"medical_history_details": {"medical_history_details", kindString},
 	"ongoing_medication":      {"ongoing_medication", kindString},
@@ -268,6 +272,11 @@ func (s *Service) Update(ctx context.Context, a Actor, id string, body map[strin
 			return nil, err
 		}
 		fields[spec.column] = v
+	}
+	if v, ok := fields["care_level"]; ok {
+		if lvl, isInt := v.(int64); !isInt || lvl < 1 || lvl > 5 {
+			return nil, &ValidationError{"care_level", "must be between 1 and 5"}
+		}
 	}
 	if name, ok := fields["name"].(string); ok && len(strings.TrimSpace(name)) < 2 {
 		return nil, &ValidationError{"name", "must have at least 2 characters"}
@@ -376,6 +385,13 @@ func (s *Service) parseBirthDate(v *string) (*time.Time, error) {
 		return nil, &ValidationError{"date_of_birth", "cannot be in the future"}
 	}
 	return &t, nil
+}
+
+func careLevelOr(v *int) int {
+	if v == nil {
+		return 1
+	}
+	return *v
 }
 
 func deref(s *string) string {

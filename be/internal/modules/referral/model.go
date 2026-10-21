@@ -209,4 +209,6 @@ type ListFilter struct {
 	// (restricted to ClinicID when set).
 	InboxForTherapist bool    `form:"-"`
 	ClinicID          *string `form:"-"`
+	// OnlyClinic restricts to one clinic's referrals (coordinators).
+	OnlyClinic *string `form:"-"`
 }

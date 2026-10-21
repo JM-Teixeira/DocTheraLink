@@ -34,6 +34,10 @@ func (a Actor) isAdmin() bool     { return auth.IsAdmin(a.Role) }
 func (a Actor) isDoctor() bool    { return a.Role == models.RoleDoctor }
 func (a Actor) isTherapist() bool { return a.Role == models.RolePhysioTherapist }
 
+// isCoordinator: reads the referrals of their clinic (to plan patients by
+// diagnosis on the time board) but takes no part in them.
+func (a Actor) isCoordinator() bool { return a.Role == models.RoleCoordinator }
+
 // Pagination bounds for List.
 const (
 	defaultLimit = 20
@@ -156,12 +160,23 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (*Referral, e
 			return r, nil
 		}
 	}
+	// Coordinators read the referrals of their own clinic.
+	if actor.isCoordinator() {
+		mine, err := s.clinics.HomeClinic(ctx, actor.ID)
+		if err != nil {
+			return nil, err
+		}
+		if mine != nil && r.FacilityID != nil && *r.FacilityID == *mine {
+			return r, nil
+		}
+	}
 	// Hide existence from users who are not involved.
 	return nil, ErrNotFound
 }
 
 // scoped restricts f to what the actor may see: admins everything, doctors
-// their own referrals, therapists their inbox. Other roles are forbidden.
+// their own referrals, therapists their inbox, coordinators their clinic's
+// (read only). Other roles are forbidden.
 func (s *Service) scoped(ctx context.Context, actor Actor, f ListFilter) (ListFilter, error) {
 	switch {
 	case actor.isAdmin():
@@ -176,6 +191,15 @@ func (s *Service) scoped(ctx context.Context, actor Actor, f ListFilter) (ListFi
 			return f, err
 		}
 		f.ClinicID = mine
+	case actor.isCoordinator():
+		mine, err := s.clinics.HomeClinic(ctx, actor.ID)
+		if err != nil {
+			return f, err
+		}
+		if mine == nil {
+			return f, ErrForbidden
+		}
+		f.OnlyClinic = mine
 	default:
 		return f, ErrForbidden
 	}

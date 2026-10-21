@@ -1,11 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import {
+  CalendarRange,
   ChevronLeft,
   ChevronRight,
   Copy,
   LayoutGrid,
   Plus,
+  Repeat,
   Users,
 } from "lucide-react";
 import { useState } from "react";
@@ -20,20 +22,32 @@ import Page from "@/components/Common/Page";
 import {
   CopyDayDialog,
   DivisionsDialog,
-  HourDialog,
   ShiftDialog,
 } from "@/components/TimeBoard/BoardDialogs";
+import HourDialog from "@/components/TimeBoard/HourDialog";
+import PatientQuickView from "@/components/TimeBoard/PatientQuickView";
+import {
+  PlanPreset,
+  RepeatWeekDialog,
+  SeriesDialog,
+} from "@/components/TimeBoard/PlanDialogs";
+import {
+  MonthView,
+  WeekView,
+  YearView,
+} from "@/components/TimeBoard/RangeViews";
 import BoardRoutes from "@/components/TimeBoard/api";
 import {
   DIVISION_COLORS,
   addDays,
   boardHours,
   formatHour,
+  hourIsFull,
   hourOf,
-  loadLevel,
   staffingByDivision,
   today,
   utilisation,
+  weekStart,
 } from "@/components/TimeBoard/boardUtils";
 import {
   Board,
@@ -44,50 +58,90 @@ import {
 
 import query from "@/Utils/request/query";
 
-type View = "physio" | "division";
+type Mode = "day" | "week" | "month" | "year";
+type DayView = "physio" | "division";
+
+/** Previous / next period for each mode. */
+function step(mode: Mode, date: string, dir: 1 | -1) {
+  const d = dayjs(date);
+  switch (mode) {
+    case "day":
+      return addDays(date, dir);
+    case "week":
+      return addDays(date, 7 * dir);
+    case "month":
+      return d.add(dir, "month").format("YYYY-MM-DD");
+    case "year":
+      return d.add(dir, "year").format("YYYY-MM-DD");
+  }
+}
+
+function periodLabel(mode: Mode, date: string) {
+  const d = dayjs(date);
+  switch (mode) {
+    case "day":
+      return d.format("dddd, D MMMM YYYY");
+    case "week": {
+      const start = dayjs(weekStart(date));
+      return `${start.format("D MMM")} – ${start.add(6, "day").format("D MMM YYYY")}`;
+    }
+    case "month":
+      return d.format("MMMM YYYY");
+    case "year":
+      return d.format("YYYY");
+  }
+}
 
 /**
  * Time board: which physiotherapist works in which division and when, and
- * how many patients each one has per hour. Coordinators and admins plan the
- * shifts; they and the front desk assign patients to an hour.
+ * how many patients (and care credits) each one has per hour. Coordinators
+ * and admins plan shifts and assign patients; week, month and year views
+ * show the load and the sessions held.
  */
 export default function TimeBoardPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [date, setDate] = useState(today());
-  const [view, setView] = useState<View>("physio");
+  const [mode, setMode] = useState<Mode>("day");
+  const [view, setView] = useState<DayView>("physio");
   const [hour, setHour] = useState<{
-    therapist: BoardTherapist;
-    load: HourLoad;
+    therapistId: number;
+    hour: number;
   } | null>(null);
   const [shift, setShift] = useState<Shift | null>(null);
   const [preset, setPreset] = useState<{
     therapistId: number;
     hour: number;
   } | null>(null);
+  const [plan, setPlan] = useState<PlanPreset | null>(null);
+  const [patientId, setPatientId] = useState<string | null>(null);
   const [divisionsOpen, setDivisionsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
+  const [repeatOpen, setRepeatOpen] = useState(false);
 
   const { data: board, isLoading } = useQuery({
     queryKey: ["board", date],
     queryFn: query(BoardRoutes.board, { queryParams: { date } }),
-    refetchInterval: 60_000, // others book too
+    refetchInterval: 60_000, // others change it too
   });
 
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["board", date] });
+    await queryClient.invalidateQueries({ queryKey: ["board"] });
+    await queryClient.invalidateQueries({ queryKey: ["board-range"] });
+    await queryClient.invalidateQueries({ queryKey: ["board-year"] });
   };
-  // Keep the open hour dialog in sync after a change
-  const current =
-    hour && board
-      ? board.therapists.find((x) => x.id === hour.therapist.id)
-      : undefined;
-  const currentLoad =
-    current && hour ? hourOf(current, hour.load.hour) : undefined;
+  const openDay = (d: string) => {
+    setDate(d);
+    setMode("day");
+  };
 
   if (isLoading || !board) return <Loading />;
   const manage = board.permissions.manage_shifts;
   const nowHour = date === today() ? dayjs().hour() : -1;
+  const current = hour
+    ? board.therapists.find((x) => x.id === hour.therapistId)
+    : undefined;
+  const currentLoad = current && hour ? hourOf(current, hour.hour) : undefined;
 
   return (
     <Page
@@ -103,6 +157,25 @@ export default function TimeBoardPage() {
               <Copy className="mr-2 size-4" aria-hidden />
               {t("copy_day")}
             </Button>
+            <Button variant="outline" onClick={() => setRepeatOpen(true)}>
+              <Repeat className="mr-2 size-4" aria-hidden />
+              {t("repeat_week")}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!board.therapists.length}
+              onClick={() =>
+                setPlan({
+                  patient: null,
+                  therapistId: board.therapists[0].id,
+                  hour: 10,
+                  startDate: date,
+                })
+              }
+            >
+              <CalendarRange className="mr-2 size-4" aria-hidden />
+              {t("weekly_plan")}
+            </Button>
             <Button
               variant="primary"
               disabled={!board.therapists.length || !board.divisions.length}
@@ -117,14 +190,14 @@ export default function TimeBoardPage() {
         )
       }
     >
-      {/* Date, view and legend */}
+      {/* Period navigation and mode */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
           <Button
             size="icon"
             variant="outline"
-            aria-label={t("previous_day")}
-            onClick={() => setDate(addDays(date, -1))}
+            aria-label={t("previous")}
+            onClick={() => setDate(step(mode, date, -1))}
           >
             <ChevronLeft className="size-4" aria-hidden />
           </Button>
@@ -138,8 +211,8 @@ export default function TimeBoardPage() {
           <Button
             size="icon"
             variant="outline"
-            aria-label={t("next_day")}
-            onClick={() => setDate(addDays(date, 1))}
+            aria-label={t("next")}
+            onClick={() => setDate(step(mode, date, 1))}
           >
             <ChevronRight className="size-4" aria-hidden />
           </Button>
@@ -148,75 +221,124 @@ export default function TimeBoardPage() {
           </Button>
         </div>
         <span className="text-sm font-medium capitalize text-gray-700">
-          {dayjs(date).format("dddd, D MMMM YYYY")}
+          {periodLabel(mode, date)}
         </span>
-        <div
-          className="ml-auto flex rounded-lg bg-gray-100 p-0.5"
-          role="tablist"
-        >
-          {(["physio", "division"] as const).map((v) => (
-            <button
-              key={v}
-              role="tab"
-              aria-selected={view === v}
-              onClick={() => setView(v)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm",
-                view === v ? "bg-white shadow-sm" : "text-gray-600",
-              )}
+        <div className="ml-auto flex flex-wrap gap-2">
+          <div
+            className="flex rounded-lg bg-gray-100 p-0.5"
+            role="tablist"
+            aria-label={t("period")}
+          >
+            {(["day", "week", "month", "year"] as const).map((m) => (
+              <button
+                key={m}
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => setMode(m)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm",
+                  mode === m ? "bg-white shadow-sm" : "text-gray-600",
+                )}
+              >
+                {t(`period__${m}`)}
+              </button>
+            ))}
+          </div>
+          {mode === "day" && (
+            <div
+              className="flex rounded-lg bg-gray-100 p-0.5"
+              role="tablist"
+              aria-label={t("group_by")}
             >
-              {v === "physio" ? (
-                <Users className="size-4" aria-hidden />
-              ) : (
-                <LayoutGrid className="size-4" aria-hidden />
-              )}
-              {t(`board_view__${v}`)}
-            </button>
-          ))}
+              {(["physio", "division"] as const).map((v) => (
+                <button
+                  key={v}
+                  role="tab"
+                  aria-selected={view === v}
+                  onClick={() => setView(v)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm",
+                    view === v ? "bg-white shadow-sm" : "text-gray-600",
+                  )}
+                >
+                  {v === "physio" ? (
+                    <Users className="size-4" aria-hidden />
+                  ) : (
+                    <LayoutGrid className="size-4" aria-hidden />
+                  )}
+                  {t(`board_view__${v}`)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-      <div className="mb-3 flex flex-wrap gap-3 text-xs text-gray-600">
-        {board.divisions.map((d) => (
-          <span key={d.id} className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                "size-2.5 rounded-full",
-                DIVISION_COLORS[d.color].dot,
-              )}
-            />
-            {d.name}{" "}
-            <span className="text-gray-400">
-              ({t("n_per_hour", { count: d.capacity })})
-            </span>
-          </span>
-        ))}
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full ring-2 ring-rose-400" />{" "}
-          {t("full")}
-        </span>
-      </div>
 
-      {board.therapists.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">
-          {t("no_physios_in_clinic")}
-        </p>
-      ) : view === "physio" ? (
-        <PhysioGrid
-          board={board}
-          nowHour={nowHour}
-          onHour={(therapist, load) => setHour({ therapist, load })}
-          onShift={manage ? setShift : undefined}
-          onEmpty={
-            manage
-              ? (therapistId, h) => setPreset({ therapistId, hour: h })
-              : undefined
-          }
-        />
-      ) : (
-        <DivisionGrid
-          board={board}
-          nowHour={nowHour}
-          onHour={(therapist, load) => setHour({ therapist, load })}
+      {mode !== "year" && (
+        <div className="mb-3 flex flex-wrap gap-3 text-xs text-gray-600">
+          {board.divisions.map((d) => (
+            <span key={d.id} className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "size-2.5 rounded-full",
+                  DIVISION_COLORS[d.color].dot,
+                )}
+              />
+              {d.name}{" "}
+              <span className="text-gray-400">
+                (
+                {t("division_limits", {
+                  count: d.capacity,
+                  credits: d.credit_limit,
+                })}
+                )
+              </span>
+            </span>
+          ))}
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full ring-2 ring-rose-400" />{" "}
+            {t("full")}
+          </span>
+        </div>
+      )}
+
+      {mode === "day" &&
+        (board.therapists.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">
+            {t("no_physios_in_clinic")}
+          </p>
+        ) : view === "physio" ? (
+          <PhysioGrid
+            board={board}
+            nowHour={nowHour}
+            onHour={(th, load) =>
+              setHour({ therapistId: th.id, hour: load.hour })
+            }
+            onShift={manage ? setShift : undefined}
+            onEmpty={
+              manage
+                ? (therapistId, h) => setPreset({ therapistId, hour: h })
+                : undefined
+            }
+          />
+        ) : (
+          <DivisionGrid
+            board={board}
+            nowHour={nowHour}
+            onHour={(th, load) =>
+              setHour({ therapistId: th.id, hour: load.hour })
+            }
+          />
+        ))}
+      {mode === "week" && <WeekView date={date} onOpenDay={openDay} />}
+      {mode === "month" && <MonthView date={date} onOpenDay={openDay} />}
+      {mode === "year" && (
+        <YearView
+          year={dayjs(date).year()}
+          onOpenMonth={(d) => {
+            setDate(d);
+            setMode("month");
+          }}
         />
       )}
 
@@ -226,6 +348,30 @@ export default function TimeBoardPage() {
         load={currentLoad ?? null}
         onClose={() => setHour(null)}
         onChanged={refresh}
+        onOpenPatient={setPatientId}
+        onPlan={(p) => {
+          if (!hour) return;
+          setPlan({
+            patient: p,
+            therapistId: hour.therapistId,
+            hour: hour.hour,
+            startDate: date,
+          });
+          setHour(null);
+        }}
+      />
+      <PatientQuickView
+        patientId={patientId}
+        onClose={() => setPatientId(null)}
+      />
+      <SeriesDialog
+        preset={plan}
+        therapists={board.therapists}
+        onClose={() => setPlan(null)}
+        onDone={() => {
+          setPlan(null);
+          refresh();
+        }}
       />
       <ShiftDialog
         board={board}
@@ -250,6 +396,16 @@ export default function TimeBoardPage() {
         onCopied={(to) => {
           setCopyOpen(false);
           setDate(to);
+          refresh();
+        }}
+      />
+      <RepeatWeekDialog
+        open={repeatOpen}
+        date={date}
+        onClose={() => setRepeatOpen(false)}
+        onDone={() => {
+          setRepeatOpen(false);
+          refresh();
         }}
       />
     </Page>
@@ -288,7 +444,7 @@ function HourHeader({
   );
 }
 
-/** Rows = physiotherapists; cells = their division and patients per hour. */
+/** Rows = physiotherapists; cells = division, patients and credits per hour. */
 function PhysioGrid({
   board,
   nowHour,
@@ -320,9 +476,10 @@ function PhysioGrid({
                   {th.first_name} {th.last_name}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {t("n_of_capacity_patients", {
-                    count: th.patients,
-                    capacity: th.capacity,
+                  {t("n_patients", { count: th.patients })} ·{" "}
+                  {t("credits_used", {
+                    count: th.credits,
+                    limit: th.credit_capacity,
                   })}
                 </p>
                 <div className="mt-1 h-1.5 rounded-full bg-gray-100">
@@ -372,7 +529,7 @@ function PhysioGrid({
                             hour: formatHour(h),
                           })}
                           onClick={() => onEmpty(th.id, h)}
-                          className="group flex h-14 w-full items-center justify-center rounded-md border border-dashed border-transparent hover:border-gray-300"
+                          className="group flex h-16 w-full items-center justify-center rounded-md border border-dashed border-transparent hover:border-gray-300"
                         >
                           <Plus
                             className="size-4 text-gray-300 opacity-0 group-hover:opacity-100"
@@ -380,15 +537,12 @@ function PhysioGrid({
                           />
                         </button>
                       ) : (
-                        <div className="h-14" />
+                        <div className="h-16" />
                       )}
                     </td>
                   );
                 const d = division(load.division_id);
-                const level = loadLevel(
-                  load.appointments.length,
-                  load.capacity,
-                );
+                const full = hourIsFull(load);
                 return (
                   <td
                     key={h}
@@ -401,11 +555,11 @@ function PhysioGrid({
                         .map((a) => a.patient?.name)
                         .join(", ")}
                       className={cn(
-                        "flex h-14 w-full flex-col items-center justify-center rounded-md border text-xs transition hover:brightness-95",
+                        "flex h-16 w-full flex-col items-center justify-center rounded-md border text-xs transition hover:brightness-95",
                         d
                           ? DIVISION_COLORS[d.color].cell
                           : "bg-gray-50 border-gray-200",
-                        level === "full" && "ring-2 ring-rose-400",
+                        full && "ring-2 ring-rose-400",
                       )}
                     >
                       <span className="max-w-full truncate px-1 text-[11px] text-gray-600">
@@ -414,10 +568,15 @@ function PhysioGrid({
                       <span
                         className={cn(
                           "font-semibold",
-                          level === "full" ? "text-rose-700" : "text-gray-900",
+                          full ? "text-rose-700" : "text-gray-900",
                         )}
                       >
-                        {load.appointments.length}/{load.capacity}
+                        {t("n_patients_short", {
+                          count: load.appointments.length,
+                        })}
+                      </span>
+                      <span className="text-[11px] text-gray-500">
+                        {load.credits}/{load.credit_limit} {t("credits_short")}
                       </span>
                     </button>
                   </td>
@@ -461,7 +620,10 @@ function DivisionGrid({
                   {d.name}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {t("n_per_hour", { count: d.capacity })}
+                  {t("division_limits", {
+                    count: d.capacity,
+                    credits: d.credit_limit,
+                  })}
                 </p>
               </th>
               {boardHours(board).map((h) => (
@@ -482,17 +644,14 @@ function DivisionGrid({
                           className={cn(
                             "flex items-center justify-between gap-1 rounded px-1.5 py-0.5 text-xs",
                             DIVISION_COLORS[d.color].chip,
-                            loadLevel(
-                              load.appointments.length,
-                              load.capacity,
-                            ) === "full" && "ring-2 ring-rose-400",
+                            hourIsFull(load) && "ring-2 ring-rose-400",
                           )}
                         >
                           <span className="truncate">
                             {therapist.first_name}
                           </span>
                           <span className="font-semibold">
-                            {load.appointments.length}/{load.capacity}
+                            {load.credits}/{load.credit_limit}
                           </span>
                         </button>
                       ),

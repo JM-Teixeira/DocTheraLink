@@ -65,10 +65,12 @@ describe("form ↔ payload", () => {
       name: " Ana Silva ",
       gender: "2",
       allergies: "  ",
+      care_level: "5",
     });
     expect(body).toMatchObject({
       name: "Ana Silva",
       gender: 2,
+      care_level: 5,
       allergies: null,
       date_of_birth: null,
     });
@@ -84,6 +86,7 @@ describe("form ↔ payload", () => {
       blood_group: "O+",
     });
     expect(form.date_of_birth).toBe("1975-03-14");
+    expect(form.care_level).toBe("1"); // patients without a level count as 1
     expect(formToPayload(form)).toMatchObject({
       name: "Rui",
       gender: 1,

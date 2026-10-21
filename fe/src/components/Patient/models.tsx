@@ -110,6 +110,8 @@ export interface PatientModel {
   nationality?: string;
   nif?: string | null;
   sns_number?: string | null;
+  /** 1–5: how much of a physio's hour the patient needs (time-board credits). */
+  care_level?: number;
   /** Create only: confirm a name-based possible duplicate is another person. */
   allow_duplicate?: boolean;
   passport_no?: string;

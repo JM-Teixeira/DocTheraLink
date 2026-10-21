@@ -110,7 +110,59 @@ export function staffingByDivision(board: Board) {
   return out;
 }
 
-/** Share of the day's capacity in use, 0–100 (for the per-physio bar). */
+/** Share of the day's credits in use, 0–100 (for the per-physio bar). */
 export const utilisation = (
-  row: Pick<BoardTherapist, "patients" | "capacity">,
-) => (row.capacity ? Math.round((row.patients / row.capacity) * 100) : 0);
+  row: Pick<BoardTherapist, "credits" | "credit_capacity">,
+) =>
+  row.credit_capacity
+    ? Math.round((row.credits / row.credit_capacity) * 100)
+    : 0;
+
+/**
+ * Whether an hour is full: no patient place left, or not even a level-1
+ * patient fits in the remaining credits.
+ */
+export const hourIsFull = (h: HourLoad) =>
+  h.appointments.length >= h.capacity || h.credits >= h.credit_limit;
+
+/** Monday of the date's week, as YYYY-MM-DD. */
+export function weekStart(date: string) {
+  const d = dayjs(date);
+  const offset = (d.day() + 6) % 7; // Monday = 0
+  return d.subtract(offset, "day").format("YYYY-MM-DD");
+}
+
+/** The 7 dates of the week starting at start. */
+export const weekDates = (start: string) =>
+  Array.from({ length: 7 }, (_, i) => addDays(start, i));
+
+/**
+ * Calendar of the date's month: weeks (Monday first) of dates; days of the
+ * neighbouring months fill the first and last week.
+ */
+export function monthGrid(date: string) {
+  const first = dayjs(date).startOf("month").format("YYYY-MM-DD");
+  const last = dayjs(date).endOf("month").format("YYYY-MM-DD");
+  const weeks: string[][] = [];
+  for (let start = weekStart(first); start <= last; start = addDays(start, 7))
+    weeks.push(weekDates(start));
+  return weeks;
+}
+
+/** Care levels 1–5 (credits), with literal Tailwind classes. */
+export const CARE_LEVELS = [1, 2, 3, 4, 5] as const;
+export const CARE_LEVEL_STYLES: Record<number, string> = {
+  1: "bg-emerald-100 text-emerald-800",
+  2: "bg-lime-100 text-lime-800",
+  3: "bg-amber-100 text-amber-800",
+  4: "bg-orange-100 text-orange-800",
+  5: "bg-rose-100 text-rose-800",
+};
+
+/** Weekday presets of a treatment plan (0 = Sunday … 6 = Saturday). */
+export const PLAN_PRESETS: Record<string, number[]> = {
+  once: [1],
+  twice: [2, 4],
+  three: [1, 3, 5],
+  weekdays: [1, 2, 3, 4, 5],
+};

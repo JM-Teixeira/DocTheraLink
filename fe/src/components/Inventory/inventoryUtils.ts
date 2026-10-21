@@ -2,6 +2,7 @@
 import {
   MovementKind,
   StockItem,
+  StockMovement,
   StockStatus,
 } from "@/components/Inventory/types";
 
@@ -43,6 +44,41 @@ export function groupByCategory(items: StockItem[], other: string) {
   );
 }
 
+/**
+ * Totals per person for the audit view: how much each one used and opened,
+ * per item ("Sarah: 12 pairs of gloves used, 2 boxes opened").
+ */
+export function auditTotals(moves: StockMovement[]) {
+  const people = new Map<
+    number,
+    {
+      name: string;
+      items: Map<
+        string,
+        { name: string; unit: string; used: number; opened: number }
+      >;
+    }
+  >();
+  for (const m of moves) {
+    if (!m.user || (m.kind !== "use" && m.kind !== "open")) continue;
+    const p = people.get(m.user.id) ?? {
+      name: `${m.user.first_name} ${m.user.last_name}`,
+      items: new Map(),
+    };
+    const it = p.items.get(m.item_id) ?? {
+      name: m.item?.name ?? "",
+      unit: m.item?.unit ?? "",
+      used: 0,
+      opened: 0,
+    };
+    if (m.kind === "use") it.used += -m.delta;
+    else it.opened += -m.delta;
+    p.items.set(m.item_id, it);
+    people.set(m.user.id, p);
+  }
+  return [...people.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Movement text for the history list: "+20", "−3", "= 12". */
 export function movementLabel(
   kind: MovementKind,
@@ -64,6 +100,7 @@ export function checkMovement(
 ) {
   if (!Number.isInteger(quantity) || quantity < 0) return "stock_error__number";
   if (kind !== "adjust" && quantity < 1) return "stock_error__at_least_one";
-  if (kind === "use" && quantity > inStock) return "stock_error__not_enough";
+  if ((kind === "use" || kind === "open") && quantity > inStock)
+    return "stock_error__not_enough";
   return null;
 }

@@ -91,6 +91,38 @@ func (f *fakeRepo) Movements(_ context.Context, id string, _ int) ([]Movement, e
 	return out, nil
 }
 
+func (f *fakeRepo) Audit(_ context.Context, clinicIDs []string, fl AuditFilter, _ int) ([]Movement, error) {
+	var out []Movement
+	for _, m := range f.movements {
+		it := f.items[m.ItemID]
+		if (clinicIDs == nil || slices.Contains(clinicIDs, it.ClinicID)) &&
+			(fl.UserID == 0 || m.UserID == fl.UserID) && (fl.Kind == "" || m.Kind == fl.Kind) {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) SessionItems(_ context.Context, clinicID string) ([]Item, error) {
+	var out []Item
+	for _, it := range f.items {
+		if it.ClinicID == clinicID && it.PerSession > 0 && !it.Archived {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) NetForAppointment(_ context.Context, id string) (map[string]int, error) {
+	out := map[string]int{}
+	for _, m := range f.movements {
+		if m.AppointmentID != nil && *m.AppointmentID == id {
+			out[m.ItemID] += m.Delta
+		}
+	}
+	return out, nil
+}
+
 var (
 	clinicA = uuid.NewString()
 	clinicB = uuid.NewString()
@@ -202,6 +234,48 @@ func TestInventoryPermissions(t *testing.T) {
 	}
 	if items, _ := s.List(ctx, admin, ListFilter{}); len(items) != 2 {
 		t.Errorf("admin sees every clinic: %d", len(items))
+	}
+}
+
+func TestSessionUseAndAudit(t *testing.T) {
+	ctx := context.Background()
+	s, repo := newSvc()
+	gloves, _ := s.Create(ctx, physio, ItemRequest{Name: "Gloves", Quantity: 3, PerSession: 1})
+	gel, _ := s.Create(ctx, physio, ItemRequest{Name: "Gel", Quantity: 0, PerSession: 1})
+	if _, err := s.Create(ctx, physio, ItemRequest{Name: "Masks", Quantity: 10}); err != nil {
+		t.Fatal(err)
+	}
+	appt := uuid.NewString()
+
+	warnings, err := s.SessionAttended(ctx, clinicA, appt, physio.ID)
+	if err != nil || len(warnings) != 1 || !strings.HasPrefix(warnings[0], "Gel") {
+		t.Fatalf("attended: %v %v", warnings, err)
+	}
+	if repo.items[gloves.ID].Quantity != 2 || repo.items[gel.ID].Quantity != 0 {
+		t.Fatalf("one pair of gloves used, gel short: %d / %d", repo.items[gloves.ID].Quantity, repo.items[gel.ID].Quantity)
+	}
+	if _, err := s.SessionAttended(ctx, clinicA, appt, physio.ID); err != nil || repo.items[gloves.ID].Quantity != 2 {
+		t.Errorf("the same session uses stock once: %d", repo.items[gloves.ID].Quantity)
+	}
+	if err := s.SessionUndone(ctx, clinicA, appt, physio.ID); err != nil || repo.items[gloves.ID].Quantity != 3 {
+		t.Errorf("undone gives the gloves back: %d %v", repo.items[gloves.ID].Quantity, err)
+	}
+
+	// Opening a pack is its own audited movement
+	if it, err := s.Move(ctx, coordinator, gloves.ID, MovementRequest{Kind: KindOpen, Quantity: 1, Note: "new box"}); err != nil || it.Quantity != 2 {
+		t.Fatalf("open: %+v %v", it, err)
+	}
+
+	if _, err := s.Audit(ctx, physio, AuditFilter{}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("physios do not see the audit log: %v", err)
+	}
+	opened, err := s.Audit(ctx, coordinator, AuditFilter{Kind: KindOpen})
+	if err != nil || len(opened) != 1 || opened[0].UserID != coordinator.ID {
+		t.Errorf("audit of openings: %+v %v", opened, err)
+	}
+	byPhysio, _ := s.Audit(ctx, coordinator, AuditFilter{UserID: physio.ID})
+	if len(byPhysio) != 4 { // 2 opening stocks + session use + undo
+		t.Errorf("movements by the physio: %d", len(byPhysio))
 	}
 }
 

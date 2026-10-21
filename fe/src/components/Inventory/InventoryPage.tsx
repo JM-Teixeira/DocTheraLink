@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 import Page from "@/components/Common/Page";
+import InventoryAudit from "@/components/Inventory/InventoryAudit";
 import {
   HistoryDialog,
   ItemDialog,
@@ -64,6 +65,7 @@ export default function InventoryPage() {
     kind: MovementKind;
   } | null>(null);
   const [history, setHistory] = useState<StockItem | null>(null);
+  const [view, setView] = useState<"stock" | "audit">("stock");
 
   const { data: summary } = useQuery({
     queryKey: ["stock-summary"],
@@ -154,194 +156,246 @@ export default function InventoryPage() {
       <p className="mb-4 max-w-2xl text-sm text-gray-600">
         {t("inventory_help")}
       </p>
-
-      {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="relative w-full sm:w-72">
-          <Search
-            className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400"
-            aria-hidden
-          />
-          <input
-            aria-label={t("search_items")}
-            placeholder={t("search_items")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-10 w-full rounded-lg border border-gray-300 pl-9 pr-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2" role="tablist">
-          {filters.map((f) => (
+      {canRemove && (
+        <div
+          className="mb-4 flex w-fit rounded-lg bg-gray-100 p-0.5"
+          role="tablist"
+        >
+          {(["stock", "audit"] as const).map((tab) => (
             <button
-              key={f.key}
+              key={tab}
               role="tab"
-              aria-selected={filter === f.key}
-              onClick={() => setFilter(f.key)}
+              aria-selected={view === tab}
+              onClick={() => setView(tab)}
               className={cn(
-                "flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ring-1 ring-inset transition",
-                filter === f.key
-                  ? "bg-primary-600 text-white ring-primary-600"
-                  : "bg-white text-gray-700 ring-gray-300 hover:bg-gray-50",
+                "rounded-md px-3 py-1.5 text-sm",
+                view === tab ? "bg-white shadow-sm" : "text-gray-600",
               )}
             >
-              {f.key !== "all" && (
-                <TriangleAlert className="size-3.5" aria-hidden />
-              )}
-              {f.label}
-              {f.count !== undefined && (
-                <span
-                  className={cn(
-                    "rounded-full px-1.5 text-xs",
-                    filter === f.key ? "bg-white/20" : "bg-gray-100",
-                  )}
-                >
-                  {f.count}
-                </span>
-              )}
+              {t(`inventory_tab__${tab}`)}
             </button>
           ))}
         </div>
-      </div>
-
-      {isLoading ? (
-        <p className="text-sm text-gray-500">{t("loading")}</p>
-      ) : !items?.length ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
-          <PackageOpen className="size-8 text-gray-400" aria-hidden />
-          <p className="text-sm text-gray-600">{t("no_items")}</p>
-        </div>
+      )}
+      {view === "audit" ? (
+        <InventoryAudit />
       ) : (
-        <div className="flex flex-col gap-6">
-          {groupByCategory(items, t("other")).map(([category, group]) => (
-            <section
-              key={category}
-              className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
-            >
-              <h2 className="border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                {category}
-              </h2>
-              <ul className="divide-y divide-gray-100">
-                {group.map((it) => (
-                  <li
-                    key={it.id}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3"
-                  >
-                    <div className="min-w-40 flex-1">
-                      <p className="font-medium text-gray-900">{it.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {t("alert_at_n", {
-                          count: it.min_quantity,
-                          unit: it.unit,
-                        })}
-                      </p>
-                    </div>
-                    <div className="w-48">
-                      <div className="flex items-baseline justify-between text-sm">
-                        <span className="font-semibold text-gray-900">
-                          {it.quantity}{" "}
-                          <span className="font-normal text-gray-500">
-                            {it.unit}
-                          </span>
-                        </span>
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
-                            STATUS_STYLES[it.status].badge,
-                          )}
-                        >
-                          {t(`stock_status__${it.status}`)}
-                        </span>
-                      </div>
-                      <div className="mt-1 h-1.5 rounded-full bg-gray-100">
-                        <div
-                          className={cn(
-                            "h-1.5 rounded-full",
-                            STATUS_STYLES[it.status].bar,
-                          )}
-                          style={{
-                            width: `${stockPercent(it.quantity, it.min_quantity)}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {canWrite && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setMoving({ item: it, kind: "use" })}
-                            disabled={it.quantity <= 0}
-                          >
-                            <Minus className="mr-1 size-3.5" aria-hidden />
-                            {t("stock_action__use")}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              setMoving({ item: it, kind: "restock" })
-                            }
-                          >
-                            <Plus className="mr-1 size-3.5" aria-hidden />
-                            {t("stock_action__restock")}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              setMoving({ item: it, kind: "adjust" })
-                            }
-                          >
-                            {t("stock_action__adjust")}
-                          </Button>
-                        </>
+        <>
+          {/* Filters */}
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="relative w-full sm:w-72">
+              <Search
+                className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400"
+                aria-hidden
+              />
+              <input
+                aria-label={t("search_items")}
+                placeholder={t("search_items")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 w-full rounded-lg border border-gray-300 pl-9 pr-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2" role="tablist">
+              {filters.map((f) => (
+                <button
+                  key={f.key}
+                  role="tab"
+                  aria-selected={filter === f.key}
+                  onClick={() => setFilter(f.key)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ring-1 ring-inset transition",
+                    filter === f.key
+                      ? "bg-primary-600 text-white ring-primary-600"
+                      : "bg-white text-gray-700 ring-gray-300 hover:bg-gray-50",
+                  )}
+                >
+                  {f.key !== "all" && (
+                    <TriangleAlert className="size-3.5" aria-hidden />
+                  )}
+                  {f.label}
+                  {f.count !== undefined && (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 text-xs",
+                        filter === f.key ? "bg-white/20" : "bg-gray-100",
                       )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label={t("stock_history")}
-                        onClick={() => setHistory(it)}
+                    >
+                      {f.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {isLoading ? (
+            <p className="text-sm text-gray-500">{t("loading")}</p>
+          ) : !items?.length ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
+              <PackageOpen className="size-8 text-gray-400" aria-hidden />
+              <p className="text-sm text-gray-600">{t("no_items")}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {groupByCategory(items, t("other")).map(([category, group]) => (
+                <section
+                  key={category}
+                  className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+                >
+                  <h2 className="border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {category}
+                  </h2>
+                  <ul className="divide-y divide-gray-100">
+                    {group.map((it) => (
+                      <li
+                        key={it.id}
+                        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3"
                       >
-                        <History className="size-4" aria-hidden />
-                      </Button>
-                      {canWrite && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label={t("edit_item")}
-                          onClick={() => setEditing(it)}
-                        >
-                          <Pencil className="size-4" aria-hidden />
-                        </Button>
-                      )}
-                      {canRemove && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label={t("remove_item")}
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                t("confirm_remove_item", { name: it.name }),
-                              )
-                            )
-                              archive.mutate(it.id);
-                          }}
-                        >
-                          <Trash2
-                            className="size-4 text-rose-600"
-                            aria-hidden
-                          />
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
+                        <div className="min-w-40 flex-1">
+                          <p className="flex items-center gap-2 font-medium text-gray-900">
+                            {it.name}
+                            {it.per_session > 0 && (
+                              <span
+                                className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-normal text-primary-700"
+                                title={t("used_per_session_help")}
+                              >
+                                {t("n_per_session", { count: it.per_session })}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {t("alert_at_n", {
+                              count: it.min_quantity,
+                              unit: it.unit,
+                            })}
+                          </p>
+                        </div>
+                        <div className="w-48">
+                          <div className="flex items-baseline justify-between text-sm">
+                            <span className="font-semibold text-gray-900">
+                              {it.quantity}{" "}
+                              <span className="font-normal text-gray-500">
+                                {it.unit}
+                              </span>
+                            </span>
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+                                STATUS_STYLES[it.status].badge,
+                              )}
+                            >
+                              {t(`stock_status__${it.status}`)}
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 rounded-full bg-gray-100">
+                            <div
+                              className={cn(
+                                "h-1.5 rounded-full",
+                                STATUS_STYLES[it.status].bar,
+                              )}
+                              style={{
+                                width: `${stockPercent(it.quantity, it.min_quantity)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {canWrite && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setMoving({ item: it, kind: "use" })
+                                }
+                                disabled={it.quantity <= 0}
+                              >
+                                <Minus className="mr-1 size-3.5" aria-hidden />
+                                {t("stock_action__use")}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setMoving({ item: it, kind: "restock" })
+                                }
+                              >
+                                <Plus className="mr-1 size-3.5" aria-hidden />
+                                {t("stock_action__restock")}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setMoving({ item: it, kind: "open" })
+                                }
+                                disabled={it.quantity <= 0}
+                              >
+                                <PackageOpen
+                                  className="mr-1 size-3.5"
+                                  aria-hidden
+                                />
+                                {t("stock_action__open")}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  setMoving({ item: it, kind: "adjust" })
+                                }
+                              >
+                                {t("stock_action__adjust")}
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={t("stock_history")}
+                            onClick={() => setHistory(it)}
+                          >
+                            <History className="size-4" aria-hidden />
+                          </Button>
+                          {canWrite && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              aria-label={t("edit_item")}
+                              onClick={() => setEditing(it)}
+                            >
+                              <Pencil className="size-4" aria-hidden />
+                            </Button>
+                          )}
+                          {canRemove && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              aria-label={t("remove_item")}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    t("confirm_remove_item", { name: it.name }),
+                                  )
+                                )
+                                  archive.mutate(it.id);
+                              }}
+                            >
+                              <Trash2
+                                className="size-4 text-rose-600"
+                                aria-hidden
+                              />
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <ItemDialog

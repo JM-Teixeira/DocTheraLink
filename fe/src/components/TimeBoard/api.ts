@@ -6,8 +6,12 @@ import {
   Board,
   Division,
   DivisionRequest,
+  RangeView,
+  SeriesRequest,
+  SeriesResult,
   Shift,
   ShiftRequest,
+  YearStats,
 } from "@/components/TimeBoard/types";
 
 import { Type } from "@/Utils/request/api";
@@ -19,6 +23,33 @@ const BoardRoutes = {
     path: "/api/v1/schedule/board/",
     method: "GET",
     TRes: Type<Board>(),
+  },
+  range: {
+    path: "/api/v1/schedule/range/",
+    method: "GET",
+    TRes: Type<RangeView>(),
+  },
+  year: {
+    path: "/api/v1/schedule/year/",
+    method: "GET",
+    TRes: Type<YearStats>(),
+  },
+  series: {
+    path: "/api/v1/schedule/series/",
+    method: "POST",
+    TBody: Type<SeriesRequest>(),
+    TRes: Type<SeriesResult>(),
+  },
+  cancelSeries: {
+    path: "/api/v1/schedule/series/{id}/",
+    method: "DELETE",
+    TRes: Type<{ removed: number }>(),
+  },
+  repeatWeek: {
+    path: "/api/v1/schedule/shifts/repeat-week/",
+    method: "POST",
+    TBody: Type<{ week_start: string; weeks: number }>(),
+    TRes: Type<{ copied: number }>(),
   },
   createDivision: {
     path: "/api/v1/schedule/divisions/",
@@ -70,7 +101,7 @@ const BoardRoutes = {
     path: "/api/v1/schedule/appointments/{id}/",
     method: "PATCH",
     TBody: Type<{ status: AppointmentStatus }>(),
-    TRes: Type<Appointment>(),
+    TRes: Type<Appointment & { warnings: string[] }>(),
   },
   unbook: {
     path: "/api/v1/schedule/appointments/{id}/",

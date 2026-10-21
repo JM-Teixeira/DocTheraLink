@@ -15,6 +15,11 @@ const InventoryRoutes = {
     method: "GET",
     TRes: Type<StockSummary>(),
   },
+  audit: {
+    path: "/api/v1/inventory/audit/",
+    method: "GET",
+    TRes: Type<StockMovement[]>(),
+  },
   list: {
     path: "/api/v1/inventory/items/",
     method: "GET",

@@ -33,6 +33,7 @@ export interface PatientFormState {
   nationality: string;
   nif: string;
   sns_number: string;
+  care_level: string; // "1" … "5"
   address: string;
   blood_group: string;
   allergies: string;
@@ -49,6 +50,7 @@ export const EMPTY_PATIENT_FORM: PatientFormState = {
   nationality: "",
   nif: "",
   sns_number: "",
+  care_level: "1",
   address: "",
   blood_group: "",
   allergies: "",
@@ -67,6 +69,7 @@ export function patientToForm(p: PatientModel): PatientFormState {
     nationality: p.nationality ?? "",
     nif: p.nif ?? "",
     sns_number: p.sns_number ?? "",
+    care_level: String(p.care_level ?? 1),
     address: p.address ?? "",
     blood_group: p.blood_group ?? "",
     allergies: p.allergies ?? "",
@@ -90,6 +93,7 @@ export function formToPayload(f: PatientFormState): Record<string, unknown> {
     nationality: opt(f.nationality),
     nif: opt(normalizeId(f.nif)),
     sns_number: opt(normalizeId(f.sns_number)),
+    care_level: Number(f.care_level) || 1,
     address: opt(f.address),
     blood_group: opt(f.blood_group),
     allergies: opt(f.allergies),

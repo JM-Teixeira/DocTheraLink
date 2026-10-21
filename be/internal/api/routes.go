@@ -132,10 +132,10 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	timelog.GET("/user/:id", timeLogHandler.GetUserLogs)
 
 	// Clinic consumables (stock, use, restock, low-stock alerts)
-	inventory.RegisterRoutes(protected, db)
+	stock := inventory.RegisterRoutes(protected, db)
 
 	// Time board: divisions, physio shifts, patients per physio per hour
-	schedule.RegisterRoutes(protected, db)
+	schedule.RegisterRoutes(protected, db, stock) // attended sessions use consumables
 
 	// Admin-only CSV exports
 	admin := protected.Group("")

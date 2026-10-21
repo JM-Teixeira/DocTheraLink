@@ -155,3 +155,25 @@ func TestSameDayIgnoresTimezone(t *testing.T) {
 		t.Error("same instant in another zone is the same day")
 	}
 }
+
+func TestCareLevel(t *testing.T) {
+	ctx := context.Background()
+	s, repo := newSvc()
+	p, err := s.Create(ctx, nurse, CreateRequest{Name: "Rui Neuro"})
+	if err != nil || p.CareLevel != 1 {
+		t.Fatalf("default care level 1: %+v %v", p, err)
+	}
+	five := 5
+	if p, err = s.Create(ctx, nurse, CreateRequest{Name: "Ana Neuro", CareLevel: &five}); err != nil || p.CareLevel != 5 {
+		t.Fatalf("level 5: %v", err)
+	}
+	if _, err := s.Update(ctx, nurse, p.ID, map[string]any{"care_level": float64(3)}); err != nil || repo.updates["care_level"] != int64(3) {
+		t.Errorf("update to 3: %v %v", err, repo.updates)
+	}
+	var verr *ValidationError
+	for _, bad := range []any{float64(0), float64(6), nil, "high"} {
+		if _, err := s.Update(ctx, nurse, p.ID, map[string]any{"care_level": bad}); !errors.As(err, &verr) {
+			t.Errorf("care_level %v: %v", bad, err)
+		}
+	}
+}

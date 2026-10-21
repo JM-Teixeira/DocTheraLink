@@ -40,7 +40,8 @@ be/                Go backend (Go module name: klyniva)
       attachment/  files on referrals; access follows the referral
       catalog/     embedded ICD-10 subset + referral templates (EN/PT, read-only)
       inventory/   clinic consumables: items, movements (use/restock/count), alerts
-      schedule/    time board: divisions, shifts, appointments per physio-hour
+      schedule/    time board: divisions, shifts, appointments per physio-hour,
+                   weekly plans (series), range/year stats; SessionHook → inventory
     storage/       file Store interface (Local today, S3 later)
     mailer/        SMTP or log-only mailer (no patient data in e-mails)
     clinic/        which clinic a user works in (Resolver) — scope new data with it
@@ -104,10 +105,10 @@ context. Roles are strings on `users.user_type`. Admin = State/District/LocalBod
 admin (organisation-wide, no clinic).
 
 **Roles in use:** `Doctor` (refers), `PhysioTherapist` (treats), `Nurse`,
-`Receptionist` (front desk: registers/edits patients, assigns patients on the
-time board, **no** referrals/clinical notes), `Coordinator` (runs the clinic
-day: plans divisions and physio shifts, sees physio load, removes stock items;
-no referrals), `Staff`, read-only variants, admins. Frontend checks
+`Receptionist` (front desk: registers/edits patients, views the time board,
+**no** referrals/clinical notes), `Coordinator` (runs the clinic
+day: plans divisions and physio shifts, assigns patients to physios, audits
+stock; reads — never acts on — the clinic's referrals), `Staff`, read-only variants, admins. Frontend checks
 live in `fe/src/Utils/roles.ts` and mirror the backend.
 
 **Clinics (decision D2):** single clinic today, built for many. A clinic is a

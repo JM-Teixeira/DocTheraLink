@@ -82,6 +82,9 @@ func (f *fakeRepo) List(_ context.Context, flt ListFilter) ([]Referral, int64, e
 		if flt.DoctorID != 0 && r.DoctorID != flt.DoctorID {
 			continue
 		}
+		if flt.OnlyClinic != nil && (r.FacilityID == nil || *r.FacilityID != *flt.OnlyClinic) {
+			continue
+		}
 		if flt.TherapistID != 0 {
 			assigned := r.TherapistID != nil && *r.TherapistID == flt.TherapistID
 			open := flt.InboxForTherapist && r.TherapistID == nil && r.Status == StatusPending &&

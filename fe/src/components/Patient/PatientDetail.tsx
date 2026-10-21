@@ -126,6 +126,10 @@ export default function PatientDetail({ id }: { id: string }) {
             />
           </Card>
           <Card title={t("clinical_background")}>
+            <Item
+              label={t("care_level")}
+              value={`${patient.care_level ?? 1} · ${t(`care_level_help__${patient.care_level ?? 1}`)}`}
+            />
             <Item label={t("blood_group")} value={patient.blood_group} />
             <Item label={t("allergies")} value={patient.allergies} />
             <Item

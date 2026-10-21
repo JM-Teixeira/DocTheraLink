@@ -101,8 +101,12 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 
 ### M3 — Scheduling (P1) — started early on request (time board)
 - [x] **Time board** (`/time-board`): divisions of the clinic (gym, rooms, pool…) with a capacity of patients per physio per hour; physio shifts per day per division; patients assigned per physio-hour (capacity, on-shift and double-booking checks, safe under concurrency); views by physio and by division; copy a day's shifts; attended / missed.
-- [x] **Coordinator** role (decision D6, pending user feedback): plans divisions and shifts and sees each physio's load; coordinators, admins and receptionists assign patients; everyone in the clinic sees the board; a physio marks their own patients attended/missed.
-- [ ] Waiting for user feedback on the time board (which roles do what, week view, recurring weekly pattern instead of copy-day).
+- [x] **Coordinator** role (D6, confirmed): plans divisions and shifts, sees each physio's load and **assigns patients to physios** (with admins; receptionists no longer assign); reads the clinic's referrals (read-only) for the patient pop-up.
+- [x] **Care level 1–5** per patient = credits; each division has an hourly credit limit per physio (default 8) besides the patient limit — two level-5 patients never share an hour.
+- [x] **Weekly plans**: book a patient 1/2/3× per week or every weekday for N sessions, with a preview of skipped dates; cancel the rest of a plan. **Repeat week** copies a week of shifts forward.
+- [x] **Day / week / month / year** views; the year view counts sessions held/missed, patients seen, referred and discharged per month.
+- [x] Clicking a patient on the board opens a pop-up: age, contact, care level, allergies, the doctor's referral and the doctor–physio thread, links to the patient and referral pages.
+- [ ] Next on the board: drag to move an appointment; reschedule a whole plan; waiting list; a physio's own "my day" view; print the day sheet.
 - [ ] Link board appointments to referrals (field exists) and book the whole series of N sessions at once; receptionists manage them.
 - [ ] Therapist availability from the timetable; room/section capacity; conflict checks.
 - [x] Old unrouted WIP screens (`Facility/TimetableGrid`, `Therapy/*`) and the legacy `/timetable` + `/sections` API removed — superseded by the time board.
@@ -119,7 +123,9 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 
 ### M5 — Clinic administration (P2)
 - [x] **Inventory of consumables** (D1), done early on request (`/inventory`, sidebar): items per clinic with alert levels, use / restock / count with history, low and out-of-stock filters, demo stock seeded. Replaced the CARE inventory screens and 501 stubs.
-- [ ] Waiting for user feedback on inventory (who may add/remove items, suppliers, reorder list/export, usage per session → M2).
+- [x] Inventory **audit** (coordinators/admins): every use, opening, restock and count with who and when, totals per person, filters; new **Open** action (opened a box/bottle).
+- [x] **Automatic use per session**: items with a per-session quantity (e.g. 1 pair of gloves) are taken from stock when a session is marked attended, and given back if that is undone; shortages are reported, never block the session.
+- [ ] Inventory next: suppliers and a reorder list/export; per-session quantities by division or treatment type.
 - [ ] Wire the existing clock in/out button and time-log history (`Users/ClockInOutButton`, `Users/TimeLogHistory` — built but never shown); time-tracking reports and exports.
 - [ ] Organisations with several clinics (switch clinic, per-clinic admins) on top of `internal/clinic`.
 - [ ] Dashboards: referrals by status, waiting time to first session, therapist load, outcomes.

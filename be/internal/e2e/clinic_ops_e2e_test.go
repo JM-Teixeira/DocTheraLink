@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -47,7 +48,7 @@ func TestInventory(t *testing.T) {
 }
 
 // TestTimeBoard: the coordinator puts a physiotherapist in a division; the
-// front desk assigns patients up to the division's capacity per hour; the
+// coordinator assigns patients up to the division's capacity per hour; the
 // board shows the load; a shift with patients cannot be deleted.
 func TestTimeBoard(t *testing.T) {
 	coord, _ := login(t, "coordinator")
@@ -85,9 +86,10 @@ func TestTimeBoard(t *testing.T) {
 			"date": date, "hour": hour, "therapist_id": tiagoID, "patient_id": patientID,
 		}, nil)
 	}
-	expect(t, "front desk books", book(rec, p1["id"].(string), 9), 201)
-	expect(t, "hour full", book(rec, p2["id"].(string), 9), 409)
-	expect(t, "outside the shift", book(rec, p2["id"].(string), 15), 409)
+	expect(t, "front desk does not assign", book(rec, p1["id"].(string), 9), 403)
+	expect(t, "coordinator assigns", book(coord, p1["id"].(string), 9), 201)
+	expect(t, "hour full", book(coord, p2["id"].(string), 9), 409)
+	expect(t, "outside the shift", book(coord, p2["id"].(string), 15), 409)
 	expect(t, "doctors do not book", book(doctor, p2["id"].(string), 10), 403)
 
 	var board struct {
@@ -117,6 +119,127 @@ func TestTimeBoard(t *testing.T) {
 	expect(t, "physio marks attended", tiago.call("PATCH", "/schedule/appointments/"+apptID+"/", map[string]any{"status": "attended"}, nil), 200)
 	shiftID := shift["id"].(string)
 	expect(t, "busy shift cannot be deleted", coord.call("DELETE", "/schedule/shifts/"+shiftID+"/", nil, nil), 409)
-	expect(t, "unbook", rec.call("DELETE", "/schedule/appointments/"+apptID+"/", nil, nil), 204)
+	expect(t, "unbook", coord.call("DELETE", "/schedule/appointments/"+apptID+"/", nil, nil), 204)
 	expect(t, "delete empty shift", coord.call("DELETE", "/schedule/shifts/"+shiftID+"/", nil, nil), 204)
+}
+
+// TestCarePlanAndAutoUse: care levels limit an hour to 8 credits (two
+// level-5 patients never fit); a weekly plan books several sessions at
+// once; marking a session attended uses the per-session gloves; the
+// coordinator audits who used what; the year view counts the sessions.
+func TestCarePlanAndAutoUse(t *testing.T) {
+	coord, _ := login(t, "coordinator")
+	tiago, _ := login(t, "physiotherapist2")
+	tiagoID := userIDOf(tiago)
+	start := time.Date(2045, 1, 2, 0, 0, 0, 0, time.UTC).AddDate(0, 0, 7*int(time.Now().Unix()%2000)) // a Monday
+	day := func(d int) string { return start.AddDate(0, 0, d).Format("2006-01-02") }
+
+	var divisions []map[string]any
+	expect(t, "divisions", coord.call("GET", "/schedule/divisions/", nil, &divisions), 200)
+	var gym string
+	for _, d := range divisions {
+		if d["capacity"].(float64) >= 3 && d["credit_limit"] == 8.0 {
+			gym = d["id"].(string)
+		}
+	}
+	if gym == "" {
+		t.Fatal("expected a multi-patient division with 8 credits")
+	}
+	for _, d := range []int{0, 2, 4} { // Mon, Wed, Fri
+		expect(t, "shift", coord.call("POST", "/schedule/shifts/", map[string]any{
+			"date": day(d), "start_hour": 9, "end_hour": 12, "therapist_id": tiagoID, "division_id": gym,
+		}, nil), 201)
+	}
+
+	stamp := time.Now().Format("150405.000")
+	newPatient := func(name string, level int) string {
+		var p map[string]any
+		expect(t, "patient "+name, coord.call("POST", "/patient/", map[string]any{"name": name + " " + stamp, "care_level": level}, &p), 201)
+		if p["care_level"] != float64(level) {
+			t.Fatalf("care level: %v", p["care_level"])
+		}
+		return p["id"].(string)
+	}
+	neuroA, neuroB, light := newPatient("Neuro A", 5), newPatient("Neuro B", 5), newPatient("Light", 1)
+	book := func(patient string, hour int) int {
+		return coord.call("POST", "/schedule/appointments/", map[string]any{"date": day(0), "hour": hour, "therapist_id": tiagoID, "patient_id": patient}, nil)
+	}
+	expect(t, "first level-5 patient", book(neuroA, 9), 201)
+	expect(t, "second level-5 patient does not fit 8 credits", book(neuroB, 9), 409)
+	expect(t, "a level-1 patient still fits", book(light, 9), 201)
+
+	// Weekly plan: Mon/Wed/Fri at 10 for 3 sessions — preview, then book
+	plan := map[string]any{"patient_id": neuroB, "therapist_id": tiagoID, "weekdays": []int{1, 3, 5}, "hour": 10,
+		"start_date": day(0), "sessions": 3, "dry_run": true}
+	var preview struct {
+		Booked  []string `json:"booked"`
+		Skipped []any    `json:"skipped"`
+	}
+	expect(t, "plan preview", coord.call("POST", "/schedule/series/", plan, &preview), 201)
+	if len(preview.Booked) != 3 {
+		t.Fatalf("preview: %+v", preview)
+	}
+	plan["dry_run"] = false
+	var booked struct {
+		SeriesID string   `json:"series_id"`
+		Booked   []string `json:"booked"`
+	}
+	expect(t, "plan booked", coord.call("POST", "/schedule/series/", plan, &booked), 201)
+	if len(booked.Booked) != 3 || booked.SeriesID == "" {
+		t.Fatalf("plan: %+v", booked)
+	}
+
+	// A session-consumable item, then attending a session uses it
+	var gloves map[string]any
+	expect(t, "gloves", coord.call("POST", "/inventory/items/", map[string]any{
+		"name": "E2E session gloves " + stamp, "unit": "pairs", "quantity": 10, "per_session": 1,
+	}, &gloves), 201)
+	var board struct {
+		Therapists []struct {
+			ID    float64 `json:"id"`
+			Hours []struct {
+				Hour         int              `json:"hour"`
+				Appointments []map[string]any `json:"appointments"`
+			} `json:"hours"`
+		} `json:"therapists"`
+	}
+	expect(t, "board", coord.call("GET", "/schedule/board/?date="+day(2), nil, &board), 200)
+	var apptID string
+	for _, row := range board.Therapists {
+		for _, h := range row.Hours {
+			if row.ID == tiagoID && h.Hour == 10 && len(h.Appointments) == 1 {
+				apptID = h.Appointments[0]["id"].(string)
+			}
+		}
+	}
+	if apptID == "" {
+		t.Fatal("planned Wednesday session missing from the board")
+	}
+	expect(t, "tiago marks attended", tiago.call("PATCH", "/schedule/appointments/"+apptID+"/", map[string]any{"status": "attended"}, nil), 200)
+	var items []map[string]any
+	expect(t, "stock", coord.call("GET", "/inventory/items/?search=E2E+session+gloves+"+stamp, nil, &items), 200)
+	if len(items) != 1 || items[0]["quantity"] != 9.0 {
+		t.Fatalf("one pair used by the session: %v", items)
+	}
+	var audit []map[string]any
+	expect(t, "physio cannot audit", tiago.call("GET", "/inventory/audit/", nil, nil), 403)
+	expect(t, "audit", coord.call("GET", "/inventory/audit/?auto=true&item="+gloves["id"].(string), nil, &audit), 200)
+	if len(audit) != 1 || audit[0]["user_id"] != tiagoID || audit[0]["appointment_id"] != apptID {
+		t.Fatalf("audit of automatic use: %v", audit)
+	}
+
+	var year struct {
+		Months []map[string]float64 `json:"months"`
+	}
+	expect(t, "year view", coord.call("GET", fmt.Sprintf("/schedule/year/?year=%d", start.Year()), nil, &year), 200)
+	// The plan may cross into the next month: count the whole year
+	var attended, booked2 float64
+	for _, m := range year.Months {
+		attended += m["attended"]
+		booked2 += m["booked"]
+	}
+	if attended < 1 || booked2 < 4 {
+		t.Fatalf("year view: %v attended, %v booked", attended, booked2)
+	}
+	expect(t, "cancel the rest of the plan", coord.call("DELETE", "/schedule/series/"+booked.SeriesID+"/?from="+day(0), nil, nil), 200)
 }

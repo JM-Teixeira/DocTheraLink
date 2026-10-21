@@ -1,5 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Check, Plus, Search, Trash2, UserX, X } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -21,21 +21,16 @@ import {
   DIVISION_COLORS,
   addDays,
   formatHour,
-  loadLevel,
 } from "@/components/TimeBoard/boardUtils";
 import {
   Board,
-  BoardTherapist,
   Division,
   DivisionColor,
-  HourLoad,
   Shift,
 } from "@/components/TimeBoard/types";
 
-import useDebouncedValue from "@/hooks/useDebouncedValue";
-
 import * as Notification from "@/Utils/Notifications";
-import query, { callApi } from "@/Utils/request/query";
+import { callApi } from "@/Utils/request/query";
 import { HTTPError } from "@/Utils/request/types";
 
 const fieldClass =
@@ -45,200 +40,6 @@ const fieldClass =
 export function apiError(e: Error, fallback: string) {
   const msg = e instanceof HTTPError ? e.cause?.message : undefined;
   Notification.Error({ msg: typeof msg === "string" && msg ? msg : fallback });
-}
-
-/** One physiotherapist-hour: its patients, their status, and booking. */
-export function HourDialog({
-  board,
-  therapist,
-  load,
-  onClose,
-  onChanged,
-}: {
-  board: Board;
-  therapist: BoardTherapist | null;
-  load: HourLoad | null;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
-  const { t } = useTranslation();
-  const [search, setSearch] = useState("");
-  const debounced = useDebouncedValue(search);
-  useEffect(() => setSearch(""), [load]);
-  const canBook = board.permissions.book_patients;
-  const division = board.divisions.find((d) => d.id === load?.division_id);
-  const full = load
-    ? loadLevel(load.appointments.length, load.capacity) === "full"
-    : false;
-
-  const { data: patients } = useQuery({
-    queryKey: ["board-patient-search", debounced],
-    queryFn: query(BoardRoutes.searchPatients, {
-      queryParams: { search: debounced, limit: 6 },
-    }),
-    enabled: !!load && canBook && !full && debounced.trim().length >= 2,
-  });
-
-  const fail = (e: Error) => apiError(e, t("board_save_failed"));
-  const book = useMutation({
-    mutationFn: (patientId: string) =>
-      callApi(BoardRoutes.book, {
-        body: {
-          date: board.date,
-          hour: load!.hour,
-          therapist_id: therapist!.id,
-          patient_id: patientId,
-        },
-        silent: true,
-      }),
-    onSuccess: () => {
-      setSearch("");
-      onChanged();
-    },
-    onError: fail,
-  });
-  const status = useMutation({
-    mutationFn: (v: { id: string; status: "booked" | "attended" | "missed" }) =>
-      callApi(BoardRoutes.setStatus, {
-        pathParams: { id: v.id },
-        body: { status: v.status },
-        silent: true,
-      }),
-    onSuccess: onChanged,
-    onError: fail,
-  });
-  const unbook = useMutation({
-    mutationFn: (id: string) =>
-      callApi(BoardRoutes.unbook, { pathParams: { id }, silent: true }),
-    onSuccess: onChanged,
-    onError: fail,
-  });
-
-  return (
-    <Dialog open={!!load} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {therapist?.first_name} {therapist?.last_name} ·{" "}
-            {load && formatHour(load.hour)}
-          </DialogTitle>
-          <DialogDescription className="flex items-center gap-2">
-            {division && (
-              <span
-                className={cn(
-                  "size-2.5 rounded-full",
-                  DIVISION_COLORS[division.color].dot,
-                )}
-              />
-            )}
-            {division?.name} ·{" "}
-            {t("n_of_capacity_patients", {
-              count: load?.appointments.length ?? 0,
-              capacity: load?.capacity ?? 0,
-            })}
-          </DialogDescription>
-        </DialogHeader>
-
-        {load?.appointments.length ? (
-          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
-            {load.appointments.map((ap) => (
-              <li
-                key={ap.id}
-                className="flex items-center gap-2 px-3 py-2 text-sm"
-              >
-                <span className="min-w-0 flex-1 truncate font-medium text-gray-900">
-                  {ap.patient?.name}
-                </span>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-xs",
-                    ap.status === "attended" &&
-                      "bg-emerald-50 text-emerald-700",
-                    ap.status === "missed" && "bg-rose-50 text-rose-700",
-                    ap.status === "booked" && "bg-gray-100 text-gray-700",
-                  )}
-                >
-                  {t(`appointment_status__${ap.status}`)}
-                </span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={t("mark_attended")}
-                  onClick={() =>
-                    status.mutate({ id: ap.id, status: "attended" })
-                  }
-                >
-                  <Check className="size-4 text-emerald-600" aria-hidden />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={t("mark_missed")}
-                  onClick={() => status.mutate({ id: ap.id, status: "missed" })}
-                >
-                  <UserX className="size-4 text-amber-600" aria-hidden />
-                </Button>
-                {canBook && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={t("remove_from_hour")}
-                    onClick={() => unbook.mutate(ap.id)}
-                  >
-                    <X className="size-4 text-rose-600" aria-hidden />
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-gray-500">{t("no_patients_this_hour")}</p>
-        )}
-
-        {canBook &&
-          (full ? (
-            <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
-              {t("hour_is_full")}
-            </p>
-          ) : (
-            <div>
-              <div className="relative">
-                <Search
-                  className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400"
-                  aria-hidden
-                />
-                <input
-                  aria-label={t("assign_patient")}
-                  placeholder={t("assign_patient_placeholder")}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className={cn(fieldClass, "mt-0 pl-9")}
-                />
-              </div>
-              {!!patients?.results.length && (
-                <ul className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
-                  {patients.results.map((p) => (
-                    <li key={p.id}>
-                      <button
-                        type="button"
-                        disabled={book.isPending}
-                        onClick={() => book.mutate(p.id!)}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
-                      >
-                        <span className="font-medium text-gray-900">
-                          {p.name}
-                        </span>
-                        <Plus className="size-4 text-primary-600" aria-hidden />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 /** Creates or edits a shift (who, where, from–to). */
@@ -441,7 +242,24 @@ export function ShiftDialog({
   );
 }
 
-/** Add, rename, recolour or remove divisions and set their capacity. */
+type DivisionDraft = {
+  name: string;
+  color: DivisionColor;
+  capacity: number;
+  credit_limit: number;
+};
+const EMPTY_DIVISION: DivisionDraft = {
+  name: "",
+  color: "teal",
+  capacity: 3,
+  credit_limit: 8,
+};
+
+/**
+ * Add, rename, recolour or remove divisions and set their limits: patients
+ * per physio per hour, and care credits per physio per hour (patients count
+ * their care level 1–5).
+ */
 export function DivisionsDialog({
   open,
   divisions,
@@ -454,20 +272,10 @@ export function DivisionsDialog({
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState<{
-    name: string;
-    color: DivisionColor;
-    capacity: number;
-  }>({ name: "", color: "teal", capacity: 3 });
+  const [draft, setDraft] = useState<DivisionDraft>(EMPTY_DIVISION);
   const fail = (e: Error) => apiError(e, t("board_save_failed"));
   const save = useMutation({
-    mutationFn: (v: {
-      id?: string;
-      name: string;
-      color: DivisionColor;
-      capacity: number;
-      sort_order: number;
-    }) =>
+    mutationFn: (v: DivisionDraft & { id?: string; sort_order: number }) =>
       v.id
         ? callApi(BoardRoutes.updateDivision, {
             pathParams: { id: v.id },
@@ -476,7 +284,7 @@ export function DivisionsDialog({
           })
         : callApi(BoardRoutes.createDivision, { body: v, silent: true }),
     onSuccess: () => {
-      setDraft({ name: "", color: "teal", capacity: 3 });
+      setDraft(EMPTY_DIVISION);
       onChanged();
     },
     onError: fail,
@@ -490,7 +298,7 @@ export function DivisionsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("divisions")}</DialogTitle>
           <DialogDescription>{t("divisions_help")}</DialogDescription>
@@ -536,19 +344,11 @@ export function DivisionsDialog({
             value={draft.color}
             onChange={(color) => setDraft((d) => ({ ...d, color }))}
           />
-          <label className="w-24 text-sm font-medium text-gray-700">
-            {t("per_hour")}
-            <input
-              type="number"
-              min={1}
-              max={20}
-              value={draft.capacity}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, capacity: Number(e.target.value) }))
-              }
-              className={fieldClass}
-            />
-          </label>
+          <LimitInputs
+            value={draft}
+            onChange={(v) => setDraft((d) => ({ ...d, ...v }))}
+            labelled
+          />
           <Button
             type="submit"
             variant="primary"
@@ -563,25 +363,73 @@ export function DivisionsDialog({
   );
 }
 
+function LimitInputs({
+  value,
+  onChange,
+  labelled,
+}: {
+  value: { capacity: number; credit_limit: number };
+  onChange: (v: { capacity?: number; credit_limit?: number }) => void;
+  labelled?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <label className="w-24 text-sm font-medium text-gray-700">
+        {labelled ? (
+          t("patients_per_hour")
+        ) : (
+          <span className="sr-only">{t("patients_per_hour")}</span>
+        )}
+        <input
+          type="number"
+          min={1}
+          max={20}
+          value={value.capacity}
+          onChange={(e) => onChange({ capacity: Number(e.target.value) })}
+          className={cn(fieldClass, !labelled && "mt-0")}
+        />
+      </label>
+      <label className="w-24 text-sm font-medium text-gray-700">
+        {labelled ? (
+          t("credits_per_hour")
+        ) : (
+          <span className="sr-only">{t("credits_per_hour")}</span>
+        )}
+        <input
+          type="number"
+          min={1}
+          max={40}
+          value={value.credit_limit}
+          onChange={(e) => onChange({ credit_limit: Number(e.target.value) })}
+          className={cn(fieldClass, !labelled && "mt-0")}
+        />
+      </label>
+    </>
+  );
+}
+
 function DivisionRow({
   division,
   onSave,
   onRemove,
 }: {
   division: Division;
-  onSave: (v: { name: string; color: DivisionColor; capacity: number }) => void;
+  onSave: (v: DivisionDraft) => void;
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
-  const [v, setV] = useState({
+  const [v, setV] = useState<DivisionDraft>({
     name: division.name,
     color: division.color,
     capacity: division.capacity,
+    credit_limit: division.credit_limit,
   });
   const dirty =
     v.name !== division.name ||
     v.color !== division.color ||
-    v.capacity !== division.capacity;
+    v.capacity !== division.capacity ||
+    v.credit_limit !== division.credit_limit;
   return (
     <li className="flex flex-wrap items-center gap-2 px-3 py-2">
       <input
@@ -594,16 +442,9 @@ function DivisionRow({
         value={v.color}
         onChange={(color) => setV((x) => ({ ...x, color }))}
       />
-      <input
-        aria-label={t("per_hour")}
-        type="number"
-        min={1}
-        max={20}
-        value={v.capacity}
-        onChange={(e) =>
-          setV((x) => ({ ...x, capacity: Number(e.target.value) }))
-        }
-        className={cn(fieldClass, "mt-0 w-20")}
+      <LimitInputs
+        value={v}
+        onChange={(lim) => setV((x) => ({ ...x, ...lim }))}
       />
       <Button
         size="sm"

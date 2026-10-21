@@ -41,21 +41,28 @@ type Actor struct {
 
 // Who may do what on the time board:
 //   - everyone in the clinic sees the board (who is where, how busy);
-//   - coordinators and admins manage divisions and shifts;
-//   - they and receptionists assign patients to a physiotherapist's hour;
-//   - a physiotherapist can mark their own patients attended or missed.
+//   - coordinators and admins plan divisions and shifts and assign patients
+//     to physiotherapists;
+//   - a physiotherapist marks their own patients attended or missed.
 func canManage(a Actor) bool { return auth.IsAdmin(a.Role) || a.Role == models.RoleCoordinator }
-func canBook(a Actor) bool   { return canManage(a) || a.Role == models.RoleReceptionist }
 
 // Service holds the time-board rules.
 type Service struct {
 	repo    Repository
 	clinics clinic.Resolver
+	hook    SessionHook
 }
 
 // NewService builds the service.
 func NewService(repo Repository, clinics clinic.Resolver) *Service {
-	return &Service{repo: repo, clinics: clinics}
+	return &Service{repo: repo, clinics: clinics, hook: noHook{}}
+}
+
+// WithSessionHook sets what happens when a session is held (e.g. using
+// consumables) and returns the service.
+func (s *Service) WithSessionHook(h SessionHook) *Service {
+	s.hook = h
+	return s
 }
 
 // clinicOf is the actor's clinic; admins without one get the default clinic.
@@ -81,6 +88,13 @@ func parseDate(field, v string) (time.Time, error) {
 		return time.Time{}, &ValidationError{field, "must be a date in YYYY-MM-DD format"}
 	}
 	return t, nil
+}
+
+func creditLimit(d *Division) int {
+	if d.CreditLimit <= 0 {
+		return DefaultCreditLimit
+	}
+	return d.CreditLimit
 }
 
 // ---- Divisions ----
@@ -114,6 +128,10 @@ func (s *Service) SaveDivision(ctx context.Context, a Actor, id string, req Divi
 		return nil, &ValidationError{"name", "must have at least 2 characters"}
 	}
 	d.Capacity, d.SortOrder = req.Capacity, req.SortOrder
+	d.CreditLimit = req.CreditLimit
+	if d.CreditLimit == 0 {
+		d.CreditLimit = DefaultCreditLimit
+	}
 	if req.Color != "" {
 		d.Color = req.Color
 	} else if d.Color == "" {
@@ -186,7 +204,7 @@ func (s *Service) SaveShift(ctx context.Context, a Actor, id string, req ShiftRe
 	sh.TherapistID, sh.DivisionID, sh.Notes = req.TherapistID, req.DivisionID, strings.TrimSpace(req.Notes)
 
 	// No overlap with the physiotherapist's other shifts that day
-	day, err := s.repo.Shifts(ctx, cid, date)
+	day, err := s.repo.Shifts(ctx, cid, date, date)
 	if err != nil {
 		return nil, err
 	}
@@ -244,11 +262,43 @@ func (s *Service) CopyDay(ctx context.Context, a Actor, req CopyRequest) (int, e
 	if from.Equal(to) {
 		return 0, &ValidationError{"to_date", "must differ from from_date"}
 	}
-	src, err := s.repo.Shifts(ctx, cid, from)
+	return s.copyDay(ctx, cid, a.ID, from, to)
+}
+
+// RepeatWeek copies the 7 days starting at WeekStart onto each of the next
+// Weeks weeks (same weekday), skipping physiotherapists already scheduled.
+func (s *Service) RepeatWeek(ctx context.Context, a Actor, req RepeatWeekRequest) (int, error) {
+	if !canManage(a) {
+		return 0, ErrForbidden
+	}
+	cid, err := s.clinicOf(ctx, a)
 	if err != nil {
 		return 0, err
 	}
-	dst, err := s.repo.Shifts(ctx, cid, to)
+	start, err := parseDate("week_start", req.WeekStart)
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for w := 1; w <= req.Weeks; w++ {
+		for d := 0; d < 7; d++ {
+			from := start.AddDate(0, 0, d)
+			n, err := s.copyDay(ctx, cid, a.ID, from, from.AddDate(0, 0, 7*w))
+			total += n
+			if err != nil {
+				return total, err
+			}
+		}
+	}
+	return total, nil
+}
+
+func (s *Service) copyDay(ctx context.Context, cid string, actorID uint, from, to time.Time) (int, error) {
+	src, err := s.repo.Shifts(ctx, cid, from, from)
+	if err != nil {
+		return 0, err
+	}
+	dst, err := s.repo.Shifts(ctx, cid, to, to)
 	if err != nil {
 		return 0, err
 	}
@@ -262,7 +312,7 @@ func (s *Service) CopyDay(ctx context.Context, a Actor, req CopyRequest) (int, e
 			continue
 		}
 		c := Shift{ClinicID: cid, Date: to, StartHour: sh.StartHour, EndHour: sh.EndHour,
-			TherapistID: sh.TherapistID, DivisionID: sh.DivisionID, Notes: sh.Notes, CreatedByID: a.ID}
+			TherapistID: sh.TherapistID, DivisionID: sh.DivisionID, Notes: sh.Notes, CreatedByID: actorID}
 		if err := s.repo.SaveShift(ctx, &c); err != nil {
 			return n, err
 		}
@@ -281,7 +331,7 @@ func (s *Service) shift(ctx context.Context, cid, id string) (*Shift, error) {
 // checkStranded fails if appointments inside old would fall outside next
 // (nil = the shift is deleted).
 func (s *Service) checkStranded(ctx context.Context, cid string, old Shift, next *Shift) error {
-	appts, err := s.repo.Appointments(ctx, cid, old.Date)
+	appts, err := s.repo.Appointments(ctx, cid, old.Date, old.Date)
 	if err != nil {
 		return err
 	}
@@ -303,9 +353,9 @@ func (s *Service) checkStranded(ctx context.Context, cid string, old Shift, next
 // ---- Appointments ----
 
 // Book assigns a patient to a physiotherapist's hour. The physiotherapist
-// must be on shift then and the division's capacity not yet reached.
+// must be on shift then and the division's patients and credits not yet used up.
 func (s *Service) Book(ctx context.Context, a Actor, req AppointmentRequest) (*Appointment, error) {
-	if !canBook(a) {
+	if !canManage(a) {
 		return nil, ErrForbidden
 	}
 	cid, err := s.clinicOf(ctx, a)
@@ -316,19 +366,15 @@ func (s *Service) Book(ctx context.Context, a Actor, req AppointmentRequest) (*A
 	if err != nil {
 		return nil, err
 	}
-	if ok, err := s.repo.PatientInClinic(ctx, cid, req.PatientID); err != nil || !ok {
+	level, ok, err := s.repo.PatientCareLevel(ctx, cid, req.PatientID)
+	if err != nil || !ok {
 		return nil, firstErr(err, &ValidationError{"patient_id", "is not a patient of this clinic"})
 	}
-	shifts, err := s.repo.Shifts(ctx, cid, date)
+	shifts, err := s.repo.Shifts(ctx, cid, date, date)
 	if err != nil {
 		return nil, err
 	}
-	var on *Shift
-	for i := range shifts {
-		if shifts[i].TherapistID == req.TherapistID && shifts[i].Covers(req.Hour) {
-			on = &shifts[i]
-		}
-	}
+	on := shiftAt(shifts, req.TherapistID, req.Hour)
 	if on == nil {
 		return nil, &ConflictError{"the physiotherapist is not on shift at this hour"}
 	}
@@ -338,38 +384,70 @@ func (s *Service) Book(ctx context.Context, a Actor, req AppointmentRequest) (*A
 	}
 	ap := &Appointment{
 		ClinicID: cid, Date: date, Hour: req.Hour, TherapistID: req.TherapistID, PatientID: req.PatientID,
-		ReferralID: req.ReferralID, Status: StatusBooked, Notes: strings.TrimSpace(req.Notes), CreatedByID: a.ID,
+		Credits: level, ReferralID: req.ReferralID, Status: StatusBooked, Notes: strings.TrimSpace(req.Notes), CreatedByID: a.ID,
 	}
-	if err := s.repo.Book(ctx, ap, div.Capacity); err != nil {
+	if err := s.repo.Book(ctx, ap, div.Capacity, creditLimit(div)); err != nil {
 		return nil, err
 	}
 	return ap, nil
 }
 
-// SetStatus marks attended / missed: board managers, front desk or the
-// physiotherapist of the appointment.
-func (s *Service) SetStatus(ctx context.Context, a Actor, id string, req StatusRequest) (*Appointment, error) {
+func shiftAt(shifts []Shift, therapistID uint, hour int) *Shift {
+	for i := range shifts {
+		if shifts[i].TherapistID == therapistID && shifts[i].Covers(hour) {
+			return &shifts[i]
+		}
+	}
+	return nil
+}
+
+// SetStatus marks attended / missed: board managers or the physiotherapist
+// of the appointment. Becoming attended triggers the session hook (e.g.
+// gloves used automatically); leaving attended undoes it.
+func (s *Service) SetStatus(ctx context.Context, a Actor, id string, req StatusRequest) (*StatusResult, error) {
 	ap, err := s.appointment(ctx, a, id)
 	if err != nil {
 		return nil, err
 	}
-	if !canBook(a) && ap.TherapistID != a.ID {
+	if !canManage(a) && ap.TherapistID != a.ID {
 		return nil, ErrForbidden
+	}
+	res := &StatusResult{Appointment: *ap, Warnings: []string{}}
+	if ap.Status == req.Status {
+		return res, nil
 	}
 	if err := s.repo.UpdateAppointment(ctx, id, map[string]any{"status": req.Status}); err != nil {
 		return nil, err
 	}
-	ap.Status = req.Status
-	return ap, nil
+	switch {
+	case req.Status == StatusAttended:
+		w, err := s.hook.SessionAttended(ctx, ap.ClinicID, ap.ID, a.ID)
+		if err != nil {
+			return nil, err
+		}
+		res.Warnings = append(res.Warnings, w...)
+	case ap.Status == StatusAttended:
+		if err := s.hook.SessionUndone(ctx, ap.ClinicID, ap.ID, a.ID); err != nil {
+			return nil, err
+		}
+	}
+	res.Status = req.Status
+	return res, nil
 }
 
 // Unbook removes a patient from the hour.
 func (s *Service) Unbook(ctx context.Context, a Actor, id string) error {
-	if !canBook(a) {
+	if !canManage(a) {
 		return ErrForbidden
 	}
-	if _, err := s.appointment(ctx, a, id); err != nil {
+	ap, err := s.appointment(ctx, a, id)
+	if err != nil {
 		return err
+	}
+	if ap.Status == StatusAttended {
+		if err := s.hook.SessionUndone(ctx, ap.ClinicID, ap.ID, a.ID); err != nil {
+			return err
+		}
 	}
 	return s.repo.DeleteAppointment(ctx, id)
 }
@@ -397,33 +475,52 @@ func (s *Service) Board(ctx context.Context, a Actor, date string) (*Board, erro
 	if err != nil {
 		return nil, err
 	}
-	divs, err := s.repo.Divisions(ctx, cid)
+	data, err := s.load(ctx, cid, d, d)
 	if err != nil {
 		return nil, err
 	}
-	therapists, err := s.repo.Therapists(ctx, cid)
-	if err != nil {
+	b := buildBoard(d, data.divisions, data.therapists, data.shifts, data.appts)
+	b.Permissions = permissions(a)
+	return b, nil
+}
+
+func permissions(a Actor) Permissions {
+	m := canManage(a)
+	return Permissions{ManageShifts: m, BookPatients: m}
+}
+
+// boardData is everything of a date range needed to build boards.
+type boardData struct {
+	divisions  []Division
+	therapists []UserSummary
+	shifts     []Shift
+	appts      []Appointment
+}
+
+func (s *Service) load(ctx context.Context, cid string, from, to time.Time) (*boardData, error) {
+	var d boardData
+	var err error
+	if d.divisions, err = s.repo.Divisions(ctx, cid); err != nil {
 		return nil, err
 	}
-	shifts, err := s.repo.Shifts(ctx, cid, d)
-	if err != nil {
+	if d.therapists, err = s.repo.Therapists(ctx, cid); err != nil {
 		return nil, err
 	}
-	appts, err := s.repo.Appointments(ctx, cid, d)
-	if err != nil {
+	if d.shifts, err = s.repo.Shifts(ctx, cid, from, to); err != nil {
+		return nil, err
+	}
+	if d.appts, err = s.repo.Appointments(ctx, cid, from, to); err != nil {
 		return nil, err
 	}
 	// Shifts may use divisions removed since; include them for display
-	for _, sh := range shifts {
-		if !hasDivision(divs, sh.DivisionID) {
+	for _, sh := range d.shifts {
+		if !hasDivision(d.divisions, sh.DivisionID) {
 			if old, err := s.repo.GetDivision(ctx, cid, sh.DivisionID); err == nil {
-				divs = append(divs, *old)
+				d.divisions = append(d.divisions, *old)
 			}
 		}
 	}
-	b := buildBoard(d, divs, therapists, shifts, appts)
-	b.Permissions = Permissions{ManageShifts: canManage(a), BookPatients: canBook(a)}
-	return b, nil
+	return &d, nil
 }
 
 func hasDivision(ds []Division, id string) bool {

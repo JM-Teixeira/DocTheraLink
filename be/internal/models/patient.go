@@ -38,25 +38,28 @@ const (
 )
 
 type Patient struct {
-	tableName            struct{}            `gorm:"table:patients"`
-	ID                   string              `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Name                 string              `json:"name" gorm:"not null"`
-	Gender               *int                `json:"gender"`
-	PhoneNumber          *string             `json:"phone_number"`
-	EmergencyPhoneNumber *string             `json:"emergency_phone_number"`
-	DateOfBirth          *time.Time          `json:"date_of_birth"`
-	YearOfBirth          *int                `json:"year_of_birth"`
-	Age                  *string             `json:"age" gorm:"-"`
-	BloodGroup           *BloodGroup         `json:"blood_group"`
-	Address              *string             `json:"address"`
-	PermanentAddress     *string             `json:"permanent_address"`
-	Village              *string             `json:"village"`
-	Pincode              *int                `json:"pincode"`
-	Nationality          *string             `json:"nationality"`
-	NIF                  *string             `json:"nif" gorm:"size:9;index"`        // Portuguese tax number (validated)
-	SNSNumber            *string             `json:"sns_number" gorm:"size:9;index"` // número de utente do SNS
-	PassportNo           *string             `json:"passport_no"`
-	RationCardCategory   *RationCardCategory `json:"ration_card_category"`
+	tableName            struct{}    `gorm:"table:patients"`
+	ID                   string      `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	Name                 string      `json:"name" gorm:"not null"`
+	Gender               *int        `json:"gender"`
+	PhoneNumber          *string     `json:"phone_number"`
+	EmergencyPhoneNumber *string     `json:"emergency_phone_number"`
+	DateOfBirth          *time.Time  `json:"date_of_birth"`
+	YearOfBirth          *int        `json:"year_of_birth"`
+	Age                  *string     `json:"age" gorm:"-"`
+	BloodGroup           *BloodGroup `json:"blood_group"`
+	Address              *string     `json:"address"`
+	PermanentAddress     *string     `json:"permanent_address"`
+	Village              *string     `json:"village"`
+	Pincode              *int        `json:"pincode"`
+	Nationality          *string     `json:"nationality"`
+	NIF                  *string     `json:"nif" gorm:"size:9;index"`        // Portuguese tax number (validated)
+	SNSNumber            *string     `json:"sns_number" gorm:"size:9;index"` // número de utente do SNS
+	// CareLevel 1–5: how much of a physio's hour the patient needs (1 =
+	// independent … 5 = cannot move by themselves); booking credits.
+	CareLevel          int                 `json:"care_level" gorm:"not null;default:1"`
+	PassportNo         *string             `json:"passport_no"`
+	RationCardCategory *RationCardCategory `json:"ration_card_category"`
 
 	// Medical Information
 	Allergies             *string `json:"allergies"`

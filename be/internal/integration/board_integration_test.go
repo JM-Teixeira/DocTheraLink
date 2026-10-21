@@ -148,6 +148,81 @@ func TestTimeBoardOnPostgres(t *testing.T) {
 		t.Fatalf("board: found=%v permissions=%+v", found, b.Permissions)
 	}
 
+	// Attending a session uses the per-session consumables (real inventory)
+	stock := inventory.NewService(inventory.NewGormRepository(db), clinic.NewGormResolver(db))
+	invActor := inventory.Actor{ID: coord.ID, Role: coord.Role}
+	gloves, err := stock.Create(ctx, invActor, inventory.ItemRequest{Name: "Board gloves", Quantity: 10, PerSession: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	withHook := schedule.NewService(schedule.NewGormRepository(db), clinic.NewGormResolver(db)).WithSessionHook(stock)
+	var apptID string
+	for _, row := range b.Therapists {
+		if row.ID == sarah.ID {
+			apptID = row.Hours[1].Appointments[0].ID
+		}
+	}
+	if _, err := withHook.SetStatus(ctx, coordinator, apptID, schedule.StatusRequest{Status: schedule.StatusAttended}); err != nil {
+		t.Fatal(err)
+	}
+	items, _ := stock.List(ctx, invActor, inventory.ListFilter{Search: "Board gloves"})
+	if len(items) != 1 || items[0].Quantity != 8 {
+		t.Fatalf("2 gloves used per session: %+v", items)
+	}
+	auto := true
+	used, err := stock.Audit(ctx, invActor, inventory.AuditFilter{ItemID: gloves.ID, Auto: &auto})
+	if err != nil || len(used) != 1 || used[0].Item == nil || used[0].Item.Name != "Board gloves" || used[0].User == nil {
+		t.Fatalf("audit of automatic use: %+v %v", used, err)
+	}
+	if _, err := withHook.SetStatus(ctx, coordinator, apptID, schedule.StatusRequest{Status: schedule.StatusMissed}); err != nil {
+		t.Fatal(err)
+	}
+	if items, _ = stock.List(ctx, invActor, inventory.ListFilter{Search: "Board gloves"}); items[0].Quantity != 10 {
+		t.Fatalf("undo gives back: %d", items[0].Quantity)
+	}
+
+	// Credits: a level-5 patient leaves 3 of 8 credits in a gym hour
+	gym := divs[0]
+	if gym.CreditLimit != schedule.DefaultCreditLimit {
+		t.Fatalf("gym credit limit: %+v", gym)
+	}
+	tiago := userID(t, "physiotherapist2")
+	if _, err := svc.SaveShift(ctx, coordinator, "", schedule.ShiftRequest{
+		Date: date, StartHour: 14, EndHour: 16, TherapistID: tiago.ID, DivisionID: gym.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	five := 5
+	var neuro []string
+	for i := 0; i < 2; i++ {
+		p, err := psvc.Create(ctx, patient.Actor{ID: coord.ID, Role: coord.Role},
+			patient.CreateRequest{Name: "Neuro Patient " + string(rune('A'+i)), CareLevel: &five, AllowDuplicate: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		neuro = append(neuro, p.ID)
+	}
+	if _, err := svc.Book(ctx, coordinator, schedule.AppointmentRequest{Date: date, Hour: 14, TherapistID: tiago.ID, PatientID: neuro[0]}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Book(ctx, coordinator, schedule.AppointmentRequest{Date: date, Hour: 14, TherapistID: tiago.ID, PatientID: neuro[1]}); !errors.Is(err, schedule.ErrOverCredits) {
+		t.Fatalf("second level-5 patient: %v", err)
+	}
+
+	// A weekly plan books on PostgreSQL; the year view aggregates
+	plan, err := svc.Series(ctx, coordinator, schedule.SeriesRequest{PatientID: neuro[1], TherapistID: tiago.ID,
+		Weekdays: []int{int(time.Sunday)}, Hour: 15, StartDate: date, Sessions: 1})
+	if err != nil || len(plan.Booked) != 1 || plan.SeriesID == "" {
+		t.Fatalf("series: %+v %v", plan, err)
+	}
+	year, err := svc.Year(ctx, coordinator, 2031)
+	if err != nil || year.Months[5].Booked < 2 || year.Months[5].Patients < 2 {
+		t.Fatalf("June 2031 stats: %+v %v", year.Months[5], err)
+	}
+	if _, err := svc.Range(ctx, coordinator, "2031-05-26", "2031-06-01"); err != nil {
+		t.Fatalf("range: %v", err)
+	}
+
 	// Seeded weekday shifts exist for the coming two weeks
 	next := time.Now()
 	for next.Weekday() == time.Saturday || next.Weekday() == time.Sunday {

@@ -7,6 +7,24 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-21 — M4 patients (branch `feat/m4-patients`)
 
+### 15:30 · Care levels, weekly plans, calendar views, stock audit (user request)
+- Patients get a **care level 1–5**; it is stored on each appointment as
+  credits. Divisions have a per-physio hourly **credit limit** (default 8)
+  next to the patient limit, checked under the booking lock.
+- Only **coordinators and admins assign patients**; coordinators can read
+  the clinic's referrals (not act on them).
+- **Weekly plans** (`POST /schedule/series/`, dry-run preview): weekdays +
+  hour + start + N sessions; skipped dates are reported with the reason;
+  cancel the rest of a plan. **Repeat week** for N weeks.
+- **Week / month / year views** (`/schedule/range/`, `/schedule/year/`).
+- **Patient pop-up** on the board: basics, care level, allergies, current
+  referral (diagnosis, reason, goals, precautions) and the thread.
+- **Inventory audit** tab, **Open** movements, and **per-session automatic
+  use** wired from the time board (attended → use; undo → give back).
+- Tests: unit (credits, plans, ranges, hook, audit, coordinator read),
+  PostgreSQL (credits, auto-use/undo, audit, plan, year stats), e2e
+  `TestCarePlanAndAutoUse`; 83 frontend tests.
+
 ### 13:30 · Time board, working inventory, Coordinator role (user request)
 - **Time board** (`modules/schedule`, `/time-board`): divisions with a
   per-hour capacity per physio; daily shifts per physio and division (no

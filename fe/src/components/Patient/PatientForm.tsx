@@ -28,6 +28,10 @@ import {
   serverErrorsToForm,
   validatePatientForm,
 } from "@/components/Patient/patientFormUtils";
+import {
+  CARE_LEVELS,
+  CARE_LEVEL_STYLES,
+} from "@/components/TimeBoard/boardUtils";
 
 import * as Notification from "@/Utils/Notifications";
 import { HTTPError } from "@/Utils/request/types";
@@ -204,6 +208,45 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
                     className="sr-only"
                   />
                   {t(g.key)}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="sm:col-span-2">
+            <legend className="text-sm font-medium text-gray-700">
+              {t("care_level")}
+            </legend>
+            <p className="text-xs text-gray-500">{t("care_level_form_help")}</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-5">
+              {CARE_LEVELS.map((lvl) => (
+                <label
+                  key={lvl}
+                  className={cn(
+                    "cursor-pointer rounded-lg p-2 text-xs ring-1 ring-inset transition",
+                    form.care_level === String(lvl)
+                      ? "bg-primary-50 ring-2 ring-primary-500"
+                      : "bg-white ring-gray-200 hover:bg-gray-50",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="care_level"
+                    value={lvl}
+                    checked={form.care_level === String(lvl)}
+                    onChange={() => set("care_level")(String(lvl))}
+                    className="sr-only"
+                  />
+                  <span
+                    className={cn(
+                      "mb-1 inline-block rounded px-1.5 font-semibold",
+                      CARE_LEVEL_STYLES[lvl],
+                    )}
+                  >
+                    {lvl}
+                  </span>
+                  <span className="block text-gray-600">
+                    {t(`care_level_help__${lvl}`)}
+                  </span>
                 </label>
               ))}
             </div>

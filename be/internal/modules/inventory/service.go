@@ -61,6 +61,9 @@ func (s *Service) clinicsFor(ctx context.Context, a Actor) ([]string, error) {
 
 func canWrite(a Actor) bool { return auth.CanModifyResource(a.Role) }
 
+// canAudit: the clinic-wide log of who used or opened what.
+func canAudit(a Actor) bool { return canArchive(a) }
+
 func canArchive(a Actor) bool {
 	return auth.IsAdmin(a.Role) || a.Role == models.RoleCoordinator
 }
@@ -123,7 +126,7 @@ func (s *Service) Create(ctx context.Context, a Actor, req ItemRequest) (*ItemVi
 	}
 	it := &Item{
 		ClinicID: clinicID, Name: strings.TrimSpace(req.Name), Category: strings.TrimSpace(req.Category),
-		Unit: unitOr(req.Unit), Quantity: req.Quantity, MinQuantity: req.MinQuantity,
+		Unit: unitOr(req.Unit), Quantity: req.Quantity, MinQuantity: req.MinQuantity, PerSession: req.PerSession,
 	}
 	if err := s.checkName(ctx, clinicID, it.Name, ""); err != nil {
 		return nil, err
@@ -154,7 +157,7 @@ func (s *Service) Update(ctx context.Context, a Actor, id string, req ItemReques
 	}
 	fields := map[string]any{
 		"name": name, "category": strings.TrimSpace(req.Category),
-		"unit": unitOr(req.Unit), "min_quantity": req.MinQuantity,
+		"unit": unitOr(req.Unit), "min_quantity": req.MinQuantity, "per_session": req.PerSession,
 	}
 	if err := s.repo.Update(ctx, id, fields); err != nil {
 		return nil, err
@@ -204,6 +207,66 @@ func (s *Service) History(ctx context.Context, a Actor, id string) ([]Movement, 
 		return nil, err
 	}
 	return s.repo.Movements(ctx, id, 100)
+}
+
+// Audit is the clinic's log of movements (who used, opened, restocked or
+// counted what, and when) for coordinators and admins; at most 1000 rows.
+func (s *Service) Audit(ctx context.Context, a Actor, f AuditFilter) ([]Movement, error) {
+	if !canAudit(a) {
+		return nil, ErrForbidden
+	}
+	ids, err := s.clinicsFor(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.Audit(ctx, ids, f, 1000)
+}
+
+// SessionAttended uses the per-session quantity of every such item for an
+// attended appointment (once). Items short of stock are skipped and
+// reported as warnings; the session itself is never refused.
+func (s *Service) SessionAttended(ctx context.Context, clinicID, appointmentID string, actorID uint) ([]string, error) {
+	items, err := s.repo.SessionItems(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	done, err := s.repo.NetForAppointment(ctx, appointmentID)
+	if err != nil {
+		return nil, err
+	}
+	warnings := []string{}
+	for _, it := range items {
+		if done[it.ID] < 0 {
+			continue // already used for this session
+		}
+		_, err := s.repo.Apply(ctx, it.ID, &Movement{Kind: KindUse, Delta: it.PerSession,
+			Note: "session", UserID: actorID, AppointmentID: &appointmentID})
+		switch {
+		case errors.Is(err, ErrInsufficient):
+			warnings = append(warnings, it.Name+": not enough in stock")
+		case err != nil:
+			return warnings, err
+		}
+	}
+	return warnings, nil
+}
+
+// SessionUndone gives back what SessionAttended used for the appointment.
+func (s *Service) SessionUndone(ctx context.Context, _ string, appointmentID string, actorID uint) error {
+	net, err := s.repo.NetForAppointment(ctx, appointmentID)
+	if err != nil {
+		return err
+	}
+	for itemID, n := range net {
+		if n >= 0 {
+			continue
+		}
+		if _, err := s.repo.Apply(ctx, itemID, &Movement{Kind: KindRestock, Delta: -n,
+			Note: "session undone", UserID: actorID, AppointmentID: &appointmentID}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // targetClinic: staff always use their own clinic; admins must name one.

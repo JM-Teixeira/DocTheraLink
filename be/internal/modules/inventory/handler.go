@@ -154,6 +154,25 @@ func (h *Handler) Move(c *gin.Context) {
 	c.JSON(http.StatusOK, it)
 }
 
+// Audit handles GET /inventory/audit/?item=&user=&kind=&from=&to=&auto=
+func (h *Handler) Audit(c *gin.Context) {
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var f AuditFilter
+	if err := c.ShouldBindQuery(&f); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: err.Error()})
+		return
+	}
+	ms, err := h.svc.Audit(c.Request.Context(), a, f)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, ms)
+}
+
 // History handles GET /inventory/items/:id/movements/
 func (h *Handler) History(c *gin.Context) {
 	a, ok := actorFrom(c)

@@ -4,10 +4,14 @@ import {
   addDays,
   boardHours,
   formatHour,
+  hourIsFull,
   hourOf,
   loadLevel,
+  monthGrid,
   staffingByDivision,
   utilisation,
+  weekDates,
+  weekStart,
 } from "@/components/TimeBoard/boardUtils";
 import { Board, BoardTherapist } from "@/components/TimeBoard/types";
 
@@ -22,6 +26,8 @@ const sarah: BoardTherapist = {
       division_id: "gym",
       shift_id: "s1",
       capacity: 4,
+      credits: 0,
+      credit_limit: 8,
       appointments: [],
     },
     {
@@ -29,6 +35,8 @@ const sarah: BoardTherapist = {
       division_id: "gym",
       shift_id: "s1",
       capacity: 4,
+      credits: 0,
+      credit_limit: 8,
       appointments: [],
     },
     {
@@ -36,11 +44,15 @@ const sarah: BoardTherapist = {
       division_id: "room",
       shift_id: "s2",
       capacity: 1,
+      credits: 0,
+      credit_limit: 8,
       appointments: [],
     },
   ],
   patients: 3,
   capacity: 9,
+  credits: 0,
+  credit_capacity: 24,
 };
 const board: Board = {
   date: "2026-10-26",
@@ -52,6 +64,7 @@ const board: Board = {
       name: "Gym",
       color: "teal",
       capacity: 4,
+      credit_limit: 8,
       sort_order: 0,
       active: true,
     },
@@ -60,6 +73,7 @@ const board: Board = {
       name: "Room 1",
       color: "indigo",
       capacity: 1,
+      credit_limit: 8,
       sort_order: 1,
       active: true,
     },
@@ -104,8 +118,31 @@ describe("time board helpers", () => {
     expect(by.get("room")?.get(9)).toBeUndefined();
   });
 
-  it("computes utilisation", () => {
-    expect(utilisation(sarah)).toBe(33);
-    expect(utilisation({ patients: 0, capacity: 0 })).toBe(0);
+  it("computes utilisation from credits", () => {
+    expect(utilisation({ credits: 6, credit_capacity: 24 })).toBe(25);
+    expect(utilisation({ credits: 0, credit_capacity: 0 })).toBe(0);
+  });
+
+  it("knows when an hour is full by patients or credits", () => {
+    const h = { hour: 9, division_id: "g", shift_id: "s", appointments: [] };
+    expect(hourIsFull({ ...h, capacity: 4, credits: 5, credit_limit: 8 })).toBe(
+      false,
+    );
+    expect(hourIsFull({ ...h, capacity: 4, credits: 8, credit_limit: 8 })).toBe(
+      true,
+    );
+    expect(hourIsFull({ ...h, capacity: 0, credits: 0, credit_limit: 8 })).toBe(
+      true,
+    );
+  });
+
+  it("finds weeks and builds the month calendar", () => {
+    expect(weekStart("2026-10-21")).toBe("2026-10-19"); // Wednesday → Monday
+    expect(weekStart("2026-10-25")).toBe("2026-10-19"); // Sunday → previous Monday
+    expect(weekDates("2026-10-19")).toHaveLength(7);
+    const october = monthGrid("2026-10-15");
+    expect(october[0][0]).toBe("2026-09-28");
+    expect(october.at(-1)?.at(-1)).toBe("2026-11-01");
+    expect(october).toHaveLength(5);
   });
 });

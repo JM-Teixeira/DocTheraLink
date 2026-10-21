@@ -51,6 +51,7 @@ export function ItemDialog({
     category: "",
     unit: "units",
     min: "0",
+    perSession: "0",
     quantity: "0",
   });
   useEffect(() => {
@@ -60,6 +61,7 @@ export function ItemDialog({
         category: item?.category ?? "",
         unit: item?.unit ?? "units",
         min: String(item?.min_quantity ?? 0),
+        perSession: String(item?.per_session ?? 0),
         quantity: "0",
       });
   }, [open, item]);
@@ -84,6 +86,7 @@ export function ItemDialog({
               category: form.category.trim(),
               unit: form.unit.trim(),
               min_quantity: Number(form.min),
+              per_session: Number(form.perSession) || 0,
               ...(item ? {} : { quantity: Number(form.quantity) }),
             });
           }}
@@ -129,6 +132,20 @@ export function ItemDialog({
                 onChange={set("min")}
                 className={fieldClass}
               />
+            </label>
+            <label className="col-span-2 text-sm font-medium text-gray-700">
+              {t("used_per_session")}
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={form.perSession}
+                onChange={set("perSession")}
+                className={fieldClass}
+              />
+              <span className="mt-1 block text-xs font-normal text-gray-500">
+                {t("used_per_session_help")}
+              </span>
             </label>
             {!item && (
               <label className="text-sm font-medium text-gray-700">

@@ -87,6 +87,9 @@ func filtered(q *gorm.DB, f ListFilter, withStatus bool) *gorm.DB {
 	case f.TherapistID != 0:
 		q = q.Where("therapist_id = ?", f.TherapistID)
 	}
+	if f.OnlyClinic != nil {
+		q = q.Where("facility_id = ?", *f.OnlyClinic)
+	}
 	// Optional user-facing filters
 	if f.Priority != "" {
 		q = q.Where("priority = ?", f.Priority)

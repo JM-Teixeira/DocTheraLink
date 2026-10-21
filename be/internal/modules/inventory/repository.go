@@ -26,6 +26,12 @@ type Repository interface {
 	// returns the item after the change.
 	Apply(ctx context.Context, itemID string, m *Movement) (*Item, error)
 	Movements(ctx context.Context, itemID string, limit int) ([]Movement, error)
+	// Audit lists the movements of the clinics' items, newest first.
+	Audit(ctx context.Context, clinicIDs []string, f AuditFilter, limit int) ([]Movement, error)
+	// SessionItems are the clinic's items used automatically per session.
+	SessionItems(ctx context.Context, clinicID string) ([]Item, error)
+	// NetForAppointment sums the stock change per item recorded for an appointment.
+	NetForAppointment(ctx context.Context, appointmentID string) (map[string]int, error)
 }
 
 // GormRepository implements Repository on PostgreSQL via GORM.
@@ -130,6 +136,60 @@ func (g *GormRepository) Movements(ctx context.Context, itemID string, limit int
 	return ms, err
 }
 
+func (g *GormRepository) Audit(ctx context.Context, clinicIDs []string, f AuditFilter, limit int) ([]Movement, error) {
+	items := g.db.Model(&Item{}).Select("id")
+	if clinicIDs != nil {
+		items = items.Where("clinic_id IN ?", clinicIDs)
+	}
+	db := g.db.WithContext(ctx).Preload("User").Preload("Item").Where("item_id IN (?)", items)
+	if f.ItemID != "" {
+		db = db.Where("item_id = ?", f.ItemID)
+	}
+	if f.UserID != 0 {
+		db = db.Where("user_id = ?", f.UserID)
+	}
+	if f.Kind != "" {
+		db = db.Where("kind = ?", f.Kind)
+	}
+	if f.From != nil {
+		db = db.Where("created_at >= ?", *f.From)
+	}
+	if f.To != nil {
+		db = db.Where("created_at < ?", f.To.AddDate(0, 0, 1)) // inclusive end date
+	}
+	if f.Auto != nil {
+		if *f.Auto {
+			db = db.Where("appointment_id IS NOT NULL")
+		} else {
+			db = db.Where("appointment_id IS NULL")
+		}
+	}
+	var ms []Movement
+	err := db.Order("created_at DESC").Limit(limit).Find(&ms).Error
+	return ms, err
+}
+
+func (g *GormRepository) SessionItems(ctx context.Context, clinicID string) ([]Item, error) {
+	var items []Item
+	err := g.db.WithContext(ctx).Where("clinic_id = ? AND per_session > 0 AND archived = false", clinicID).
+		Order("name").Find(&items).Error
+	return items, err
+}
+
+func (g *GormRepository) NetForAppointment(ctx context.Context, appointmentID string) (map[string]int, error) {
+	var rows []struct {
+		ItemID string
+		Net    int
+	}
+	err := g.db.WithContext(ctx).Model(&Movement{}).Select("item_id, SUM(delta) AS net").
+		Where("appointment_id = ?", appointmentID).Group("item_id").Scan(&rows).Error
+	out := map[string]int{}
+	for _, r := range rows {
+		out[r.ItemID] = r.Net
+	}
+	return out, err
+}
+
 // nextQuantity applies a movement to the current stock. For restock/use the
 // amount is the (positive) quantity; for adjust it is the counted stock.
 // It returns the new stock and the signed change.
@@ -137,7 +197,7 @@ func nextQuantity(current int, kind string, amount int) (next, delta int, err er
 	switch kind {
 	case KindRestock:
 		next = current + amount
-	case KindUse:
+	case KindUse, KindOpen:
 		next = current - amount
 	case KindAdjust:
 		next = amount

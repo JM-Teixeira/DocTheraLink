@@ -1,7 +1,7 @@
 /** Types of the inventory API (be/internal/modules/inventory/model.go). */
 
 export type StockStatus = "ok" | "low" | "out";
-export type MovementKind = "restock" | "use" | "adjust";
+export type MovementKind = "restock" | "use" | "adjust" | "open";
 
 export interface StockItem {
   id: string;
@@ -11,6 +11,7 @@ export interface StockItem {
   unit: string;
   quantity: number;
   min_quantity: number;
+  per_session: number; // used automatically per attended session
   status: StockStatus;
   modified_date: string;
 }
@@ -23,6 +24,8 @@ export interface StockMovement {
   quantity_after: number;
   note: string;
   user?: { id: number; first_name: string; last_name: string };
+  item?: { id: string; name: string; unit: string; category: string };
+  appointment_id?: string | null; // set for automatic session use
   created_date: string;
 }
 
@@ -37,6 +40,7 @@ export interface ItemRequest {
   category: string;
   unit: string;
   min_quantity: number;
+  per_session: number;
   quantity?: number; // opening stock, create only
 }
 

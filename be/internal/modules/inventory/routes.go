@@ -7,15 +7,18 @@ import (
 	"gorm.io/gorm"
 )
 
-// RegisterRoutes wires the inventory API onto an authenticated group.
-func RegisterRoutes(protected *gin.RouterGroup, db *gorm.DB) {
+// RegisterRoutes wires the inventory API onto an authenticated group and
+// returns the service (it also handles sessions held on the time board).
+func RegisterRoutes(protected *gin.RouterGroup, db *gorm.DB) *Service {
 	svc := NewService(NewGormRepository(db), clinic.NewGormResolver(db))
 	mount(protected.Group("/inventory"), NewHandler(svc))
+	return svc
 }
 
 // mount is the route table, shared with the handler tests.
 func mount(g *gin.RouterGroup, h *Handler) {
 	g.GET("/summary/", h.Summary)
+	g.GET("/audit/", h.Audit)
 	g.GET("/items/", h.List)
 	g.POST("/items/", h.Create)
 	g.PUT("/items/:id/", h.Update)

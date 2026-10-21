@@ -18,6 +18,7 @@ const (
 	KindRestock = "restock" // stock arrived: +quantity
 	KindUse     = "use"     // used in treatment: -quantity
 	KindAdjust  = "adjust"  // physical count: stock becomes quantity
+	KindOpen    = "open"    // a pack/bottle opened for use: -quantity, audited separately
 )
 
 // Item is one consumable a clinic keeps in stock.
@@ -29,6 +30,7 @@ type Item struct {
 	Unit        string    `json:"unit" gorm:"size:30;not null;default:units"`
 	Quantity    int       `json:"quantity" gorm:"not null;default:0"`
 	MinQuantity int       `json:"min_quantity" gorm:"not null;default:0"` // alert at or below this
+	PerSession  int       `json:"per_session" gorm:"not null;default:0"`  // used automatically per attended session
 	Archived    bool      `json:"archived" gorm:"not null;default:false;index"`
 	CreatedAt   time.Time `json:"created_date"`
 	UpdatedAt   time.Time `json:"modified_date"`
@@ -72,12 +74,34 @@ type Movement struct {
 	Delta         int          `json:"delta" gorm:"not null"`
 	QuantityAfter int          `json:"quantity_after" gorm:"not null"`
 	Note          string       `json:"note" gorm:"size:300"`
-	UserID        uint         `json:"user_id" gorm:"not null"`
+	UserID        uint         `json:"user_id" gorm:"not null;index"`
+	AppointmentID *string      `json:"appointment_id" gorm:"type:uuid;index"` // set for automatic session use
+	Item          *ItemName    `json:"item,omitempty" gorm:"foreignKey:ItemID;->;-:migration"`
 	User          *UserSummary `json:"user,omitempty" gorm:"foreignKey:UserID;->;-:migration"`
 	CreatedAt     time.Time    `json:"created_date" gorm:"index"`
 }
 
 func (Movement) TableName() string { return "stock_movements" }
+
+// ItemName is the item shown next to a movement in the audit log.
+type ItemName struct {
+	ID       string `json:"id" gorm:"primaryKey;type:uuid"`
+	Name     string `json:"name"`
+	Unit     string `json:"unit"`
+	Category string `json:"category"`
+}
+
+func (ItemName) TableName() string { return "stock_items" }
+
+// AuditFilter narrows the audit log of movements.
+type AuditFilter struct {
+	ItemID string     `form:"item" binding:"omitempty,uuid"`
+	UserID uint       `form:"user"`
+	Kind   string     `form:"kind" binding:"omitempty,oneof=restock use adjust open"`
+	From   *time.Time `form:"from" time_format:"2006-01-02"`
+	To     *time.Time `form:"to" time_format:"2006-01-02"`
+	Auto   *bool      `form:"auto"` // true: only automatic session use
+}
 
 // Models lists the tables for AutoMigrate.
 func Models() []any { return []any{&Item{}, &Movement{}} }
@@ -89,13 +113,14 @@ type ItemRequest struct {
 	Category    string  `json:"category" binding:"max=60"`
 	Unit        string  `json:"unit" binding:"max=30"`
 	MinQuantity int     `json:"min_quantity" binding:"min=0,max=100000"`
+	PerSession  int     `json:"per_session" binding:"min=0,max=100"`
 	Quantity    int     `json:"quantity" binding:"min=0,max=100000"`
 	ClinicID    *string `json:"clinic_id" binding:"omitempty,uuid"` // admins only
 }
 
 // MovementRequest records stock arriving, being used or counted.
 type MovementRequest struct {
-	Kind     string `json:"kind" binding:"required,oneof=restock use adjust"`
+	Kind     string `json:"kind" binding:"required,oneof=restock use adjust open"`
 	Quantity int    `json:"quantity" binding:"min=0,max=100000"`
 	Note     string `json:"note" binding:"max=300"`
 }

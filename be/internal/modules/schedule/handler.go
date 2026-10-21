@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"klyniva/internal/auth"
@@ -39,6 +40,8 @@ func writeError(c *gin.Context, err error) {
 		c.JSON(http.StatusConflict, models.ErrorResponse{Error: "conflict", Message: cerr.Msg})
 	case errors.Is(err, ErrFull):
 		c.JSON(http.StatusConflict, models.ErrorResponse{Error: "hour_full", Message: err.Error()})
+	case errors.Is(err, ErrOverCredits):
+		c.JSON(http.StatusConflict, models.ErrorResponse{Error: "over_credits", Message: err.Error()})
 	case errors.Is(err, ErrPatientBusy):
 		c.JSON(http.StatusConflict, models.ErrorResponse{Error: "patient_busy", Message: err.Error()})
 	case errors.Is(err, ErrNotFound):
@@ -82,6 +85,48 @@ type none struct{}
 func (h *Handler) Board(c *gin.Context) {
 	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
 		return h.svc.Board(c.Request.Context(), a, c.DefaultQuery("date", time.Now().Format(dateLayout)))
+	})
+}
+
+// Range handles GET /schedule/range/?from=&to= (week and month views).
+func (h *Handler) Range(c *gin.Context) {
+	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
+		return h.svc.Range(c.Request.Context(), a, c.Query("from"), c.Query("to"))
+	})
+}
+
+// Year handles GET /schedule/year/?year= (this year by default).
+func (h *Handler) Year(c *gin.Context) {
+	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
+		year, err := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(time.Now().Year())))
+		if err != nil {
+			return nil, &ValidationError{"year", "must be a number"}
+		}
+		return h.svc.Year(c.Request.Context(), a, year)
+	})
+}
+
+// Series handles POST /schedule/series/ (dry_run previews).
+func (h *Handler) Series(c *gin.Context) {
+	status := http.StatusCreated
+	handle(c, status, true, func(a Actor, req SeriesRequest) (any, error) {
+		return h.svc.Series(c.Request.Context(), a, req)
+	})
+}
+
+// CancelSeries handles DELETE /schedule/series/:id/?from= (today by default).
+func (h *Handler) CancelSeries(c *gin.Context) {
+	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
+		n, err := h.svc.CancelSeries(c.Request.Context(), a, c.Param("id"), c.DefaultQuery("from", time.Now().Format(dateLayout)))
+		return gin.H{"removed": n}, err
+	})
+}
+
+// RepeatWeek handles POST /schedule/shifts/repeat-week/.
+func (h *Handler) RepeatWeek(c *gin.Context) {
+	handle(c, http.StatusOK, true, func(a Actor, req RepeatWeekRequest) (any, error) {
+		n, err := h.svc.RepeatWeek(c.Request.Context(), a, req)
+		return gin.H{"copied": n}, err
 	})
 }
 
