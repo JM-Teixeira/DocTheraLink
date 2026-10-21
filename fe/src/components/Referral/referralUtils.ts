@@ -70,6 +70,14 @@ export function canPostNote(r: Referral, u: CurrentUser) {
 export const catalogLang = (uiLanguage?: string) =>
   uiLanguage?.toLowerCase().startsWith("pt") ? "pt" : "en";
 
+/** A completed referral prints as a discharge summary, anything else as a referral letter. */
+export const letterKind = (r: Pick<Referral, "status">) =>
+  r.status === "completed" ? "discharge" : "referral";
+
+/** Short human reference printed on letters, e.g. "REF-6B1F3C1E". */
+export const letterReference = (id: string) =>
+  `REF-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+
 /** Visual style per status: tailwind classes for badges and the accent bar. */
 export const STATUS_STYLES: Record<
   ReferralStatus,

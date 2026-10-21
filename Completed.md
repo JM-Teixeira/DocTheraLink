@@ -7,6 +7,15 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-21 — M1 referral loop (branch `feat/m1-referral-loop`)
 
+### 10:45 · Printable referral letter / discharge summary — M1 complete
+- `/referrals/:id/letter`: A4 letter with clinic letterhead, reference,
+  patient, clinical details, signatures and a confidentiality footer; a
+  completed referral prints as a discharge summary (dates, therapist,
+  outcome). "Print / save as PDF" uses the browser; the print copy is
+  portalled under `<body>` so the app layout does not affect it.
+- Print button on the referral page. Tests: letter helpers; print output
+  checked by rendering to PDF with Playwright.
+
 ### 10:15 · ICD-10 picker and referral templates
 - Backend `modules/catalog`: embedded, validated-at-start-up data — 65
   physiotherapy-relevant ICD-10 codes and 9 templates (low back pain, neck

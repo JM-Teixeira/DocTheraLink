@@ -319,5 +319,14 @@
   "attachment_error__generic": "Ocorreu um erro com o ficheiro. Tente novamente.",
   "icd_code_placeholder": "Código ou palavras, ex. M54.5",
   "start_from_template": "Começar a partir de um modelo",
-  "replace_with_template": "Substituir os detalhes clínicos que escreveu por este modelo?"
+  "replace_with_template": "Substituir os detalhes clínicos que escreveu por este modelo?",
+  "referral_letter": "Carta de encaminhamento",
+  "letter_title__referral": "Encaminhamento para fisioterapia",
+  "letter_title__discharge": "Relatório de alta de fisioterapia",
+  "letter_button__referral": "Imprimir carta",
+  "letter_button__discharge": "Imprimir relatório de alta",
+  "print_or_save_pdf": "Imprimir / guardar PDF",
+  "treatment_outcome": "Tratamento e resultado",
+  "addressed_to": "Dirigido a",
+  "letter_confidential": "Confidencial: contém dados de saúde. Partilhar apenas com o utente e os profissionais envolvidos nos seus cuidados."
 }

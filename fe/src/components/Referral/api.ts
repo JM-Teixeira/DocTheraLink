@@ -1,3 +1,4 @@
+import { FacilityModel } from "@/components/Facility/models";
 import { PatientModel } from "@/components/Patient/models";
 import { Attachment } from "@/components/Referral/attachments";
 import {
@@ -118,6 +119,11 @@ const ReferralRoutes = {
     path: "/api/v1/catalog/referral-templates/",
     method: "GET",
     TRes: Type<ReferralTemplate[]>(),
+  },
+  getClinic: {
+    path: "/api/v1/facility/{id}/",
+    method: "GET",
+    TRes: Type<FacilityModel>(),
   },
   getPatient: {
     path: "/api/v1/patient/{id}/",

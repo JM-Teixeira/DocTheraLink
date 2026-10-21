@@ -81,7 +81,7 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - **D3** Add a **Receptionist** role — **done** (patients yes, referrals no; appointments in M3).
 - **D4** Billing **not** in the first stages (M6 stays parked).
 
-### M1 — Close the referral loop (P1) ← current
+### M1 — Close the referral loop (P1) — done (PR #3)
 - [x] "Refer to physiotherapy" button on the patient page.
 - [x] Notifications: in-app bell + e-mail on new referral (therapists), accepted/declined/completed (doctor), new message. _(e-mails carry no patient data; SMTP optional)_
 - [x] Attachments on referrals (imaging, reports, PDFs; content-sniffed, 10 MB, participants upload, uploader/admin delete) — replaced the `/files` stubs.
@@ -89,9 +89,9 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] Filters & search on the referral list (patient, priority, date, therapist) and counts per status tab.
 - [x] ICD-10 code picker (curated physio subset, EN/PT, code or word search); 9 built-in referral templates.
 - [ ] Later: clinic-defined templates stored in the database; optional full ICD-10 import (licensed data, PT edition).
-- [ ] Printable referral / discharge letter (PDF).
+- [x] Printable referral / discharge letter (A4 page; browser print → PDF).
 
-### M4 — Patients (P1)
+### M4 — Patients (P1) ← next
 - [x] New Klyniva patient pages: list/search, detail, create/edit (replace CARE's 3k-line pages).
 - [ ] Rest of the old "centralized patient creation" spec (from `.kiro`): **duplicate detection with confirmation** (reuse `Facility/DuplicatePatientDialog`), draft auto-save, retry on network errors, accessibility checks, browser E2E of the flow, ≥80 % coverage. Backend model grows to match: emergency contact (name/relationship), address parts, insurance, structured allergies/medications/conditions.
 - [ ] Portuguese identifiers: NIF and SNS number with validation.

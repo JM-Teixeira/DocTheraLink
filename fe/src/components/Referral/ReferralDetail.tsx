@@ -3,10 +3,12 @@ import dayjs from "dayjs";
 import {
   CalendarDays,
   ClipboardList,
+  Printer,
   ShieldAlert,
   Target,
   TriangleAlert,
 } from "lucide-react";
+import { navigate } from "raviger";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,6 +29,7 @@ import {
   allowedActions,
   fullName,
   hasDoctorTitle,
+  letterKind,
 } from "@/components/Referral/referralUtils";
 import { Referral, ReferralAction } from "@/components/Referral/types";
 
@@ -144,6 +147,15 @@ export default function ReferralDetail({ id }: { id: string }) {
     <Page
       title={t("referral")}
       backUrl="/referrals"
+      options={
+        <Button
+          variant="outline"
+          onClick={() => navigate(`/referrals/${id}/letter`)}
+        >
+          <Printer className="mr-2 size-4" aria-hidden />
+          {t(`letter_button__${letterKind(referral)}`)}
+        </Button>
+      }
       // Show the patient's name in the breadcrumb instead of the referral UUID
       crumbsReplacements={{ [id]: { name: referral.patient?.name ?? "" } }}
     >

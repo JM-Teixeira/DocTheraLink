@@ -8,6 +8,8 @@ import {
   fullName,
   hasDoctorTitle,
   initials,
+  letterKind,
+  letterReference,
   stepIndex,
   sumCounts,
 } from "@/components/Referral/referralUtils";
@@ -144,5 +146,19 @@ describe("formatting helpers", () => {
     expect(stepIndex("pending")).toBe(0);
     expect(stepIndex("completed")).toBe(3);
     expect(stepIndex("declined")).toBe(-1);
+  });
+});
+
+describe("letters", () => {
+  it("prints completed referrals as discharge summaries", () => {
+    expect(letterKind({ status: "completed" })).toBe("discharge");
+    expect(letterKind({ status: "in_progress" })).toBe("referral");
+    expect(letterKind({ status: "pending" })).toBe("referral");
+  });
+
+  it("builds a short reference from the id", () => {
+    expect(letterReference("6b1f3c1e-5a8e-4c1d-9a0e-000000000001")).toBe(
+      "REF-6B1F3C1E",
+    );
   });
 });
