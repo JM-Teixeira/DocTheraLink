@@ -7,12 +7,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// RegisterRoutes wires the module onto an authenticated router group.
-// The group must already run auth.AuthMiddleware. notifier is told about
-// referral events (in-app notifications, e-mail).
-func RegisterRoutes(protected *gin.RouterGroup, db *gorm.DB, notifier Notifier) {
+// RegisterRoutes wires the module onto an authenticated router group and
+// returns the service so other modules (e.g. attachments) can reuse its
+// access rules. The group must already run auth.AuthMiddleware. notifier is
+// told about referral events (in-app notifications, e-mail).
+func RegisterRoutes(protected *gin.RouterGroup, db *gorm.DB, notifier Notifier) *Service {
 	svc := NewService(NewGormRepository(db), clinic.NewGormResolver(db), nil).WithNotifier(notifier)
 	mount(protected.Group("/referrals"), NewHandler(svc))
+	return svc
 }
 
 // mount is the route table, shared by RegisterRoutes and the handler tests.

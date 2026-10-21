@@ -438,6 +438,11 @@ func (s *Service) transition(ctx context.Context, actor Actor, id string, from S
 	return s.repo.Get(ctx, r.ID)
 }
 
+// IsParticipant reports whether the actor takes part in the referral (admin,
+// referring doctor or assigned therapist). Other modules use it, e.g. to
+// decide who may attach files.
+func IsParticipant(a Actor, r *Referral) bool { return isParticipant(a, r) }
+
 func isParticipant(a Actor, r *Referral) bool {
 	return a.isAdmin() || r.DoctorID == a.ID || isAssignedTherapist(a, r)
 }

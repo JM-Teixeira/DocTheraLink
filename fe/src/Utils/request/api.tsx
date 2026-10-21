@@ -18,9 +18,6 @@ import {
 } from "@/components/Facility/models";
 import { DailyRoundsModel, PatientModel } from "@/components/Patient/models";
 import {
-  CreateFileRequest,
-  CreateFileResponse,
-  FileUploadModel,
 } from "@/components/Patient/models";
 import {
   SkillModel,
@@ -477,29 +474,6 @@ const routes = {
     method: "PUT",
   },
 
-  // FileUpload Create
-  createUpload: {
-    path: "/api/v1/files/",
-    method: "POST",
-    TBody: Type<CreateFileRequest>(),
-    TRes: Type<CreateFileResponse>(),
-  },
-  viewUpload: {
-    path: "/api/v1/files/",
-    method: "GET",
-    TRes: Type<PaginatedResponse<FileUploadModel>>(),
-  },
-  retrieveUpload: {
-    path: "/api/v1/files/{id}/",
-    method: "GET",
-    TRes: Type<FileUploadModel>(),
-  },
-  editUpload: {
-    path: "/api/v1/files/{id}/?file_type={fileType}&associating_id={associatingId}",
-    method: "PATCH",
-    TBody: Type<Partial<FileUploadModel>>(),
-    TRes: Type<FileUploadModel>(),
-  },
 
   // Assets endpoints
 

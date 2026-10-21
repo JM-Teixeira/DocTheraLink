@@ -13,6 +13,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
@@ -336,4 +338,91 @@ func TestClockInOut(t *testing.T) {
 	}
 	expect(t, "clock in", staff.call("POST", "/timelog/clock-in", map[string]string{"notes": "e2e"}, nil), 201)
 	expect(t, "clock out", staff.call("POST", "/timelog/clock-out", map[string]string{}, nil), 200)
+}
+
+// upload sends one file as multipart form field "file" and decodes the answer.
+func (c *client) upload(path, name string, content []byte, out any) int {
+	c.t.Helper()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	part, _ := w.CreateFormFile("file", name)
+	_, _ = part.Write(content)
+	_ = w.Close()
+	req, _ := http.NewRequest("POST", c.base+"/api/v1"+path, &buf)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		c.t.Fatalf("upload %s: %v", path, err)
+	}
+	defer resp.Body.Close()
+	if out != nil {
+		_ = json.NewDecoder(resp.Body).Decode(out)
+	}
+	return resp.StatusCode
+}
+
+// download returns the status, body and headers of a raw GET.
+func (c *client) download(path string) (int, []byte, http.Header) {
+	c.t.Helper()
+	req, _ := http.NewRequest("GET", c.base+"/api/v1"+path, nil)
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		c.t.Fatalf("download %s: %v", path, err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, b, resp.Header
+}
+
+// TestAttachments: the doctor attaches an MRI report, the therapist downloads
+// it byte for byte; outsiders, disguised executables and deletes by the
+// other participant are refused.
+func TestAttachments(t *testing.T) {
+	doctor, _ := login(t, "doctor")
+	physio, _ := login(t, "physiotherapist")
+	nurse, _ := login(t, "nurse")
+
+	var p map[string]any
+	expect(t, "patient", doctor.call("POST", "/patient/", map[string]any{"name": "Files " + time.Now().Format("150405")}, &p), 201)
+	var ref map[string]any
+	expect(t, "referral", doctor.call("POST", "/referrals/", map[string]any{
+		"patient_id": p["id"], "therapist_id": userIDOf(physio), "diagnosis": "Rotator cuff tear", "reason": "Post-op rehab",
+	}, &ref), 201)
+	rid := ref["id"].(string)
+
+	pdf := []byte("%PDF-1.7\n1 0 obj << >> endobj\ntrailer\n%%EOF\n")
+	var a map[string]any
+	expect(t, "doctor uploads PDF", doctor.upload("/referrals/"+rid+"/attachments/", "MRI shoulder.pdf", pdf, &a), 201)
+	aid := a["id"].(string)
+	if a["file_name"] != "MRI shoulder.pdf" || a["content_type"] != "application/pdf" {
+		t.Fatalf("attachment: %v", a)
+	}
+
+	expect(t, "disguised executable", doctor.upload("/referrals/"+rid+"/attachments/", "scan.pdf",
+		append([]byte("MZ\x90\x00"), make([]byte, 64)...), nil), 415)
+	expect(t, "nurse cannot upload", nurse.upload("/referrals/"+rid+"/attachments/", "x.pdf", pdf, nil), 404)
+
+	var list []map[string]any
+	expect(t, "physio lists files", physio.call("GET", "/referrals/"+rid+"/attachments/", nil, &list), 200)
+	if len(list) != 1 || list[0]["id"] != aid {
+		t.Fatalf("list: %v", list)
+	}
+
+	code, body, h := physio.download("/attachments/" + aid + "/download/")
+	expect(t, "physio downloads", code, 200)
+	if !bytes.Equal(body, pdf) {
+		t.Fatal("downloaded content differs")
+	}
+	if !strings.HasPrefix(h.Get("Content-Disposition"), "attachment") || h.Get("X-Content-Type-Options") != "nosniff" {
+		t.Errorf("download headers: %v", h)
+	}
+	code, _, _ = nurse.download("/attachments/" + aid + "/download/")
+	expect(t, "nurse cannot download", code, 404)
+
+	expect(t, "physio cannot delete doctor's file", physio.call("DELETE", "/attachments/"+aid+"/", nil, nil), 403)
+	expect(t, "doctor deletes own file", doctor.call("DELETE", "/attachments/"+aid+"/", nil, nil), 204)
+	code, _, _ = physio.download("/attachments/" + aid + "/download/")
+	expect(t, "deleted file is gone", code, 404)
 }

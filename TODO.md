@@ -62,7 +62,8 @@ Open testing work:
 ## 3. Deployment & operations (P2/P3)
 
 - [ ] P2 Container registry + CD: GitHub Actions → GHCR tagged by git SHA, pin tags in `k8s/overlays/production`.
-- [ ] P2 Uploads to S3-compatible storage (needed for >1 backend replica).
+- [ ] P2 Uploads to S3-compatible storage (needed for >1 backend replica) — add an S3 implementation of `internal/storage.Store`.
+- [ ] P2 Virus scanning of uploaded attachments (ClamAV sidecar) before they are downloadable.
 - [ ] P3 Managed PostgreSQL or CloudNativePG with PITR backups.
 - [ ] P3 Observability: Prometheus metrics, OpenTelemetry traces, Sentry DSN wiring.
 - [ ] P3 Redis only if needed for rate limiting/sessions (removed from k8s for now).
@@ -82,10 +83,10 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 
 ### M1 — Close the referral loop (P1) ← current
 - [x] "Refer to physiotherapy" button on the patient page.
-- [ ] Notifications: in-app bell + e-mail on new referral (therapists), accepted/declined/completed (doctor), new message.
-- [ ] Attachments on referrals and messages (imaging, reports, PDFs) with access control (replaces the `/files` stubs).
-- [ ] Re-assign / hand-over to another therapist; re-open a declined referral to another therapist.
-- [ ] Filters & search on the referral list (patient, priority, date, therapist) and counts per status tab.
+- [x] Notifications: in-app bell + e-mail on new referral (therapists), accepted/declined/completed (doctor), new message. _(e-mails carry no patient data; SMTP optional)_
+- [x] Attachments on referrals (imaging, reports, PDFs; content-sniffed, 10 MB, participants upload, uploader/admin delete) — replaced the `/files` stubs.
+- [x] Re-assign / hand-over to another therapist; re-open a declined referral to another therapist.
+- [x] Filters & search on the referral list (patient, priority, date, therapist) and counts per status tab.
 - [ ] ICD-10 code picker; referral templates for common conditions (ACL rehab, low back pain, frozen shoulder…).
 - [ ] Printable referral / discharge letter (PDF).
 

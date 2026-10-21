@@ -516,22 +516,6 @@ func (h *FacilityHandler) GetItems(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
 }
 
-func (h *FacilityHandler) ViewUpload(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) CreateUpload(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) RetrieveUpload(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) EditUpload(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
 func (h *FacilityHandler) DownloadFacility(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
 }

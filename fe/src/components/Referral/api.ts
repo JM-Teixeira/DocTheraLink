@@ -1,4 +1,5 @@
 import { PatientModel } from "@/components/Patient/models";
+import { Attachment } from "@/components/Referral/attachments";
 import {
   CreateReferralRequest,
   NoteRequest,
@@ -92,6 +93,17 @@ const ReferralRoutes = {
     method: "POST",
     TBody: Type<NoteRequest>(),
     TRes: Type<ReferralNote>(),
+  },
+
+  listAttachments: {
+    path: "/api/v1/referrals/{id}/attachments/",
+    method: "GET",
+    TRes: Type<Attachment[]>(),
+  },
+  deleteAttachment: {
+    path: "/api/v1/attachments/{id}/",
+    method: "DELETE",
+    TRes: Type<void>(),
   },
 
   // Lookups used by the create form

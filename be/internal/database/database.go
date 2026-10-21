@@ -7,6 +7,7 @@ import (
 
 	"klyniva/internal/config"
 	"klyniva/internal/models"
+	"klyniva/internal/modules/attachment"
 	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/referral"
 
@@ -113,6 +114,7 @@ func Migrate() error {
 		{"staff scheduling", []any{&models.TimeLog{}, &models.TimetableSection{}, &models.TimetableSlot{}}},
 		{"referrals", referral.Models()},
 		{"notifications", notification.Models()},
+		{"attachments", attachment.Models()},
 	}
 	for i, p := range phases {
 		log.Printf("Migrating phase %d: %s...", i+1, p.name)

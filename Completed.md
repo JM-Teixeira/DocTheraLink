@@ -5,6 +5,31 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-21 — M1 referral loop (branch `feat/m1-referral-loop`)
+
+### 09:30 · Attachments on referrals
+- Backend: `internal/storage` (Store interface, atomic local files) and
+  `modules/attachment`: upload (multipart, content sniffed — PDF, JPEG,
+  PNG, WebP, text; 10 MB), list, download (`attachment` disposition,
+  nosniff, no-store), delete. Participants upload; anyone who can see the
+  referral downloads; uploader or admin deletes. File names sanitised.
+- Frontend: "Files" panel on the referral page with drag & drop, client-side
+  checks, download with the auth header, delete with confirmation (EN/PT).
+- Removed the CARE `/files` 501 stubs and the orphaned file-upload
+  components/hooks; proxy body limit raised to 12 MB.
+- Tests: storage, attachment service/handler, frontend helpers, e2e
+  `TestAttachments` (upload, byte-exact download, spoofed .exe → 415,
+  outsider → 404, other participant cannot delete).
+
+### 08:30 · Notifications (b8b15ab)
+- In-app bell + generic e-mails for referral events; see commit message.
+
+### 07:30 · Filters, counts, hand-over and re-open (046f8d3)
+- Referral list search/priority/therapist/date filters and per-status
+  counts; hand-over to another therapist; re-open a declined referral.
+
+---
+
 ## 2026-10-21 — Roadmap decisions D1–D5 approved; D1–D3 implemented
 
 ### 00:10 · D1 remove CARE ICU modules, new patient pages
