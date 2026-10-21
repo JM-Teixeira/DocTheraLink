@@ -159,8 +159,8 @@ func (f *fakeRepo) MonthlyStats(context.Context, string, int) ([]MonthStats, err
 // recordingHook remembers session events.
 type recordingHook struct{ attended, undone []string }
 
-func (h *recordingHook) SessionAttended(_ context.Context, _, id string, _ uint) ([]string, error) {
-	h.attended = append(h.attended, id)
+func (h *recordingHook) SessionAttended(_ context.Context, _, id, division string, _ uint) ([]string, error) {
+	h.attended = append(h.attended, id+"@"+division)
 	return []string{"Gloves: not enough in stock"}, nil
 }
 func (h *recordingHook) SessionUndone(_ context.Context, _, id string, _ uint) error {
@@ -306,6 +306,9 @@ func TestBookingRulesAndCredits(t *testing.T) {
 	res, err := f.svc.SetStatus(ctx, sarahActor, first.ID, StatusRequest{Status: StatusAttended})
 	if err != nil || res.Status != StatusAttended || len(res.Warnings) != 1 {
 		t.Fatalf("attended: %+v %v", res, err)
+	}
+	if f.hook.attended[0] != first.ID+"@"+f.gym {
+		t.Errorf("the hook gets the session's division: %v", f.hook.attended)
 	}
 	if _, err := f.svc.SetStatus(ctx, sarahActor, first.ID, StatusRequest{Status: StatusAttended}); err != nil || len(f.hook.attended) != 1 {
 		t.Errorf("repeating attended must not use stock twice: %v %v", err, f.hook.attended)

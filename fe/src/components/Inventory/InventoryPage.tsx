@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import {
+  CircleCheck,
+  Download,
   History,
+  LayoutGrid,
   Minus,
   PackageOpen,
   Pencil,
@@ -22,11 +26,14 @@ import {
   HistoryDialog,
   ItemDialog,
   MovementDialog,
+  SessionRulesDialog,
 } from "@/components/Inventory/InventoryDialogs";
 import InventoryRoutes from "@/components/Inventory/api";
 import {
   STATUS_STYLES,
+  actionsFor,
   groupByCategory,
+  reorderCsv,
   stockPercent,
 } from "@/components/Inventory/inventoryUtils";
 import {
@@ -39,21 +46,33 @@ import useAuthUser from "@/hooks/useAuthUser";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 import * as Notification from "@/Utils/Notifications";
-import { callApi } from "@/Utils/request/query";
-import query from "@/Utils/request/query";
+import query, { callApi } from "@/Utils/request/query";
 import { HTTPError } from "@/Utils/request/types";
 import { canManageBoard, isReadOnly } from "@/Utils/roles";
 
 type Filter = "all" | "attention" | "out";
+type Tab = "stock" | "reorder" | "audit";
 
-/** The clinic's consumables: stock levels, use / restock / count, alerts. */
+const ACTION_ICONS: Partial<Record<MovementKind, typeof Plus>> = {
+  use: Minus,
+  open: PackageOpen,
+  finish: CircleCheck,
+  restock: Plus,
+};
+
+/**
+ * The clinic's consumables. Single-use items are used; containers (bottles,
+ * packs, rolls) are opened and later finished, so it is known who opened
+ * what and since when. Coordinators also see the reorder list and the audit.
+ */
 export default function InventoryPage() {
   const { t } = useTranslation();
   const user = useAuthUser();
   const queryClient = useQueryClient();
   const canWrite = !isReadOnly(user);
-  const canRemove = canManageBoard(user); // coordinators and admins
+  const manager = canManageBoard(user); // coordinators and admins
 
+  const [tab, setTab] = useState<Tab>("stock");
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search);
   const [filter, setFilter] = useState<Filter>("all");
@@ -65,7 +84,7 @@ export default function InventoryPage() {
     kind: MovementKind;
   } | null>(null);
   const [history, setHistory] = useState<StockItem | null>(null);
-  const [view, setView] = useState<"stock" | "audit">("stock");
+  const [rules, setRules] = useState<StockItem | null>(null);
 
   const { data: summary } = useQuery({
     queryKey: ["stock-summary"],
@@ -84,6 +103,7 @@ export default function InventoryPage() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["stock-items"] });
     queryClient.invalidateQueries({ queryKey: ["stock-summary"] });
+    queryClient.invalidateQueries({ queryKey: ["stock-reorder"] });
   };
   const failed = (e: Error) =>
     Notification.Error({
@@ -140,6 +160,9 @@ export default function InventoryPage() {
     },
     { key: "out", label: t("out_of_stock"), count: summary?.out },
   ];
+  const tabs: Tab[] = manager
+    ? ["stock", "reorder", "audit"]
+    : ["stock", "reorder"];
 
   return (
     <Page
@@ -153,35 +176,39 @@ export default function InventoryPage() {
         )
       }
     >
-      <p className="mb-4 max-w-2xl text-sm text-gray-600">
-        {t("inventory_help")}
+      <p className="mb-4 max-w-3xl text-sm text-gray-600">
+        {t("inventory_help_kinds")}
       </p>
-      {canRemove && (
-        <div
-          className="mb-4 flex w-fit rounded-lg bg-gray-100 p-0.5"
-          role="tablist"
-        >
-          {(["stock", "audit"] as const).map((tab) => (
-            <button
-              key={tab}
-              role="tab"
-              aria-selected={view === tab}
-              onClick={() => setView(tab)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm",
-                view === tab ? "bg-white shadow-sm" : "text-gray-600",
-              )}
-            >
-              {t(`inventory_tab__${tab}`)}
-            </button>
-          ))}
-        </div>
-      )}
-      {view === "audit" ? (
-        <InventoryAudit />
-      ) : (
+      <div
+        className="mb-4 flex w-fit rounded-lg bg-gray-100 p-0.5"
+        role="tablist"
+      >
+        {tabs.map((k) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={tab === k}
+            onClick={() => setTab(k)}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm",
+              tab === k ? "bg-white shadow-sm" : "text-gray-600",
+            )}
+          >
+            {t(`inventory_tab__${k}`)}
+          </button>
+        ))}
+      </div>
+
+      {tab === "audit" && <InventoryAudit />}
+      {tab === "reorder" && <ReorderList />}
+      {tab === "stock" && (
         <>
-          {/* Filters */}
+          {!!summary?.open_expired && (
+            <p className="mb-4 flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              <TriangleAlert className="size-4" aria-hidden />
+              {t("open_expired_banner", { count: summary.open_expired })}
+            </p>
+          )}
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="relative w-full sm:w-72">
               <Search
@@ -196,12 +223,11 @@ export default function InventoryPage() {
                 className="h-10 w-full rounded-lg border border-gray-300 pl-9 pr-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
               />
             </div>
-            <div className="flex flex-wrap gap-2" role="tablist">
+            <div className="flex flex-wrap gap-2">
               {filters.map((f) => (
                 <button
                   key={f.key}
-                  role="tab"
-                  aria-selected={filter === f.key}
+                  aria-pressed={filter === f.key}
                   onClick={() => setFilter(f.key)}
                   className={cn(
                     "flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ring-1 ring-inset transition",
@@ -248,147 +274,24 @@ export default function InventoryPage() {
                   </h2>
                   <ul className="divide-y divide-gray-100">
                     {group.map((it) => (
-                      <li
+                      <ItemRow
                         key={it.id}
-                        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3"
-                      >
-                        <div className="min-w-40 flex-1">
-                          <p className="flex items-center gap-2 font-medium text-gray-900">
-                            {it.name}
-                            {it.per_session > 0 && (
-                              <span
-                                className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-normal text-primary-700"
-                                title={t("used_per_session_help")}
-                              >
-                                {t("n_per_session", { count: it.per_session })}
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {t("alert_at_n", {
-                              count: it.min_quantity,
-                              unit: it.unit,
-                            })}
-                          </p>
-                        </div>
-                        <div className="w-48">
-                          <div className="flex items-baseline justify-between text-sm">
-                            <span className="font-semibold text-gray-900">
-                              {it.quantity}{" "}
-                              <span className="font-normal text-gray-500">
-                                {it.unit}
-                              </span>
-                            </span>
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
-                                STATUS_STYLES[it.status].badge,
-                              )}
-                            >
-                              {t(`stock_status__${it.status}`)}
-                            </span>
-                          </div>
-                          <div className="mt-1 h-1.5 rounded-full bg-gray-100">
-                            <div
-                              className={cn(
-                                "h-1.5 rounded-full",
-                                STATUS_STYLES[it.status].bar,
-                              )}
-                              style={{
-                                width: `${stockPercent(it.quantity, it.min_quantity)}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {canWrite && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  setMoving({ item: it, kind: "use" })
-                                }
-                                disabled={it.quantity <= 0}
-                              >
-                                <Minus className="mr-1 size-3.5" aria-hidden />
-                                {t("stock_action__use")}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  setMoving({ item: it, kind: "restock" })
-                                }
-                              >
-                                <Plus className="mr-1 size-3.5" aria-hidden />
-                                {t("stock_action__restock")}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  setMoving({ item: it, kind: "open" })
-                                }
-                                disabled={it.quantity <= 0}
-                              >
-                                <PackageOpen
-                                  className="mr-1 size-3.5"
-                                  aria-hidden
-                                />
-                                {t("stock_action__open")}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  setMoving({ item: it, kind: "adjust" })
-                                }
-                              >
-                                {t("stock_action__adjust")}
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label={t("stock_history")}
-                            onClick={() => setHistory(it)}
-                          >
-                            <History className="size-4" aria-hidden />
-                          </Button>
-                          {canWrite && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              aria-label={t("edit_item")}
-                              onClick={() => setEditing(it)}
-                            >
-                              <Pencil className="size-4" aria-hidden />
-                            </Button>
-                          )}
-                          {canRemove && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              aria-label={t("remove_item")}
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    t("confirm_remove_item", { name: it.name }),
-                                  )
-                                )
-                                  archive.mutate(it.id);
-                              }}
-                            >
-                              <Trash2
-                                className="size-4 text-rose-600"
-                                aria-hidden
-                              />
-                            </Button>
-                          )}
-                        </div>
-                      </li>
+                        item={it}
+                        canWrite={canWrite}
+                        manager={manager}
+                        onMove={(kind) => setMoving({ item: it, kind })}
+                        onHistory={() => setHistory(it)}
+                        onEdit={() => setEditing(it)}
+                        onRules={() => setRules(it)}
+                        onRemove={() => {
+                          if (
+                            window.confirm(
+                              t("confirm_remove_item", { name: it.name }),
+                            )
+                          )
+                            archive.mutate(it.id);
+                        }}
+                      />
                     ))}
                   </ul>
                 </section>
@@ -413,6 +316,237 @@ export default function InventoryPage() {
         onSave={(quantity, note) => move.mutate({ quantity, note })}
       />
       <HistoryDialog item={history} onClose={() => setHistory(null)} />
+      <SessionRulesDialog
+        item={rules}
+        onClose={() => setRules(null)}
+        onSaved={refresh}
+      />
     </Page>
+  );
+}
+
+function ItemRow({
+  item: it,
+  canWrite,
+  manager,
+  onMove,
+  onHistory,
+  onEdit,
+  onRules,
+  onRemove,
+}: {
+  item: StockItem;
+  canWrite: boolean;
+  manager: boolean;
+  onMove: (kind: MovementKind) => void;
+  onHistory: () => void;
+  onEdit: () => void;
+  onRules: () => void;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
+  const container = it.tracking === "container";
+  const ruled = it.session_rules.filter((r) => r.quantity > 0).length;
+  return (
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+      <div className="min-w-48 flex-1">
+        <p className="flex flex-wrap items-center gap-2 font-medium text-gray-900">
+          {it.name}
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-600">
+            {t(`item_kind__${it.tracking}`)}
+          </span>
+          {(it.per_session > 0 || ruled > 0) && (
+            <span
+              className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-normal text-primary-700"
+              title={t("used_per_session_help")}
+            >
+              {it.per_session > 0
+                ? t("n_per_session", { count: it.per_session })
+                : t("per_session_in_divisions", { count: ruled })}
+            </span>
+          )}
+        </p>
+        <p className="text-xs text-gray-500">
+          {t("alert_at_n", { count: it.min_quantity, unit: it.unit })}
+          {container && it.in_use > 0 && it.oldest_open_at && (
+            <span
+              className={cn(
+                "ml-2",
+                it.open_expired ? "font-medium text-rose-700" : "text-gray-600",
+              )}
+            >
+              ·{" "}
+              {t("n_open_since", {
+                count: it.in_use,
+                date: dayjs(it.oldest_open_at).format("D MMM"),
+              })}
+              {it.open_expired && ` — ${t("discard_now")}`}
+            </span>
+          )}
+        </p>
+      </div>
+      <div className="w-48">
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="font-semibold text-gray-900">
+            {it.quantity}{" "}
+            <span className="font-normal text-gray-500">
+              {container ? t("sealed_unit", { unit: it.unit }) : it.unit}
+            </span>
+          </span>
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+              STATUS_STYLES[it.status].badge,
+            )}
+          >
+            {t(`stock_status__${it.status}`)}
+          </span>
+        </div>
+        <div className="mt-1 h-1.5 rounded-full bg-gray-100">
+          <div
+            className={cn("h-1.5 rounded-full", STATUS_STYLES[it.status].bar)}
+            style={{ width: `${stockPercent(it.quantity, it.min_quantity)}%` }}
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        {canWrite &&
+          actionsFor(it).map((kind) => {
+            const Icon = ACTION_ICONS[kind];
+            const disabled =
+              ((kind === "use" || kind === "open") && it.quantity <= 0) ||
+              (kind === "finish" && it.in_use <= 0);
+            return (
+              <Button
+                key={kind}
+                size="sm"
+                variant={kind === "adjust" ? "ghost" : "outline"}
+                disabled={disabled}
+                onClick={() => onMove(kind)}
+              >
+                {Icon && <Icon className="mr-1 size-3.5" aria-hidden />}
+                {t(`stock_action__${kind}`)}
+              </Button>
+            );
+          })}
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label={t("stock_history")}
+          onClick={onHistory}
+        >
+          <History className="size-4" aria-hidden />
+        </Button>
+        {manager && !container && (
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t("per_session_by_division")}
+            onClick={onRules}
+          >
+            <LayoutGrid className="size-4" aria-hidden />
+          </Button>
+        )}
+        {canWrite && (
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t("edit_item")}
+            onClick={onEdit}
+          >
+            <Pencil className="size-4" aria-hidden />
+          </Button>
+        )}
+        {manager && (
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t("remove_item")}
+            onClick={onRemove}
+          >
+            <Trash2 className="size-4 text-rose-600" aria-hidden />
+          </Button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** What to order and how much, to send to the supplier (CSV). */
+function ReorderList() {
+  const { t } = useTranslation();
+  const { data: items, isLoading } = useQuery({
+    queryKey: ["stock-reorder"],
+    queryFn: query(InventoryRoutes.reorder),
+  });
+  const download = () => {
+    const csv = reorderCsv(items ?? [], [
+      t("item_name"),
+      t("category"),
+      t("in_stock"),
+      t("to_order"),
+      t("unit"),
+    ]);
+    const url = URL.createObjectURL(
+      new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `encomenda-${dayjs().format("YYYY-MM-DD")}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
+        <p className="text-sm text-gray-600">{t("reorder_help")}</p>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!items?.length}
+          onClick={download}
+        >
+          <Download className="mr-1 size-4" aria-hidden />
+          {t("download_csv")}
+        </Button>
+      </header>
+      {isLoading ? (
+        <p className="p-4 text-sm text-gray-500">{t("loading")}</p>
+      ) : !items?.length ? (
+        <p className="p-4 text-sm text-gray-500">{t("nothing_to_reorder")}</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-left text-xs text-gray-500">
+            <tr>
+              <th className="p-3 font-medium">{t("item_name")}</th>
+              <th className="p-3 font-medium">{t("category")}</th>
+              <th className="p-3 text-right font-medium">{t("in_stock")}</th>
+              <th className="p-3 text-right font-medium">{t("to_order")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {items.map((it) => (
+              <tr key={it.id}>
+                <td className="p-3 font-medium text-gray-900">{it.name}</td>
+                <td className="p-3 text-gray-600">{it.category}</td>
+                <td
+                  className={cn(
+                    "p-3 text-right",
+                    it.status === "out"
+                      ? "font-semibold text-rose-700"
+                      : "text-amber-700",
+                  )}
+                >
+                  {it.quantity} {it.unit}
+                </td>
+                <td className="p-3 text-right font-semibold text-gray-900">
+                  {it.reorder_quantity} {it.unit}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }

@@ -55,6 +55,7 @@ const StatelessSidebar = ({
   const user = useAuthUser();
   // Only show what the role can open (the backend enforces the same rules)
   const BaseNavItems: INavItem[] = [
+    { text: t("home"), to: "/", icon: "l-home" },
     { text: t("patients"), to: "/patients", icon: "d-patient" },
     ...(canSeeReferrals(user)
       ? [

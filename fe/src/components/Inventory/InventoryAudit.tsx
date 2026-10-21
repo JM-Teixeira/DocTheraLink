@@ -17,7 +17,7 @@ import query from "@/Utils/request/query";
 
 const fieldClass =
   "h-9 rounded-lg border border-gray-300 px-2 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500";
-const KINDS: MovementKind[] = ["use", "open", "restock", "adjust"];
+const KINDS: MovementKind[] = ["use", "open", "finish", "restock", "adjust"];
 
 /**
  * Audit of the clinic's stock (coordinators and admins): who used, opened,
@@ -145,10 +145,15 @@ export default function InventoryAudit() {
                   <li key={it.name} className="flex justify-between gap-2">
                     <span className="truncate">{it.name}</span>
                     <span className="shrink-0 text-gray-500">
-                      {it.used > 0 &&
-                        t("n_used", { count: it.used, unit: it.unit })}
-                      {it.used > 0 && it.opened > 0 && " · "}
-                      {it.opened > 0 && t("n_opened", { count: it.opened })}
+                      {[
+                        it.used > 0 &&
+                          t("n_used", { count: it.used, unit: it.unit }),
+                        it.opened > 0 && t("n_opened", { count: it.opened }),
+                        it.finished > 0 &&
+                          t("n_finished", { count: it.finished }),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   </li>
                 ))}
@@ -210,16 +215,18 @@ export default function InventoryAudit() {
                   <td
                     className={cn(
                       "p-3 text-right font-mono",
-                      m.kind === "adjust"
+                      m.kind === "adjust" || m.kind === "finish"
                         ? "text-gray-600"
                         : m.delta > 0
                           ? "text-emerald-700"
                           : "text-rose-700",
                     )}
                   >
-                    {movementLabel(m.kind, m.delta, m.quantity_after)}
+                    {movementLabel(m)}
                   </td>
-                  <td className="p-3 text-gray-600">{m.note}</td>
+                  <td className="p-3 text-gray-600">
+                    {m.note === "session" ? "" : m.note}
+                  </td>
                 </tr>
               ))
             )}

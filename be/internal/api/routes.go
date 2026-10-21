@@ -82,6 +82,7 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	facilities.PATCH("/:id/", facilityHandler.PartialUpdateFacility)
 	facilities.DELETE("/:id/", facilityHandler.DeleteFacility)
 	facilities.GET("/:id/users/", facilityHandler.GetFacilityUsers)
+	facilities.GET("/:id/get_users/", facilityHandler.GetFacilityUsers) // path used by the frontend
 
 	protected.GET("/getallfacilities/", facilityHandler.ListAllFacilities)
 	protected.GET("/getallfacilities/:id/", facilityHandler.GetAnyFacility)

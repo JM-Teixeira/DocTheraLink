@@ -19,10 +19,12 @@ func RegisterRoutes(protected *gin.RouterGroup, db *gorm.DB) *Service {
 func mount(g *gin.RouterGroup, h *Handler) {
 	g.GET("/summary/", h.Summary)
 	g.GET("/audit/", h.Audit)
+	g.GET("/reorder/", h.Reorder)
 	g.GET("/items/", h.List)
 	g.POST("/items/", h.Create)
 	g.PUT("/items/:id/", h.Update)
 	g.DELETE("/items/:id/", h.Archive)
 	g.GET("/items/:id/movements/", h.History)
 	g.POST("/items/:id/movements/", h.Move)
+	g.PUT("/items/:id/session-rules/", h.SetSessionRules)
 }

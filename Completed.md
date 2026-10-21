@@ -7,6 +7,26 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-21 — M4 patients (branch `feat/m4-patients`)
 
+### 18:00 · Home page, Climutua demo clinic, inventory kinds, People fix (user request)
+- **Fix**: Clinic → People failed ("Something went wrong"): the
+  `/facility/:id/get_users/` endpoint was a 501 stub; now lists the clinic's
+  users with search and paging.
+- **Home page** at `/` (logo and "Início"), by role: physio's day with
+  patients (pop-up, attended/missed), coordinator's clinic load and needs
+  attention (reorder, containers open too long, referrals waiting), doctor's
+  referrals, front-desk arrivals; notifications; quick actions.
+- **Inventory**: item kinds — single-use (*use*) vs containers (*open*, then
+  *finish*; who/when; discard-after-days alert); per-session use per
+  division (rules); reorder list with target levels and CSV export; audit
+  shows finished too.
+- **Climutua** (PT-PT): 13 staff, 6 divisions, 120 patients with valid NIF,
+  20 conditions with ICD-10, referrals in every state with messages, weekly
+  shifts ±4 weeks, ~37 sessions a day within patient/credit limits, stock
+  with deliveries, openings and automatic session use.
+- Tests: inventory kinds/rules/reorder (unit), Climutua consistency
+  (PostgreSQL: limits, shifts, NIF, idempotent), e2e `TestClinicPeople`,
+  `TestContainersAndReorder`, `TestClimutua`; 89 frontend tests.
+
 ### 15:30 · Care levels, weekly plans, calendar views, stock audit (user request)
 - Patients get a **care level 1–5**; it is stored on each appointment as
   credits. Divisions have a per-physio hourly **credit limit** (default 8)

@@ -39,6 +39,18 @@ Demo logins (local demo data only), password **`1234@1`** for all:
 | `nurse`, `staff` | clinic staff | patients |
 | `stateadmin` | administrator | everything, all clinics |
 
+**Second demo clinic — Climutua** (Porto, everything in PT-PT: 120 patients,
+diagnoses, referrals with messages, weekly schedules, sessions and stock),
+same password `1234@1`:
+
+| Username | Who |
+|---|---|
+| `cm.coordenacao` | Ana Ferreira — coordenadora |
+| `cm.medico1` / `cm.medico2` / `cm.medico3` | Miguel Sousa (fisiatra) / Helena Carvalho (ortopedista) / Rui Teixeira (neurologista) |
+| `cm.fisio1` … `cm.fisio6` | Inês Moreira, Pedro Almeida, Catarina Lopes (neurológica), João Ribeiro, Mariana Costa, Tiago Fonseca |
+| `cm.rececao1` / `cm.rececao2` | Sofia Martins / Carla Pinto — receção |
+| `cm.enfermagem` | Teresa Gomes — enfermagem |
+
 The accounts are created by `SEED_DEMO_USERS=true` (local overlay/compose
 only); production must run with it off. First time ever (no cluster yet):
 `make k8s-up` in WSL (builds images, ~5 min).

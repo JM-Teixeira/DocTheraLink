@@ -421,7 +421,7 @@ func (s *Service) SetStatus(ctx context.Context, a Actor, id string, req StatusR
 	}
 	switch {
 	case req.Status == StatusAttended:
-		w, err := s.hook.SessionAttended(ctx, ap.ClinicID, ap.ID, a.ID)
+		w, err := s.hook.SessionAttended(ctx, ap.ClinicID, ap.ID, s.divisionOf(ctx, ap), a.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -433,6 +433,18 @@ func (s *Service) SetStatus(ctx context.Context, a Actor, id string, req StatusR
 	}
 	res.Status = req.Status
 	return res, nil
+}
+
+// divisionOf is the division of the shift the appointment falls in ("" if none).
+func (s *Service) divisionOf(ctx context.Context, ap *Appointment) string {
+	shifts, err := s.repo.Shifts(ctx, ap.ClinicID, ap.Date, ap.Date)
+	if err != nil {
+		return ""
+	}
+	if sh := shiftAt(shifts, ap.TherapistID, ap.Hour); sh != nil {
+		return sh.DivisionID
+	}
+	return ""
 }
 
 // Unbook removes a patient from the hour.

@@ -51,6 +51,11 @@ const BoardRoutes = {
     TBody: Type<{ week_start: string; weeks: number }>(),
     TRes: Type<{ copied: number }>(),
   },
+  divisions: {
+    path: "/api/v1/schedule/divisions/",
+    method: "GET",
+    TRes: Type<Division[]>(),
+  },
   createDivision: {
     path: "/api/v1/schedule/divisions/",
     method: "POST",

@@ -37,6 +37,8 @@ func writeError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "not_found", Message: err.Error()})
 	case errors.Is(err, ErrForbidden), errors.Is(err, ErrNoClinic):
 		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: "forbidden", Message: err.Error()})
+	case errors.Is(err, ErrNothingOpen):
+		c.JSON(http.StatusConflict, models.ErrorResponse{Error: "nothing_open", Message: err.Error()})
 	case errors.Is(err, ErrInsufficient):
 		c.JSON(http.StatusConflict, models.ErrorResponse{Error: "insufficient_stock", Message: err.Error()})
 	default:
@@ -147,6 +149,38 @@ func (h *Handler) Move(c *gin.Context) {
 		return
 	}
 	it, err := h.svc.Move(c.Request.Context(), a, c.Param("id"), req)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, it)
+}
+
+// Reorder handles GET /inventory/reorder/ (items to order and how many).
+func (h *Handler) Reorder(c *gin.Context) {
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	items, err := h.svc.Reorder(c.Request.Context(), a)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, items)
+}
+
+// SetSessionRules handles PUT /inventory/items/:id/session-rules/
+func (h *Handler) SetSessionRules(c *gin.Context) {
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var req SessionRulesRequest
+	if !bind(c, &req) {
+		return
+	}
+	it, err := h.svc.SetSessionRules(c.Request.Context(), a, c.Param("id"), req)
 	if err != nil {
 		writeError(c, err)
 		return

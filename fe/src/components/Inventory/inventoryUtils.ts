@@ -22,6 +22,13 @@ export const STATUS_STYLES: Record<
   out: { badge: "bg-rose-50 text-rose-700 ring-rose-200", bar: "bg-rose-500" },
 };
 
+/** Actions offered for an item: single-use items are used, containers are opened and finished. */
+export function actionsFor(item: Pick<StockItem, "tracking">): MovementKind[] {
+  return item.tracking === "container"
+    ? ["open", "finish", "restock", "adjust"]
+    : ["use", "restock", "adjust"];
+}
+
 /**
  * How full the stock bar is, 0–100. The minimum sits at 25 % of the bar, so
  * anything at or below the alert level is visibly short.
@@ -44,23 +51,41 @@ export function groupByCategory(items: StockItem[], other: string) {
   );
 }
 
+/** How many a movement concerned (older records only have the delta). */
+const amountOf = (m: Pick<StockMovement, "amount" | "delta">) =>
+  m.amount || Math.abs(m.delta);
+
+/** Movement text for history and audit: "+20", "−3", "= 12", "✓ 1". */
+export function movementLabel(
+  m: Pick<StockMovement, "kind" | "amount" | "delta" | "quantity_after">,
+) {
+  switch (m.kind) {
+    case "adjust":
+      return `= ${m.quantity_after}`;
+    case "finish":
+      return `✓ ${amountOf(m)}`;
+    case "restock":
+      return `+${amountOf(m)}`;
+    default:
+      return `−${amountOf(m)}`;
+  }
+}
+
 /**
- * Totals per person for the audit view: how much each one used and opened,
- * per item ("Sarah: 12 pairs of gloves used, 2 boxes opened").
+ * Totals per person for the audit view: how much each one used, opened and
+ * finished, per item ("Sarah: 12 pairs of gloves used, 2 bottles opened").
  */
 export function auditTotals(moves: StockMovement[]) {
-  const people = new Map<
-    number,
-    {
-      name: string;
-      items: Map<
-        string,
-        { name: string; unit: string; used: number; opened: number }
-      >;
-    }
-  >();
+  type Line = {
+    name: string;
+    unit: string;
+    used: number;
+    opened: number;
+    finished: number;
+  };
+  const people = new Map<number, { name: string; items: Map<string, Line> }>();
   for (const m of moves) {
-    if (!m.user || (m.kind !== "use" && m.kind !== "open")) continue;
+    if (!m.user || !["use", "open", "finish"].includes(m.kind)) continue;
     const p = people.get(m.user.id) ?? {
       name: `${m.user.first_name} ${m.user.last_name}`,
       items: new Map(),
@@ -70,23 +95,15 @@ export function auditTotals(moves: StockMovement[]) {
       unit: m.item?.unit ?? "",
       used: 0,
       opened: 0,
+      finished: 0,
     };
-    if (m.kind === "use") it.used += -m.delta;
-    else it.opened += -m.delta;
+    if (m.kind === "use") it.used += amountOf(m);
+    else if (m.kind === "open") it.opened += amountOf(m);
+    else it.finished += amountOf(m);
     p.items.set(m.item_id, it);
     people.set(m.user.id, p);
   }
   return [...people.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/** Movement text for the history list: "+20", "−3", "= 12". */
-export function movementLabel(
-  kind: MovementKind,
-  delta: number,
-  after: number,
-) {
-  if (kind === "adjust") return `= ${after}`;
-  return delta > 0 ? `+${delta}` : `−${Math.abs(delta)}`;
 }
 
 /**
@@ -96,11 +113,30 @@ export function movementLabel(
 export function checkMovement(
   kind: MovementKind,
   quantity: number,
-  inStock: number,
+  item: Pick<StockItem, "quantity" | "in_use">,
 ) {
   if (!Number.isInteger(quantity) || quantity < 0) return "stock_error__number";
   if (kind !== "adjust" && quantity < 1) return "stock_error__at_least_one";
-  if ((kind === "use" || kind === "open") && quantity > inStock)
+  if ((kind === "use" || kind === "open") && quantity > item.quantity)
     return "stock_error__not_enough";
+  if (kind === "finish" && quantity > item.in_use)
+    return "stock_error__not_that_many_open";
   return null;
+}
+
+/** Reorder list as CSV (name;category;in stock;to order;unit) for suppliers. */
+export function reorderCsv(items: StockItem[], header: string[]) {
+  const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  return [
+    header,
+    ...items.map((i) => [
+      i.name,
+      i.category,
+      i.quantity,
+      i.reorder_quantity,
+      i.unit,
+    ]),
+  ]
+    .map((row) => row.map(cell).join(";"))
+    .join("\n");
 }

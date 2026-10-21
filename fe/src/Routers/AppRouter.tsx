@@ -1,5 +1,5 @@
 import careConfig from "@careConfig";
-import { Redirect, usePath, useRedirect, useRoutes } from "raviger";
+import { usePath, useRedirect, useRoutes } from "raviger";
 import { useEffect, useState } from "react";
 
 import IconIndex from "@/CAREUI/icons/Index";
@@ -12,6 +12,7 @@ import {
 } from "@/components/Common/Sidebar/Sidebar";
 import Error404 from "@/components/ErrorPages/404";
 import SessionExpired from "@/components/ErrorPages/SessionExpired";
+import HomePage from "@/components/Home/HomePage";
 
 import { usePluginRoutes } from "@/hooks/useCareApps";
 
@@ -39,7 +40,7 @@ export type AppRoutes = {
 };
 
 const Routes: AppRoutes = {
-  "/": () => <Redirect to="/patients" />,
+  "/": () => <HomePage />,
 
   ...FacilityRoutes,
   ...PatientRoutes,

@@ -1,6 +1,7 @@
 import {
   ItemRequest,
   MovementRequest,
+  SessionRule,
   StockItem,
   StockMovement,
   StockSummary,
@@ -19,6 +20,17 @@ const InventoryRoutes = {
     path: "/api/v1/inventory/audit/",
     method: "GET",
     TRes: Type<StockMovement[]>(),
+  },
+  reorder: {
+    path: "/api/v1/inventory/reorder/",
+    method: "GET",
+    TRes: Type<StockItem[]>(),
+  },
+  sessionRules: {
+    path: "/api/v1/inventory/items/{id}/session-rules/",
+    method: "PUT",
+    TBody: Type<{ rules: SessionRule[] }>(),
+    TRes: Type<StockItem>(),
   },
   list: {
     path: "/api/v1/inventory/items/",

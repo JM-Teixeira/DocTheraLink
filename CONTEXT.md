@@ -39,7 +39,8 @@ be/                Go backend (Go module name: klyniva)
       notification/ in-app + e-mail notifications fed by referral events
       attachment/  files on referrals; access follows the referral
       catalog/     embedded ICD-10 subset + referral templates (EN/PT, read-only)
-      inventory/   clinic consumables: items, movements (use/restock/count), alerts
+      inventory/   clinic consumables: unit items (use) and containers (open/finish),
+                   per-division session use, reorder list, audit
       schedule/    time board: divisions, shifts, appointments per physio-hour,
                    weekly plans (series), range/year stats; SessionHook → inventory
     storage/       file Store interface (Local today, S3 later)
@@ -110,6 +111,11 @@ admin (organisation-wide, no clinic).
 day: plans divisions and physio shifts, assigns patients to physios, audits
 stock; reads — never acts on — the clinic's referrals), `Staff`, read-only variants, admins. Frontend checks
 live in `fe/src/Utils/roles.ts` and mirror the backend.
+
+**Demo clinics:** "Klyniva Demo Clinic" (English, `database.DemoClinicID`) and
+**Climutua** (`database.ClimutuaClinicID`, PT-PT, 120 patients, users `cm.*`,
+`database/seed_climutua.go`; created once, its weekly shifts are kept planned
+four weeks ahead on every start).
 
 **Clinics (decision D2):** single clinic today, built for many. A clinic is a
 row in `facilities`; a user's `home_facility_id` is their clinic. Modules get a

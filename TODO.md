@@ -106,6 +106,8 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] **Weekly plans**: book a patient 1/2/3× per week or every weekday for N sessions, with a preview of skipped dates; cancel the rest of a plan. **Repeat week** copies a week of shifts forward.
 - [x] **Day / week / month / year** views; the year view counts sessions held/missed, patients seen, referred and discharged per month.
 - [x] Clicking a patient on the board opens a pop-up: age, contact, care level, allergies, the doctor's referral and the doctor–physio thread, links to the patient and referral pages.
+- [x] **Home page** (logo / Início) per role: physio "my day" (mark sessions in place), coordinator clinic load + what needs attention, doctor's referrals, front-desk arrivals, notifications.
+- [x] Second demo clinic **Climutua** (PT-PT, 120 patients, realistic load) — see README.
 - [ ] Next on the board: drag to move an appointment; reschedule a whole plan; waiting list; a physio's own "my day" view; print the day sheet.
 - [ ] Link board appointments to referrals (field exists) and book the whole series of N sessions at once; receptionists manage them.
 - [ ] Therapist availability from the timetable; room/section capacity; conflict checks.
@@ -125,7 +127,10 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] **Inventory of consumables** (D1), done early on request (`/inventory`, sidebar): items per clinic with alert levels, use / restock / count with history, low and out-of-stock filters, demo stock seeded. Replaced the CARE inventory screens and 501 stubs.
 - [x] Inventory **audit** (coordinators/admins): every use, opening, restock and count with who and when, totals per person, filters; new **Open** action (opened a box/bottle).
 - [x] **Automatic use per session**: items with a per-session quantity (e.g. 1 pair of gloves) are taken from stock when a session is marked attended, and given back if that is undone; shortages are reported, never block the session.
-- [ ] Inventory next: suppliers and a reorder list/export; per-session quantities by division or treatment type.
+- [x] **Use vs open defined**: single-use items are *used*; containers (bottles, packs, rolls) are *opened* (who/when, sealed → in use) and *finished* when empty, with an optional "discard N days after opening" alert.
+- [x] Per-session use **per division** (e.g. swim caps only in the pool, 2 pairs of gloves in hydrotherapy).
+- [x] **Reorder list** with suggested quantities (up to a target level) and CSV export.
+- [ ] Inventory next: suppliers and order history; batch / expiry dates of sealed stock.
 - [ ] Wire the existing clock in/out button and time-log history (`Users/ClockInOutButton`, `Users/TimeLogHistory` — built but never shown); time-tracking reports and exports.
 - [ ] Organisations with several clinics (switch clinic, per-clinic admins) on top of `internal/clinic`.
 - [ ] Dashboards: referrals by status, waiting time to first session, therapist load, outcomes.

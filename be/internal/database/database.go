@@ -238,6 +238,10 @@ func SeedData(includeDemoUsers bool) error {
 	if err := seedDemoClinic(); err != nil {
 		return err
 	}
+	// Second demo clinic with realistic PT-PT data
+	if err := seedClimutua(time.Now()); err != nil {
+		return fmt.Errorf("climutua demo: %w", err)
+	}
 	log.Println("Database seeding completed")
 	return nil
 }

@@ -108,13 +108,14 @@ func Models() []any { return []any{&Division{}, &Shift{}, &Appointment{}} }
 // SessionHook reacts to sessions being held, e.g. the inventory using the
 // consumables every session needs. Warnings are shown to the user.
 type SessionHook interface {
-	SessionAttended(ctx context.Context, clinicID, appointmentID string, actorID uint) (warnings []string, err error)
+	// divisionID is where the session took place ("" if unknown).
+	SessionAttended(ctx context.Context, clinicID, appointmentID, divisionID string, actorID uint) (warnings []string, err error)
 	SessionUndone(ctx context.Context, clinicID, appointmentID string, actorID uint) error
 }
 
 type noHook struct{}
 
-func (noHook) SessionAttended(context.Context, string, string, uint) ([]string, error) {
+func (noHook) SessionAttended(context.Context, string, string, string, uint) ([]string, error) {
 	return nil, nil
 }
 func (noHook) SessionUndone(context.Context, string, string, uint) error { return nil }

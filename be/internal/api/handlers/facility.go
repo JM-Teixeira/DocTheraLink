@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"klyniva/internal/config"
 	"klyniva/internal/database"
@@ -394,11 +395,33 @@ func (h *FacilityHandler) GetState(c *gin.Context) {
 }
 
 // Placeholder implementations for other endpoints
+// GetFacilityUsers lists the active users working in a clinic (their home
+// facility), optionally filtered by ?username=, with limit/offset paging.
 func (h *FacilityHandler) GetFacilityUsers(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
+	var params models.QueryParams
+	if err := c.ShouldBindQuery(&params); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: "Invalid query parameters"})
+		return
+	}
+	if params.Limit <= 0 || params.Limit > 100 {
+		params.Limit = 20
+	}
+	query := database.GetDB().Model(&models.User{}).Where("home_facility_id = ? AND is_active", c.Param("id"))
+	if u := strings.TrimSpace(c.Query("username")); u != "" {
+		query = query.Where("username ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ?", "%"+u+"%", "%"+u+"%", "%"+u+"%")
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "internal_error", Message: "Failed to fetch users"})
+		return
+	}
+	var users []models.User
+	if err := query.Preload("HomeFacility").Order("first_name, last_name").
+		Limit(params.Limit).Offset(params.Offset).Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "internal_error", Message: "Failed to fetch users"})
+		return
+	}
+	c.JSON(http.StatusOK, models.PaginatedResponse{Count: int(total), Results: users})
 }
 
 func (h *FacilityHandler) GetDistrictsByState(c *gin.Context) {

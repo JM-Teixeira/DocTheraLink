@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -12,8 +13,10 @@ import (
 var (
 	// ErrNotFound: no such item in the user's clinic.
 	ErrNotFound = errors.New("item not found")
-	// ErrInsufficient: using more than is in stock.
+	// ErrInsufficient: using or opening more than is in stock.
 	ErrInsufficient = errors.New("not enough in stock")
+	// ErrNothingOpen: finishing more containers than are open.
+	ErrNothingOpen = errors.New("not that many are open")
 )
 
 // Repository is the persistence boundary of the module.
@@ -22,23 +25,30 @@ type Repository interface {
 	Get(ctx context.Context, clinicIDs []string, id string) (*Item, error)
 	Create(ctx context.Context, it *Item, opening *Movement) error
 	Update(ctx context.Context, id string, fields map[string]any) error
-	// Apply changes the stock atomically and records the movement; it
-	// returns the item after the change.
+	// Apply changes the stock atomically and records the movement (m.Amount
+	// is the requested amount); it returns the item after the change.
 	Apply(ctx context.Context, itemID string, m *Movement) (*Item, error)
 	Movements(ctx context.Context, itemID string, limit int) ([]Movement, error)
 	// Audit lists the movements of the clinics' items, newest first.
 	Audit(ctx context.Context, clinicIDs []string, f AuditFilter, limit int) ([]Movement, error)
-	// SessionItems are the clinic's items used automatically per session.
+	// SessionItems are the clinic's unit items used per session (by default
+	// or in some division), with their rules.
 	SessionItems(ctx context.Context, clinicID string) ([]Item, error)
 	// NetForAppointment sums the stock change per item recorded for an appointment.
 	NetForAppointment(ctx context.Context, appointmentID string) (map[string]int, error)
+	ReplaceRules(ctx context.Context, itemID string, rules []SessionRule) error
 }
 
 // GormRepository implements Repository on PostgreSQL via GORM.
-type GormRepository struct{ db *gorm.DB }
+type GormRepository struct {
+	db  *gorm.DB
+	now func() time.Time
+}
 
 // NewGormRepository builds a repository on the given connection.
-func NewGormRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
+func NewGormRepository(db *gorm.DB) *GormRepository {
+	return &GormRepository{db: db, now: time.Now}
+}
 
 // inClinics restricts to the given clinics; nil means every clinic (admins).
 func inClinics(db *gorm.DB, clinicIDs []string) *gorm.DB {
@@ -49,7 +59,7 @@ func inClinics(db *gorm.DB, clinicIDs []string) *gorm.DB {
 }
 
 func (g *GormRepository) List(ctx context.Context, clinicIDs []string, f ListFilter) ([]Item, error) {
-	db := inClinics(g.db.WithContext(ctx).Model(&Item{}), clinicIDs).Where("archived = false")
+	db := inClinics(g.db.WithContext(ctx).Model(&Item{}), clinicIDs).Preload("Rules").Where("archived = false")
 	if s := strings.TrimSpace(f.Search); s != "" {
 		db = db.Where("name ILIKE ?", "%"+escapeLike(s)+"%")
 	}
@@ -73,7 +83,7 @@ func (g *GormRepository) List(ctx context.Context, clinicIDs []string, f ListFil
 
 func (g *GormRepository) Get(ctx context.Context, clinicIDs []string, id string) (*Item, error) {
 	var it Item
-	err := inClinics(g.db.WithContext(ctx), clinicIDs).
+	err := inClinics(g.db.WithContext(ctx), clinicIDs).Preload("Rules").
 		Where("archived = false").First(&it, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
@@ -83,14 +93,14 @@ func (g *GormRepository) Get(ctx context.Context, clinicIDs []string, id string)
 
 func (g *GormRepository) Create(ctx context.Context, it *Item, opening *Movement) error {
 	return g.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(it).Error; err != nil {
+		if err := tx.Omit("Rules").Create(it).Error; err != nil {
 			return err
 		}
 		if opening == nil {
 			return nil
 		}
 		opening.ItemID = it.ID
-		return tx.Omit("User").Create(opening).Error
+		return tx.Omit("User", "Item").Create(opening).Error
 	})
 }
 
@@ -112,21 +122,64 @@ func (g *GormRepository) Apply(ctx context.Context, itemID string, m *Movement) 
 			}
 			return err
 		}
-		next, delta, err := nextQuantity(out.Quantity, m.Kind, m.Delta)
+		next, err := nextState(out.Quantity, out.InUse, m.Kind, m.Amount)
 		if err != nil {
 			return err
 		}
-		if err := tx.Model(&Item{}).Where("id = ?", itemID).Update("quantity", next).Error; err != nil {
+		oldest, err := g.oldestOpen(tx, out, next, m)
+		if err != nil {
 			return err
 		}
-		out.Quantity = next
-		m.ItemID, m.Delta, m.QuantityAfter = itemID, delta, next
-		return tx.Omit("User").Create(m).Error
+		if err := tx.Model(&Item{}).Where("id = ?", itemID).Updates(map[string]any{
+			"quantity": next.quantity, "in_use": next.inUse, "oldest_open_at": oldest,
+		}).Error; err != nil {
+			return err
+		}
+		out.Quantity, out.InUse, out.OldestOpenAt = next.quantity, next.inUse, oldest
+		m.ItemID, m.Delta, m.QuantityAfter, m.InUseAfter = itemID, next.delta, next.quantity, next.inUse
+		return tx.Omit("User", "Item").Create(m).Error
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &out, nil
+}
+
+// oldestOpen keeps track of when the oldest still-open container was
+// opened (containers are finished first-in, first-out).
+func (g *GormRepository) oldestOpen(tx *gorm.DB, before Item, next state, m *Movement) (*time.Time, error) {
+	switch {
+	case next.inUse == 0:
+		return nil, nil
+	case m.Kind == KindOpen && before.InUse == 0:
+		now := g.now()
+		return &now, nil
+	case m.Kind != KindFinish:
+		return before.OldestOpenAt, nil
+	}
+	var opens []struct {
+		Amount    int
+		CreatedAt time.Time
+	}
+	if err := tx.Model(&Movement{}).Select("amount, created_at").
+		Where("item_id = ? AND kind = ?", before.ID, KindOpen).Order("created_at").Scan(&opens).Error; err != nil {
+		return nil, err
+	}
+	var finished int
+	if err := tx.Model(&Movement{}).Select("COALESCE(SUM(amount), 0)").
+		Where("item_id = ? AND kind = ?", before.ID, KindFinish).Scan(&finished).Error; err != nil {
+		return nil, err
+	}
+	finished += m.Amount
+	cum := 0
+	for _, o := range opens {
+		cum += o.Amount
+		if cum > finished {
+			t := o.CreatedAt
+			return &t, nil
+		}
+	}
+	return before.OldestOpenAt, nil
 }
 
 func (g *GormRepository) Movements(ctx context.Context, itemID string, limit int) ([]Movement, error) {
@@ -171,7 +224,9 @@ func (g *GormRepository) Audit(ctx context.Context, clinicIDs []string, f AuditF
 
 func (g *GormRepository) SessionItems(ctx context.Context, clinicID string) ([]Item, error) {
 	var items []Item
-	err := g.db.WithContext(ctx).Where("clinic_id = ? AND per_session > 0 AND archived = false", clinicID).
+	err := g.db.WithContext(ctx).Preload("Rules").
+		Where("clinic_id = ? AND tracking = ? AND archived = false", clinicID, TrackUnit).
+		Where("per_session > 0 OR id IN (SELECT item_id FROM stock_session_rules WHERE quantity > 0)").
 		Order("name").Find(&items).Error
 	return items, err
 }
@@ -190,24 +245,54 @@ func (g *GormRepository) NetForAppointment(ctx context.Context, appointmentID st
 	return out, err
 }
 
-// nextQuantity applies a movement to the current stock. For restock/use the
-// amount is the (positive) quantity; for adjust it is the counted stock.
-// It returns the new stock and the signed change.
-func nextQuantity(current int, kind string, amount int) (next, delta int, err error) {
+func (g *GormRepository) ReplaceRules(ctx context.Context, itemID string, rules []SessionRule) error {
+	return g.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("item_id = ?", itemID).Delete(&SessionRule{}).Error; err != nil {
+			return err
+		}
+		if len(rules) == 0 {
+			return nil
+		}
+		for i := range rules {
+			rules[i].ItemID = itemID
+		}
+		return tx.Create(&rules).Error
+	})
+}
+
+// state is the stock of an item after a movement.
+type state struct {
+	quantity, inUse, delta int
+}
+
+// nextState applies a movement (amount is positive; for adjust it is the
+// counted stock). It returns the new sealed/available stock, how many are
+// open, and the signed change of the stock.
+func nextState(quantity, inUse int, kind string, amount int) (state, error) {
+	next := state{quantity: quantity, inUse: inUse}
 	switch kind {
 	case KindRestock:
-		next = current + amount
-	case KindUse, KindOpen:
-		next = current - amount
+		next.quantity += amount
+	case KindUse:
+		next.quantity -= amount
+	case KindOpen:
+		next.quantity -= amount
+		next.inUse += amount
+	case KindFinish:
+		next.inUse -= amount
+		if next.inUse < 0 {
+			return state{}, ErrNothingOpen
+		}
 	case KindAdjust:
-		next = amount
+		next.quantity = amount
 	default:
-		return 0, 0, errors.New("unknown movement kind")
+		return state{}, errors.New("unknown movement kind")
 	}
-	if next < 0 {
-		return 0, 0, ErrInsufficient
+	if next.quantity < 0 {
+		return state{}, ErrInsufficient
 	}
-	return next, next - current, nil
+	next.delta = next.quantity - quantity
+	return next, nil
 }
 
 func escapeLike(s string) string {

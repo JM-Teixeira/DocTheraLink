@@ -243,3 +243,125 @@ func TestCarePlanAndAutoUse(t *testing.T) {
 	}
 	expect(t, "cancel the rest of the plan", coord.call("DELETE", "/schedule/series/"+booked.SeriesID+"/?from="+day(0), nil, nil), 200)
 }
+
+// TestClinicPeople: the clinic's "People" page lists the users who work there.
+func TestClinicPeople(t *testing.T) {
+	coord, _ := login(t, "coordinator")
+	var me map[string]any
+	coord.call("GET", "/users/getcurrentuser/", nil, &me)
+	clinic, _ := me["home_facility"].(string)
+	if clinic == "" {
+		if obj, ok := me["home_facility_object"].(map[string]any); ok {
+			clinic, _ = obj["id"].(string)
+		}
+	}
+	if clinic == "" {
+		t.Fatalf("coordinator has no clinic: %v", me)
+	}
+	var page struct {
+		Count   int              `json:"count"`
+		Results []map[string]any `json:"results"`
+	}
+	expect(t, "people", coord.call("GET", "/facility/"+clinic+"/get_users/?limit=50", nil, &page), 200)
+	if page.Count < 5 || len(page.Results) == 0 {
+		t.Fatalf("people: %d", page.Count)
+	}
+	expect(t, "search", coord.call("GET", "/facility/"+clinic+"/get_users/?username=receptionist", nil, &page), 200)
+	if page.Count != 1 {
+		t.Errorf("search by username: %d", page.Count)
+	}
+}
+
+// TestContainersAndReorder: containers are opened and finished (not used);
+// single-use items are used (not opened); the reorder list says how much
+// to order; per-division session rules can be set by the coordinator.
+func TestContainersAndReorder(t *testing.T) {
+	coord, _ := login(t, "coordinator")
+	physio, _ := login(t, "physiotherapist")
+	stamp := time.Now().Format("150405.000")
+	var gel map[string]any
+	expect(t, "container", coord.call("POST", "/inventory/items/", map[string]any{
+		"name": "E2E gel " + stamp, "unit": "bottles", "tracking": "container", "quantity": 3, "min_quantity": 2, "target_quantity": 6, "open_life_days": 30,
+	}, &gel), 201)
+	id := gel["id"].(string)
+	move := func(c *client, kind string, n int, out any) int {
+		return c.call("POST", "/inventory/items/"+id+"/movements/", map[string]any{"kind": kind, "quantity": n}, out)
+	}
+	var after map[string]any
+	expect(t, "containers are not used", move(physio, "use", 1, nil), 400)
+	expect(t, "physio opens one", move(physio, "open", 1, &after), 200)
+	if after["quantity"] != 2.0 || after["in_use"] != 1.0 || after["oldest_open_at"] == nil {
+		t.Fatalf("after open: %v", after)
+	}
+	expect(t, "finish more than open", move(physio, "finish", 2, nil), 409)
+	expect(t, "finish it", move(physio, "finish", 1, &after), 200)
+	if after["quantity"] != 2.0 || after["in_use"] != 0.0 {
+		t.Fatalf("after finish: %v", after)
+	}
+
+	var reorder []map[string]any
+	expect(t, "reorder list", coord.call("GET", "/inventory/reorder/", nil, &reorder), 200)
+	found := false
+	for _, it := range reorder {
+		if it["id"] == id {
+			found = it["reorder_quantity"] == 4.0 // 6 target − 2 in stock
+		}
+	}
+	if !found {
+		t.Errorf("gel should be on the reorder list with 4 to order")
+	}
+
+	var divisions []map[string]any
+	coord.call("GET", "/schedule/divisions/", nil, &divisions)
+	var gloves map[string]any
+	expect(t, "unit item", coord.call("POST", "/inventory/items/", map[string]any{"name": "E2E caps " + stamp, "quantity": 5}, &gloves), 201)
+	rules := map[string]any{"rules": []map[string]any{{"division_id": divisions[0]["id"], "quantity": 1}}}
+	expect(t, "physio cannot set rules", physio.call("PUT", "/inventory/items/"+gloves["id"].(string)+"/session-rules/", rules, nil), 403)
+	var ruled map[string]any
+	expect(t, "coordinator sets rules", coord.call("PUT", "/inventory/items/"+gloves["id"].(string)+"/session-rules/", rules, &ruled), 200)
+	if r, _ := ruled["session_rules"].([]any); len(r) != 1 {
+		t.Fatalf("rules: %v", ruled["session_rules"])
+	}
+	expect(t, "rules only for single-use", coord.call("PUT", "/inventory/items/"+id+"/session-rules/", rules, nil), 400)
+}
+
+// TestClimutua: the PT-PT demo clinic is there with its own staff, patients
+// and Portuguese data, isolated from the other clinic.
+func TestClimutua(t *testing.T) {
+	coord, _ := login(t, "cm.coordenacao")
+	physio, _ := login(t, "cm.fisio3")
+	other, _ := login(t, "coordinator")
+
+	var patients struct {
+		Count   int              `json:"count"`
+		Results []map[string]any `json:"results"`
+	}
+	expect(t, "patients", coord.call("GET", "/patient/?limit=100", nil, &patients), 200)
+	if patients.Count < 120 {
+		t.Fatalf("Climutua patients: %d", patients.Count)
+	}
+	var refs struct {
+		Results []map[string]any `json:"results"`
+	}
+	expect(t, "neuro physio inbox", physio.call("GET", "/referrals/?limit=50", nil, &refs), 200)
+	pt := false
+	for _, r := range refs.Results {
+		pt = pt || r["diagnosis"] == "Sequelas de AVC isquémico" || r["diagnosis"] == "Doença de Parkinson" || r["diagnosis"] == "Esclerose múltipla (surto recente)"
+	}
+	if !pt {
+		t.Error("the neuro physio should see Portuguese neuro referrals")
+	}
+	var divisions []map[string]any
+	expect(t, "divisions", coord.call("GET", "/schedule/divisions/", nil, &divisions), 200)
+	if len(divisions) != 6 || divisions[0]["name"] != "Ginásio" {
+		t.Errorf("divisions: %v", divisions)
+	}
+	var items []map[string]any
+	expect(t, "stock", coord.call("GET", "/inventory/items/?search=Luvas", nil, &items), 200)
+	if len(items) == 0 {
+		t.Error("Climutua stock in Portuguese")
+	}
+	// The other clinic's coordinator sees none of it
+	id := patients.Results[0]["id"].(string)
+	expect(t, "other clinic cannot open the patient", other.call("GET", "/patient/"+id+"/", nil, nil), 404)
+}

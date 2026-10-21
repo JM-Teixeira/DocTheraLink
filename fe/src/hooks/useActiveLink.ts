@@ -10,12 +10,10 @@ import { usePath } from "raviger";
 const activeLinkPriority = {
   "/patients": "/patients",
   "/patient/": "/patients",
-  "/death_report": "/patients",
-  "/assets": "/assets",
-  "/shifting": "/shifting",
-  "/resource": "/resource",
+  "/referrals": "/referrals",
+  "/time-board": "/time-board",
+  "/inventory": "/inventory",
   "/users": "/users",
-  "/notice_board": "/notice_board",
   "/facility": "/facility",
 };
 
@@ -24,6 +22,9 @@ const activeLinkPriority = {
  */
 export default function useActiveLink() {
   const path = usePath() || "";
+  if (path === "/") return "/"; // home
   const key = Object.keys(activeLinkPriority).find((key) => path.includes(key));
-  return key && (activeLinkPriority as any)[key];
+  return key
+    ? activeLinkPriority[key as keyof typeof activeLinkPriority]
+    : undefined;
 }

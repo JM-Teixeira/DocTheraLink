@@ -2,16 +2,25 @@ package inventory
 
 import (
 	"fmt"
+	"slices"
 
 	"gorm.io/gorm"
 )
+
+// demoContainers are the multi-use items of the demo clinic.
+var demoContainers = []string{"Hand sanitiser", "Disinfectant wipes", "Couch roll", "Ultrasound gel", "Massage oil"}
 
 // SeedDemo stocks the demo clinic with typical physiotherapy consumables
 // (only when it has no items yet). Some start low so the alerts show.
 func SeedDemo(db *gorm.DB, clinicID string) error {
 	var n int64
-	if err := db.Model(&Item{}).Where("clinic_id = ?", clinicID).Count(&n).Error; err != nil || n > 0 {
+	if err := db.Model(&Item{}).Where("clinic_id = ?", clinicID).Count(&n).Error; err != nil {
 		return err
+	}
+	if n > 0 {
+		// Demo data from before item kinds existed: bottles, packs and rolls are containers
+		return db.Model(&Item{}).Where("clinic_id = ? AND name IN ? AND tracking = ? AND in_use = 0",
+			clinicID, demoContainers, TrackUnit).Update("tracking", TrackContainer).Error
 	}
 	const ppe, hygiene, treatment = "PPE", "Hygiene", "Treatment"
 	items := []Item{
@@ -30,6 +39,12 @@ func SeedDemo(db *gorm.DB, clinicID string) error {
 	}
 	for i := range items {
 		items[i].ClinicID = clinicID
+		if slices.Contains(demoContainers, items[i].Name) {
+			items[i].Tracking, items[i].OpenLifeDays = TrackContainer, 30
+		}
+		if items[i].Name == "Nitrile gloves (M)" {
+			items[i].PerSession = 1
+		}
 		if err := db.Create(&items[i]).Error; err != nil {
 			return fmt.Errorf("seed stock item %s: %w", items[i].Name, err)
 		}
