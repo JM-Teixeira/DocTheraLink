@@ -61,13 +61,28 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 
 	// Apply filters
 	if params.Search != "" {
-		query = query.Where("first_name ILIKE ? OR last_name ILIKE ? OR username ILIKE ? OR email ILIKE ?",
-			"%"+params.Search+"%", "%"+params.Search+"%", "%"+params.Search+"%", "%"+params.Search+"%")
+		// Full name too, so "Inês Costa" finds Inês Costa
+		like := "%" + params.Search + "%"
+		query = query.Where("first_name || ' ' || last_name ILIKE ? OR username ILIKE ? OR email ILIKE ?", like, like, like)
 	}
 
 	if userType := c.Query("user_type"); userType != "" {
 		query = query.Where("user_type = ?", userType)
 	}
+	if clinic := c.Query("home_facility"); clinic != "" {
+		query = query.Where("home_facility_id = ?", clinic)
+	}
+	if status := c.Query("employment_status"); status != "" {
+		query = query.Where("employment_status = ?", status)
+	}
+	// Staff see the people of their own clinic; admins everyone
+	if claims, err := auth.GetCurrentUserClaims(c); err == nil && !auth.IsAdmin(claims.UserType) {
+		var me models.User
+		if err := db.Select("home_facility_id").First(&me, claims.UserID).Error; err == nil && me.HomeFacilityID != nil {
+			query = query.Where("home_facility_id = ?", *me.HomeFacilityID)
+		}
+	}
+	query = query.Order("first_name, last_name")
 
 	// Get total count
 	var total int64
@@ -86,6 +101,10 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 	// Convert to bare minimum for list view
 	var userList []models.UserBareMinimum
 	for _, user := range users {
+		clinicName := ""
+		if user.HomeFacility != nil {
+			clinicName = user.HomeFacility.Name
+		}
 		userList = append(userList, models.UserBareMinimum{
 			ID:                user.ID,
 			Username:          user.Username,
@@ -95,6 +114,9 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 			UserType:          user.UserType,
 			LastLogin:         user.LastLogin,
 			ProfilePictureURL: user.ProfilePictureURL,
+			EmploymentStatus:  user.EmploymentStatus,
+			EmploymentSince:   user.EmploymentSince,
+			ClinicName:        clinicName,
 		})
 	}
 
@@ -414,207 +436,6 @@ func (h *UserHandler) CheckUsername(c *gin.Context) {
 
 	c.JSON(http.StatusOK, models.SuccessResponse{
 		Message: "Username is available",
-	})
-}
-
-// ListUserSkills godoc
-// @Summary List user skills
-// @Description Get user's skills
-// @Tags users
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param username path string true "Username"
-// @Success 200 {object} models.PaginatedResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Router /users/{username}/skill/ [get]
-func (h *UserHandler) ListUserSkills(c *gin.Context) {
-	username := c.Param("username")
-
-	var user models.User
-	db := database.GetDB()
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{
-			Error:   "not_found",
-			Message: "User not found",
-		})
-		return
-	}
-
-	var skills []models.UserSkill
-	if err := db.Preload("Skill").Where("user_id = ?", user.ID).Find(&skills).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to fetch skills",
-		})
-		return
-	}
-
-	response := models.PaginatedResponse{
-		Count:   len(skills),
-		Results: skills,
-	}
-
-	c.JSON(http.StatusOK, response)
-}
-
-// AddUserSkill godoc
-// @Summary Add user skill
-// @Description Add skill to user
-// @Tags users
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param username path string true "Username"
-// @Param skill body object{skill=string} true "Skill ID"
-// @Success 201 {object} models.UserSkill
-// @Failure 400 {object} models.ErrorResponse
-// @Router /users/{username}/skill/ [post]
-func (h *UserHandler) AddUserSkill(c *gin.Context) {
-	username := c.Param("username")
-
-	var user models.User
-	db := database.GetDB()
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{
-			Error:   "not_found",
-			Message: "User not found",
-		})
-		return
-	}
-
-	var req struct {
-		Skill string `json:"skill" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "bad_request",
-			Message: "Invalid request body",
-		})
-		return
-	}
-
-	userSkill := models.UserSkill{
-		UserID:  user.ID,
-		SkillID: req.Skill,
-	}
-
-	if err := db.Create(&userSkill).Error; err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "bad_request",
-			Message: "Failed to add skill",
-		})
-		return
-	}
-
-	// Load skill details
-	db.Preload("Skill").First(&userSkill, "id = ?", userSkill.ID)
-
-	c.JSON(http.StatusCreated, userSkill)
-}
-
-// DeleteUserSkill godoc
-// @Summary Delete user skill
-// @Description Remove skill from user
-// @Tags users
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param username path string true "Username"
-// @Param id path string true "Skill ID"
-// @Success 200 {object} models.SuccessResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Router /users/{username}/skill/{id}/ [delete]
-func (h *UserHandler) DeleteUserSkill(c *gin.Context) {
-	username := c.Param("username")
-	skillID := c.Param("id")
-
-	var user models.User
-	db := database.GetDB()
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{
-			Error:   "not_found",
-			Message: "User not found",
-		})
-		return
-	}
-
-	result := db.Where("user_id = ? AND id = ?", user.ID, skillID).Delete(&models.UserSkill{})
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to delete skill",
-		})
-		return
-	}
-
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{
-			Error:   "not_found",
-			Message: "Skill not found",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, models.SuccessResponse{
-		Message: "Skill removed successfully",
-	})
-}
-
-// ListAllSkills godoc
-// @Summary List all skills
-// @Description Get all available skills
-// @Tags users
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} models.PaginatedResponse
-// @Router /skill/ [get]
-func (h *UserHandler) ListAllSkills(c *gin.Context) {
-	var skills []models.Skill
-	db := database.GetDB()
-	if err := db.Find(&skills).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to fetch skills",
-		})
-		return
-	}
-
-	response := models.PaginatedResponse{
-		Count:   len(skills),
-		Results: skills,
-	}
-
-	c.JSON(http.StatusOK, response)
-}
-
-// Placeholder implementations for other user-related endpoints
-func (h *UserHandler) ListUserFacilities(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-func (h *UserHandler) AddUserFacility(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-func (h *UserHandler) DeleteUserFacility(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-func (h *UserHandler) ClearHomeFacility(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
 	})
 }
 

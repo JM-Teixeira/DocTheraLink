@@ -1,6 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { ExternalLink, FileText, Phone, TriangleAlert } from "lucide-react";
+import {
+  ExternalLink,
+  FileText,
+  Phone,
+  Plane,
+  TriangleAlert,
+} from "lucide-react";
 import { navigate } from "raviger";
 import { useTranslation } from "react-i18next";
 
@@ -20,6 +26,7 @@ import ReferralStatusBadge from "@/components/Referral/ReferralStatusBadge";
 import ReferralRoutes from "@/components/Referral/api";
 import { ageFromDob, fullName } from "@/components/Referral/referralUtils";
 import { Referral } from "@/components/Referral/types";
+import BoardRoutes from "@/components/TimeBoard/api";
 import { CARE_LEVEL_STYLES } from "@/components/TimeBoard/boardUtils";
 
 import useAuthUser from "@/hooks/useAuthUser";
@@ -53,6 +60,15 @@ export default function PatientQuickView({
       pathParams: { id: patientId ?? "" },
     }),
     enabled: !!patientId,
+  });
+  const { data: handovers } = useQuery({
+    queryKey: ["handover", patientId],
+    queryFn: query(BoardRoutes.handover, {
+      queryParams: { patient: patientId ?? "" },
+      silent: true,
+    }),
+    enabled: !!patientId,
+    retry: false,
   });
   const { data: referrals } = useQuery({
     queryKey: ["patient-referrals", patientId],
@@ -110,6 +126,32 @@ export default function PatientQuickView({
             {t("allergies")}: {patient.allergies}
           </p>
         )}
+
+        {handovers?.map((h) => (
+          <section
+            key={h.absence.id}
+            className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm"
+          >
+            <h3 className="mb-1 flex items-center gap-2 font-semibold text-amber-900">
+              <Plane className="size-4" aria-hidden />
+              {t("handover_from", {
+                name: `${h.absence.therapist?.first_name ?? ""} ${h.absence.therapist?.last_name ?? ""}`,
+              })}
+            </h3>
+            <p className="text-xs text-amber-800">
+              {dayjs(h.absence.from).format("D MMM")} –{" "}
+              {dayjs(h.absence.to).format("D MMM")}
+              {h.absence.cover &&
+                ` · ${t("covered_by", { name: `${h.absence.cover.first_name} ${h.absence.cover.last_name}` })}`}
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-gray-900">{h.note}</p>
+            {h.absence.handover && (
+              <p className="mt-2 whitespace-pre-wrap text-xs text-gray-700">
+                {h.absence.handover}
+              </p>
+            )}
+          </section>
+        ))}
 
         {referral && (
           <section className="rounded-xl border border-gray-200 p-4">

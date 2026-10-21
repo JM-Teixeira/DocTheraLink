@@ -15,6 +15,7 @@ type RangeView struct {
 	Divisions   []Division    `json:"divisions"`
 	Therapists  []UserSummary `json:"therapists"`
 	Days        []DaySummary  `json:"days"`
+	Absences    []Absence     `json:"absences"`
 	Permissions Permissions   `json:"permissions"`
 }
 
@@ -84,7 +85,7 @@ func (s *Service) Range(ctx context.Context, a Actor, fromS, toS string) (*Range
 		return nil, err
 	}
 	v := &RangeView{From: fromS, To: toS, Divisions: data.divisions, Therapists: data.therapists,
-		Days: []DaySummary{}, Permissions: permissions(a)}
+		Days: []DaySummary{}, Permissions: permissions(a), Absences: data.absences}
 	if v.Therapists == nil {
 		v.Therapists = []UserSummary{}
 	}

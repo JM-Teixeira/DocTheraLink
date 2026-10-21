@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import PatientIds from "@/components/Patient/PatientIds";
 import { apiError } from "@/components/TimeBoard/BoardDialogs";
 import BoardRoutes from "@/components/TimeBoard/api";
 import {
@@ -259,8 +260,11 @@ export default function HourDialog({
                         key={p.id}
                         className="flex items-center gap-2 px-3 py-2 text-sm"
                       >
-                        <span className="min-w-0 flex-1 truncate font-medium text-gray-900">
-                          {p.name}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium text-gray-900">
+                            {p.name}
+                          </span>
+                          <PatientIds nif={p.nif} sns={p.sns_number} />
                         </span>
                         <span
                           className={cn(

@@ -2,7 +2,6 @@
  * TypeScript types and interfaces for Patient Creation feature
  * Feature: Centralized Patient Creation
  */
-
 import { BLOOD_GROUPS, GENDER_TYPES } from "@/common/constants";
 
 // ============================================================================
@@ -273,7 +272,6 @@ export interface FormDraft {
   data: Partial<PatientFormState>;
 }
 
-
 // ============================================================================
 // Type Guards
 // ============================================================================
@@ -373,9 +371,7 @@ export function isDemographics(value: unknown): value is Demographics {
 /**
  * Type guard to check if a value is a valid EmergencyContact
  */
-export function isEmergencyContact(
-  value: unknown,
-): value is EmergencyContact {
+export function isEmergencyContact(value: unknown): value is EmergencyContact {
   if (typeof value !== "object" || value === null) return false;
   const contact = value as Record<string, unknown>;
   return (
@@ -558,7 +554,9 @@ export function validateDateNotFuture(dateString: string): boolean {
  */
 export function validateISODate(dateString: string): boolean {
   const date = new Date(dateString);
-  return !isNaN(date.getTime()) && dateString === date.toISOString().split("T")[0];
+  return (
+    !isNaN(date.getTime()) && dateString === date.toISOString().split("T")[0]
+  );
 }
 
 /**
@@ -676,7 +674,10 @@ export function validateDemographics(
     });
   }
 
-  if (demographics.alternatePhone && !validatePhone(demographics.alternatePhone)) {
+  if (
+    demographics.alternatePhone &&
+    !validatePhone(demographics.alternatePhone)
+  ) {
     errors.push({
       field: "demographics.alternatePhone",
       message: "Please enter a valid alternate phone number",
@@ -801,9 +802,7 @@ export function validateEmergencyContact(
 /**
  * Validates ClinicalNotes data
  */
-export function validateClinicalNotes(
-  notes: ClinicalNotes,
-): ValidationError[] {
+export function validateClinicalNotes(notes: ClinicalNotes): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!validateRequired(notes.reasonForVisit)) {
@@ -870,7 +869,10 @@ export function validateAdministrative(
   if (
     admin.dischargeDate &&
     admin.admissionDate &&
-    !validateDischargeDateAfterAdmission(admin.admissionDate, admin.dischargeDate)
+    !validateDischargeDateAfterAdmission(
+      admin.admissionDate,
+      admin.dischargeDate,
+    )
   ) {
     errors.push({
       field: "administrative.dischargeDate",
@@ -929,11 +931,8 @@ export function validatePatientFormState(
  * Converts validation errors array to ValidationErrors object
  */
 export function errorsToObject(errors: ValidationError[]): ValidationErrors {
-  return errors.reduce(
-    (acc, error) => {
-      acc[error.field] = error.message;
-      return acc;
-    },
-    {} as ValidationErrors,
-  );
+  return errors.reduce((acc, error) => {
+    acc[error.field] = error.message;
+    return acc;
+  }, {} as ValidationErrors);
 }

@@ -1,5 +1,6 @@
 import { Link, usePath } from "raviger";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import CareIcon from "@/CAREUI/icons/CareIcon";
 
@@ -10,29 +11,38 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 import useAppHistory from "@/hooks/useAppHistory";
 
 import { classNames } from "@/Utils/utils";
 
-const MENU_TAGS: { [key: string]: string } = {
-  facility: "Facilities",
-  patients: "Patients",
-  assets: "Assets",
-  shifting: "Shiftings",
-  resource: "Resources",
-  users: "Users",
-  notice_board: "Notice Board",
+/** Path segments shown with a translated name. */
+const SEGMENT_KEYS: Record<string, string> = {
+  facility: "clinic",
+  patients: "patients",
+  patient: "patients",
+  referrals: "referrals",
+  "time-board": "time_board",
+  inventory: "inventory",
+  users: "users",
+  user: "users",
+  profile: "profile",
+  skills: "skills",
+  facilities: "USERMANAGEMENT_TAB__FACILITIES",
+  new: "new",
+  edit: "edit",
+  letter: "letter",
+  notifications: "notifications",
 };
 
-const capitalize = (string: string) =>
-  string
+/** Longer paths collapse their middle into "•••". */
+const COLLAPSE_AFTER = 4;
+
+const looksLikeId = (s: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s) || /^\d+$/.test(s);
+
+const capitalize = (s: string) =>
+  s
     .replace(/[_-]/g, " ")
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -48,6 +58,10 @@ interface BreadcrumbsProps {
   onBackClick?: () => boolean | void;
 }
 
+/**
+ * Back button and the path as links: Home › Utentes › Maria Silva › Editar.
+ * Ids are replaced by names when the page gives them (replacements).
+ */
 export default function Breadcrumbs({
   replacements = {},
   className = "",
@@ -55,38 +69,25 @@ export default function Breadcrumbs({
   backUrl,
   onBackClick,
 }: BreadcrumbsProps) {
+  const { t } = useTranslation();
   const { goBack } = useAppHistory();
-  const path = usePath();
-  const [showFullPath, setShowFullPath] = useState(false);
+  const path = usePath() ?? "";
+  const [expanded, setExpanded] = useState(false);
 
-  const crumbs = path
-    ?.slice(1)
-    .split("/")
-    .map((field, i) => ({
-      name: replacements[field]?.name || MENU_TAGS[field] || capitalize(field),
-      uri:
-        replacements[field]?.uri ||
-        path
-          .split("/")
-          .slice(0, i + 2)
-          .join("/"),
-      style: replacements[field]?.style || "",
-    }));
-
-  const renderCrumb = (crumb: any, index: number) => {
-    const isLastItem = index === crumbs!.length - 1;
-    return (
-      <li
-        key={crumb.name}
-        className={classNames("text-sm font-normal", crumb.style)}
-      >
-        <div className="flex items-center">
-          <BreadcrumbSeparator className="text-gray-400" />
-          {isLastItem && <span className="text-gray-600">{crumb.name}</span>}
-        </div>
-      </li>
-    );
-  };
+  const segments = path.split("/").filter(Boolean);
+  const crumbs = segments.map((field, i) => ({
+    name:
+      replacements[field]?.name ||
+      (SEGMENT_KEYS[field]
+        ? t(SEGMENT_KEYS[field])
+        : looksLikeId(field)
+          ? t("details")
+          : capitalize(field)),
+    uri: replacements[field]?.uri || "/" + segments.slice(0, i + 1).join("/"),
+    style: replacements[field]?.style || "",
+  }));
+  const collapse = !expanded && crumbs.length > COLLAPSE_AFTER;
+  const shown = collapse ? [crumbs[0], null, ...crumbs.slice(-2)] : crumbs;
 
   return (
     <Breadcrumb>
@@ -105,7 +106,7 @@ export default function Breadcrumbs({
                   }}
                 >
                   <CareIcon icon="l-arrow-left" className="h-5 text-gray-700" />
-                  <span className="pr-2">Back</span>
+                  <span className="pr-2">{t("back")}</span>
                 </Button>
               </li>
             )}
@@ -115,47 +116,40 @@ export default function Breadcrumbs({
                 variant="link"
                 className="p-1 font-normal text-gray-800 hover:text-gray-700"
               >
-                <Link href="/">Home</Link>
+                <Link href="/">{t("home")}</Link>
               </Button>
             </BreadcrumbItem>
-            {crumbs && crumbs.length > 1 && (
-              <>
-                {!showFullPath && (
-                  <li>
-                    <div className="flex items-center ml-[-2px]">
-                      <BreadcrumbSeparator className="text-gray-400" />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="link"
-                            className="h-auto p-0 font-light text-gray-500 hover:text-gray-700"
-                            onClick={() => setShowFullPath(true)}
-                          >
-                            •••
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          {crumbs.slice(0, -1).map((crumb, index) => (
-                            <DropdownMenuItem key={index}>
-                              <Button
-                                asChild
-                                variant="link"
-                                className="p-1 font-normal text-gray-800 underline underline-offset-2 hover:text-gray-700"
-                              >
-                                <Link href={crumb.uri}>{crumb.name}</Link>
-                              </Button>
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </li>
+            {shown.map((crumb, i) => (
+              <li
+                key={crumb ? crumb.uri : "collapsed"}
+                className={classNames(
+                  "flex items-center text-sm font-normal",
+                  crumb?.style ?? "",
                 )}
-                {showFullPath && crumbs.slice(0, -1).map(renderCrumb)}
-              </>
-            )}
-            {crumbs?.length &&
-              renderCrumb(crumbs[crumbs.length - 1], crumbs.length - 1)}
+              >
+                <BreadcrumbSeparator className="text-gray-400" />
+                {crumb === null ? (
+                  <Button
+                    variant="link"
+                    className="h-auto p-1 font-light text-gray-500 hover:text-gray-700"
+                    onClick={() => setExpanded(true)}
+                    aria-label={t("show_full_path")}
+                  >
+                    •••
+                  </Button>
+                ) : i === shown.length - 1 ? (
+                  <span className="p-1 text-gray-600">{crumb.name}</span>
+                ) : (
+                  <Button
+                    asChild
+                    variant="link"
+                    className="p-1 font-normal text-gray-800 hover:text-gray-700"
+                  >
+                    <Link href={crumb.uri}>{crumb.name}</Link>
+                  </Button>
+                )}
+              </li>
+            ))}
           </ol>
         </BreadcrumbList>
       </nav>

@@ -50,6 +50,11 @@ same password `1234@1`:
 | `cm.fisio1` … `cm.fisio6` | Inês Moreira, Pedro Almeida, Catarina Lopes (neurológica), João Ribeiro, Mariana Costa, Tiago Fonseca |
 | `cm.rececao1` / `cm.rececao2` | Sofia Martins / Carla Pinto — receção |
 | `cm.enfermagem` | Teresa Gomes — enfermagem |
+| `cm.fisio7` | Rui Nogueira — **left the clinic** (kept on record; cannot sign in) |
+
+Climutua has three floors (gym on floor 1, rooms on 2, hydrotherapy on 3) and
+a planned holiday: Inês Moreira is away next week, covered by João Ribeiro,
+with handover notes per patient (time board → *Ausências*).
 
 The accounts are created by `SEED_DEMO_USERS=true` (local overlay/compose
 only); production must run with it off. First time ever (no cluster yet):

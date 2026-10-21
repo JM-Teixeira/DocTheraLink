@@ -12,8 +12,10 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"klyniva/internal/models"
+	"klyniva/internal/textutil"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
@@ -39,13 +41,27 @@ type ListQuery struct {
 	Phone      string `form:"phone_number"`
 	FacilityID string `form:"facility"`
 	IsActive   *bool  `form:"is_active"`
+	AgeMin     *int   `form:"age_min"`
+	AgeMax     *int   `form:"age_max"`
+	CareLevels []int  `form:"care_level"` // any of these
+	Gender     *int   `form:"gender"`
 	Limit      int    `form:"limit"`
 	Offset     int    `form:"offset"`
+}
+
+// Stats summarises a set of patients.
+type Stats struct {
+	Total      int64            `json:"total"`
+	CareLevels map[int]int64    `json:"care_levels"` // 1–5
+	Genders    map[int]int64    `json:"genders"`     // 0 = unknown, 1–3
+	AgeBands   map[string]int64 `json:"age_bands"`   // 0-17, 18-39, 40-64, 65-79, 80+, unknown
+	AverageAge float64          `json:"average_age"`
 }
 
 // Repository is the persistence boundary of the module.
 type Repository interface {
 	List(ctx context.Context, s Scope, q ListQuery) ([]models.Patient, int64, error)
+	Stats(ctx context.Context, s Scope, q ListQuery, now time.Time) (*Stats, error)
 	Get(ctx context.Context, s Scope, id string) (*models.Patient, error)
 	Create(ctx context.Context, p *models.Patient) error
 	Update(ctx context.Context, id string, fields map[string]any) error
@@ -81,9 +97,78 @@ func scoped(db *gorm.DB, s Scope) *gorm.DB {
 }
 
 func (g *GormRepository) List(ctx context.Context, s Scope, q ListQuery) ([]models.Patient, int64, error) {
-	db := scoped(g.db.WithContext(ctx).Model(&models.Patient{}), s)
+	db := filtered(scoped(g.db.WithContext(ctx).Model(&models.Patient{}), s), q, time.Now())
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var items []models.Patient
+	err := db.Order("created_at DESC").Limit(q.Limit).Offset(q.Offset).Find(&items).Error
+	return items, total, err
+}
+
+// Stats summarises the patients matching q: total, care levels, gender and
+// age bands (for the patients page's metrics).
+func (g *GormRepository) Stats(ctx context.Context, s Scope, q ListQuery, now time.Time) (*Stats, error) {
+	base := func() *gorm.DB { return filtered(scoped(g.db.WithContext(ctx).Model(&models.Patient{}), s), q, now) }
+	st := &Stats{CareLevels: map[int]int64{}, Genders: map[int]int64{}, AgeBands: map[string]int64{}}
+	if err := base().Count(&st.Total).Error; err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		Key int
+		N   int64
+	}
+	if err := base().Select("care_level AS key, COUNT(*) AS n").Group("care_level").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		st.CareLevels[r.Key] = r.N
+	}
+	rows = nil
+	if err := base().Select("COALESCE(gender, 0) AS key, COUNT(*) AS n").Group("COALESCE(gender, 0)").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		st.Genders[r.Key] = r.N
+	}
+	var bands []struct {
+		Band string
+		N    int64
+	}
+	if err := base().Select(`CASE
+			WHEN date_of_birth IS NULL THEN 'unknown'
+			WHEN date_of_birth > ? THEN '0-17'
+			WHEN date_of_birth > ? THEN '18-39'
+			WHEN date_of_birth > ? THEN '40-64'
+			WHEN date_of_birth > ? THEN '65-79'
+			ELSE '80+' END AS band, COUNT(*) AS n`,
+		now.AddDate(-18, 0, 0), now.AddDate(-40, 0, 0), now.AddDate(-65, 0, 0), now.AddDate(-80, 0, 0)).
+		Group("band").Scan(&bands).Error; err != nil {
+		return nil, err
+	}
+	for _, b := range bands {
+		st.AgeBands[b.Band] = b.N
+	}
+	var avg *float64
+	if err := base().Select("AVG(EXTRACT(YEAR FROM age(?, date_of_birth)))", now).Scan(&avg).Error; err != nil {
+		return nil, err
+	}
+	if avg != nil {
+		st.AverageAge = *avg
+	}
+	return st, nil
+}
+
+// filtered applies the list filters (search, phone, clinic, age, care level, gender).
+func filtered(db *gorm.DB, q ListQuery, now time.Time) *gorm.DB {
 	if term := strings.TrimSpace(q.Search); term != "" {
-		db = db.Where("name ILIKE ?", "%"+escapeLike(term)+"%")
+		// Digits search the NIF and SNS number (from the start); words the name
+		if id := normalizeID(term); len(id) >= 3 && textutil.Digits(id) == id {
+			db = db.Where("patients.nif LIKE ? OR patients.sns_number LIKE ?", id+"%", id+"%")
+		} else {
+			db = db.Where("name ILIKE ?", "%"+escapeLike(term)+"%")
+		}
 	}
 	if q.Phone != "" {
 		db = db.Where("phone_number = ?", q.Phone)
@@ -94,14 +179,20 @@ func (g *GormRepository) List(ctx context.Context, s Scope, q ListQuery) ([]mode
 	if q.IsActive != nil {
 		db = db.Where("is_active = ?", *q.IsActive)
 	}
-
-	var total int64
-	if err := db.Count(&total).Error; err != nil {
-		return nil, 0, err
+	// Age from the date of birth: age_min 65 → born on or before 65 years ago
+	if q.AgeMin != nil {
+		db = db.Where("date_of_birth <= ?", now.AddDate(-*q.AgeMin, 0, 0))
 	}
-	var items []models.Patient
-	err := db.Order("created_at DESC").Limit(q.Limit).Offset(q.Offset).Find(&items).Error
-	return items, total, err
+	if q.AgeMax != nil {
+		db = db.Where("date_of_birth > ?", now.AddDate(-*q.AgeMax-1, 0, 0))
+	}
+	if len(q.CareLevels) > 0 {
+		db = db.Where("care_level IN ?", q.CareLevels)
+	}
+	if q.Gender != nil {
+		db = db.Where("gender = ?", *q.Gender)
+	}
+	return db
 }
 
 func (g *GormRepository) Get(ctx context.Context, s Scope, id string) (*models.Patient, error) {

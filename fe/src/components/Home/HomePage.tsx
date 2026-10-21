@@ -9,6 +9,7 @@ import {
   Inbox,
   Package,
   PackageX,
+  Plane,
   Stethoscope,
   TriangleAlert,
   UserPlus,
@@ -48,11 +49,16 @@ import BoardRoutes from "@/components/TimeBoard/api";
 import {
   CARE_LEVEL_STYLES,
   DIVISION_COLORS,
+  coveringFor,
   formatHour,
   today,
   utilisation,
 } from "@/components/TimeBoard/boardUtils";
-import { AppointmentStatus, Board } from "@/components/TimeBoard/types";
+import {
+  Absence,
+  AppointmentStatus,
+  Board,
+} from "@/components/TimeBoard/types";
 
 import useAuthUser from "@/hooks/useAuthUser";
 
@@ -250,6 +256,11 @@ export default function HomePage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
+          {physio &&
+            board &&
+            coveringFor(board.absences, user.id).map((a) => (
+              <CoverCard key={a.id} absence={a} onPatient={setPatientId} />
+            ))}
           {physio && board && (
             <MyDay board={board} userId={user.id} onPatient={setPatientId} />
           )}
@@ -366,6 +377,50 @@ function Card({
 }
 
 /** A physiotherapist's own hours today, with their patients. */
+/** A physio covering a colleague: whose patients, until when, and the handover. */
+function CoverCard({
+  absence,
+  onPatient,
+}: {
+  absence: Absence;
+  onPatient: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const who = `${absence.therapist?.first_name ?? ""} ${absence.therapist?.last_name ?? ""}`;
+  return (
+    <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <h2 className="flex items-center gap-2 text-base font-semibold text-amber-900">
+        <Plane className="size-4" aria-hidden />
+        {t("covering_for", {
+          name: who,
+          date: dayjs(absence.to).format("D MMM"),
+        })}
+      </h2>
+      {absence.handover && (
+        <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
+          {absence.handover}
+        </p>
+      )}
+      {!!absence.notes.length && (
+        <ul className="mt-3 flex flex-col gap-2 text-sm">
+          {absence.notes.map((n) => (
+            <li key={n.id} className="rounded-lg bg-white p-2 shadow-sm">
+              <button
+                type="button"
+                onClick={() => onPatient(n.patient_id)}
+                className="font-medium text-primary-700 hover:underline"
+              >
+                {n.patient?.name}
+              </button>
+              <p className="text-gray-700">{n.note}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function MyDay({
   board,
   userId,

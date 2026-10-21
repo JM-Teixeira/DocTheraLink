@@ -51,11 +51,12 @@ type Service struct {
 	repo    Repository
 	clinics clinic.Resolver
 	hook    SessionHook
+	now     func() time.Time
 }
 
 // NewService builds the service.
 func NewService(repo Repository, clinics clinic.Resolver) *Service {
-	return &Service{repo: repo, clinics: clinics, hook: noHook{}}
+	return &Service{repo: repo, clinics: clinics, hook: noHook{}, now: time.Now}
 }
 
 // WithSessionHook sets what happens when a session is held (e.g. using
@@ -127,7 +128,10 @@ func (s *Service) SaveDivision(ctx context.Context, a Actor, id string, req Divi
 	if len(d.Name) < 2 {
 		return nil, &ValidationError{"name", "must have at least 2 characters"}
 	}
-	d.Capacity, d.SortOrder = req.Capacity, req.SortOrder
+	d.Capacity, d.SortOrder, d.Floor = req.Capacity, req.SortOrder, req.Floor
+	if d.Floor == 0 {
+		d.Floor = 1
+	}
 	d.CreditLimit = req.CreditLimit
 	if d.CreditLimit == 0 {
 		d.CreditLimit = DefaultCreditLimit
@@ -378,6 +382,13 @@ func (s *Service) Book(ctx context.Context, a Actor, req AppointmentRequest) (*A
 	if on == nil {
 		return nil, &ConflictError{"the physiotherapist is not on shift at this hour"}
 	}
+	absences, err := s.repo.Absences(ctx, cid, date, date)
+	if err != nil {
+		return nil, err
+	}
+	if absentOn(absences, req.TherapistID, date) {
+		return nil, &ConflictError{errAbsent.Error()}
+	}
 	div, err := s.repo.GetDivision(ctx, cid, on.DivisionID)
 	if err != nil {
 		return nil, err
@@ -493,6 +504,7 @@ func (s *Service) Board(ctx context.Context, a Actor, date string) (*Board, erro
 	}
 	b := buildBoard(d, data.divisions, data.therapists, data.shifts, data.appts)
 	b.Permissions = permissions(a)
+	b.Absences = data.absences
 	return b, nil
 }
 
@@ -507,6 +519,7 @@ type boardData struct {
 	therapists []UserSummary
 	shifts     []Shift
 	appts      []Appointment
+	absences   []Absence
 }
 
 func (s *Service) load(ctx context.Context, cid string, from, to time.Time) (*boardData, error) {
@@ -522,6 +535,9 @@ func (s *Service) load(ctx context.Context, cid string, from, to time.Time) (*bo
 		return nil, err
 	}
 	if d.appts, err = s.repo.Appointments(ctx, cid, from, to); err != nil {
+		return nil, err
+	}
+	if d.absences, err = s.repo.Absences(ctx, cid, from, to); err != nil {
 		return nil, err
 	}
 	// Shifts may use divisions removed since; include them for display

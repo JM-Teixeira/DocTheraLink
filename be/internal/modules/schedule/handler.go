@@ -130,6 +130,35 @@ func (h *Handler) RepeatWeek(c *gin.Context) {
 	})
 }
 
+// Absences handles GET /schedule/absences/?from=&to=
+func (h *Handler) Absences(c *gin.Context) {
+	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
+		today := time.Now().Format(dateLayout)
+		return h.svc.Absences(c.Request.Context(), a, c.DefaultQuery("from", today), c.DefaultQuery("to", today))
+	})
+}
+
+// CreateAbsence handles POST /schedule/absences/ (dry_run previews).
+func (h *Handler) CreateAbsence(c *gin.Context) {
+	handle(c, http.StatusCreated, true, func(a Actor, req AbsenceRequest) (any, error) {
+		return h.svc.CreateAbsence(c.Request.Context(), a, req)
+	})
+}
+
+// DeleteAbsence handles DELETE /schedule/absences/:id/
+func (h *Handler) DeleteAbsence(c *gin.Context) {
+	handle(c, http.StatusNoContent, false, func(a Actor, _ none) (any, error) {
+		return nil, h.svc.DeleteAbsence(c.Request.Context(), a, c.Param("id"))
+	})
+}
+
+// Handover handles GET /schedule/handover/?patient=
+func (h *Handler) Handover(c *gin.Context) {
+	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
+		return h.svc.Handover(c.Request.Context(), a, c.Query("patient"))
+	})
+}
+
 func (h *Handler) Divisions(c *gin.Context) {
 	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
 		return h.svc.Divisions(c.Request.Context(), a)

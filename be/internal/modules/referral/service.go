@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -49,6 +50,7 @@ type Service struct {
 	repo     Repository
 	clinics  clinic.Resolver
 	notifier Notifier
+	covers   CoverChecker // nil: no holiday cover
 	now      func() time.Time
 }
 
@@ -61,6 +63,43 @@ func NewService(repo Repository, clinics clinic.Resolver, now func() time.Time) 
 }
 
 // WithNotifier sets who is told about referral events (default: nobody).
+// CoverChecker tells which physios a physio is covering on a date (holiday
+// cover on the time board).
+type CoverChecker interface {
+	CoveredBy(ctx context.Context, coverID uint, at time.Time) ([]uint, error)
+}
+
+// WithCovers lets cover physios see and post on the referrals of the
+// physios they cover; it returns the service.
+func (s *Service) WithCovers(c CoverChecker) *Service {
+	s.covers = c
+	return s
+}
+
+// covering lists who the actor (a physio) is covering today.
+func (s *Service) covering(ctx context.Context, a Actor) ([]uint, error) {
+	if s.covers == nil || !a.isTherapist() {
+		return nil, nil
+	}
+	return s.covers.CoveredBy(ctx, a.ID, s.now())
+}
+
+// participates: the referral's doctor, therapist, admins, or a physio
+// covering the therapist.
+func (s *Service) participates(ctx context.Context, a Actor, r *Referral) (bool, error) {
+	if isParticipant(a, r) {
+		return true, nil
+	}
+	if r.TherapistID == nil {
+		return false, nil
+	}
+	covered, err := s.covering(ctx, a)
+	if err != nil {
+		return false, err
+	}
+	return slices.Contains(covered, *r.TherapistID), nil
+}
+
 func (s *Service) WithNotifier(n Notifier) *Service {
 	s.notifier = n
 	return s
@@ -147,8 +186,8 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (*Referral, e
 	if err != nil {
 		return nil, err
 	}
-	if isParticipant(actor, r) {
-		return r, nil
+	if ok, err := s.participates(ctx, actor, r); err != nil || ok {
+		return r, err
 	}
 	// Any therapist of the same clinic may see open, unassigned referrals (inbox).
 	if actor.isTherapist() && r.TherapistID == nil && r.Status == StatusPending {
@@ -191,6 +230,9 @@ func (s *Service) scoped(ctx context.Context, actor Actor, f ListFilter) (ListFi
 			return f, err
 		}
 		f.ClinicID = mine
+		if f.AlsoTherapists, err = s.covering(ctx, actor); err != nil {
+			return f, err
+		}
 	case actor.isCoordinator():
 		mine, err := s.clinics.HomeClinic(ctx, actor.ID)
 		if err != nil {
@@ -416,8 +458,8 @@ func (s *Service) AddNote(ctx context.Context, actor Actor, id string, req NoteR
 	if err != nil {
 		return nil, err
 	}
-	if !isParticipant(actor, r) {
-		return nil, ErrForbidden
+	if ok, err := s.participates(ctx, actor, r); err != nil || !ok {
+		return nil, firstErr(err, ErrForbidden)
 	}
 	kind := req.Kind
 	if kind == "" {
@@ -473,4 +515,11 @@ func isParticipant(a Actor, r *Referral) bool {
 
 func isAssignedTherapist(a Actor, r *Referral) bool {
 	return a.isTherapist() && r.TherapistID != nil && *r.TherapistID == a.ID
+}
+
+func firstErr(err, fallback error) error {
+	if err != nil {
+		return err
+	}
+	return fallback
 }

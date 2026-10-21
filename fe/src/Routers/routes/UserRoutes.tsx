@@ -1,11 +1,11 @@
-import ManageUsers from "@/components/Users/ManageUsers";
+import StaffList from "@/components/Staff/StaffList";
 import UserAdd from "@/components/Users/UserAdd";
 import UserHome from "@/components/Users/UserHome";
 
 import { AppRoutes } from "@/Routers/AppRouter";
 
 const UserRoutes: AppRoutes = {
-  "/users": () => <ManageUsers />,
+  "/users": () => <StaffList />,
   "/users/add": () => <UserAdd />,
   "/users/:username": ({ username }) => (
     <UserHome username={username} tab={"profile"} />

@@ -17,6 +17,7 @@ type Board struct {
 	Divisions   []Division       `json:"divisions"`
 	Therapists  []BoardTherapist `json:"therapists"`
 	Permissions Permissions      `json:"permissions"`
+	Absences    []Absence        `json:"absences"` // overlapping the date
 }
 
 // Permissions tell the UI which controls to show (the API enforces them).

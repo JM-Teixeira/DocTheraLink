@@ -2,8 +2,10 @@
 import dayjs from "dayjs";
 
 import {
+  Absence,
   Board,
   BoardTherapist,
+  Division,
   DivisionColor,
   HourLoad,
 } from "@/components/TimeBoard/types";
@@ -166,3 +168,58 @@ export const PLAN_PRESETS: Record<string, number[]> = {
   three: [1, 3, 5],
   weekdays: [1, 2, 3, 4, 5],
 };
+
+/** The board's filters: floor, divisions and physios (empty = all). */
+export interface BoardFilter {
+  floor: number | null;
+  divisions: string[];
+  physios: number[];
+}
+
+export const NO_FILTER: BoardFilter = {
+  floor: null,
+  divisions: [],
+  physios: [],
+};
+
+/** Floors that have divisions, in order. */
+export const floorsOf = (divisions: Pick<Division, "floor">[]) =>
+  [...new Set(divisions.map((d) => d.floor ?? 1))].sort((a, b) => a - b);
+
+/**
+ * The board narrowed to a floor, some divisions and some physios: only the
+ * matching divisions and hours remain; physios with nothing left are hidden
+ * when a floor or division is chosen.
+ */
+export function filterBoard(board: Board, f: BoardFilter): Board {
+  const divisions = board.divisions.filter(
+    (d) =>
+      (f.floor === null || (d.floor ?? 1) === f.floor) &&
+      (!f.divisions.length || f.divisions.includes(d.id)),
+  );
+  const keep = new Set(divisions.map((d) => d.id));
+  const byPlace = f.floor !== null || f.divisions.length > 0;
+  const therapists = board.therapists
+    .filter((t) => !f.physios.length || f.physios.includes(t.id))
+    .map((t) =>
+      byPlace
+        ? {
+            ...t,
+            shifts: t.shifts.filter((s) => keep.has(s.division_id)),
+            hours: t.hours.filter((h) => keep.has(h.division_id)),
+          }
+        : t,
+    )
+    .filter((t) => !byPlace || t.hours.length > 0);
+  return { ...board, divisions, therapists };
+}
+
+/** The absence of a physio on the board's date, if any. */
+export const absenceOf = (
+  absences: Absence[] | undefined,
+  therapistId: number,
+) => absences?.find((a) => a.therapist_id === therapistId);
+
+/** Absences in which this physio covers a colleague. */
+export const coveringFor = (absences: Absence[] | undefined, userId: number) =>
+  absences?.filter((a) => a.cover_id === userId) ?? [];

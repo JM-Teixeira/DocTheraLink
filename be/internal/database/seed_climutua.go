@@ -1,14 +1,17 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"math/rand/v2"
 	"time"
 
+	"klyniva/internal/clinic"
 	"klyniva/internal/models"
 	"klyniva/internal/modules/inventory"
 	"klyniva/internal/modules/referral"
 	"klyniva/internal/modules/schedule"
+	"klyniva/internal/modules/staff"
 
 	"gorm.io/gorm"
 )
@@ -39,19 +42,30 @@ var climutuaStaff = []struct {
 	{"cm.rececao1", "Sofia", "Martins", models.RoleReceptionist},
 	{"cm.rececao2", "Carla", "Pinto", models.RoleReceptionist},
 	{"cm.enfermagem", "Teresa", "Gomes", models.RoleNurse},
+	{"cm.fisio7", "Rui", "Nogueira", models.RolePhysioTherapist}, // left the clinic (kept as a record)
+}
+
+// Skills of the Climutua physios (cm.fisio1 … cm.fisio6).
+var climutuaSkills = [][]string{
+	{"Fisioterapia músculo-esquelética", "Terapia manual", "Pavimento pélvico"},
+	{"Hidroterapia", "Reabilitação pós-operatória", "Fisioterapia músculo-esquelética"},
+	{"Fisioterapia neurológica", "Reabilitação vestibular"},
+	{"Terapia manual", "Punção seca", "Fisioterapia desportiva"},
+	{"Eletroterapia", "Hidroterapia", "Drenagem linfática"},
+	{"Fisioterapia desportiva", "Ligadura funcional (taping)", "Reabilitação pós-operatória"},
 }
 
 // Divisions of Climutua: name, colour, patients and credits per physio-hour.
 var climutuaDivisions = []struct {
-	name, color       string
-	capacity, credits int
+	name, color              string
+	capacity, credits, floor int
 }{
-	{"Ginásio", "teal", 6, 8},
-	{"Gabinete 1", "indigo", 1, 8},
-	{"Gabinete 2", "amber", 1, 8},
-	{"Hidroterapia", "sky", 4, 8},
-	{"Sala de Eletroterapia", "violet", 3, 8},
-	{"Reabilitação Neurológica", "rose", 2, 8},
+	{"Ginásio", "teal", 6, 8, 1},
+	{"Gabinete 1", "indigo", 1, 8, 2},
+	{"Gabinete 2", "amber", 1, 8, 2},
+	{"Hidroterapia", "sky", 4, 8, 1},
+	{"Sala de Eletroterapia", "violet", 3, 8, 2},
+	{"Reabilitação Neurológica", "rose", 2, 8, 3},
 }
 
 const (
@@ -218,7 +232,7 @@ func createClimutua(today time.Time) error {
 	divs := make([]schedule.Division, len(climutuaDivisions))
 	for i, d := range climutuaDivisions {
 		divs[i] = schedule.Division{ClinicID: ClimutuaClinicID, Name: d.name, Color: d.color, Capacity: d.capacity,
-			CreditLimit: d.credits, SortOrder: i, Active: true}
+			CreditLimit: d.credits, Floor: d.floor, SortOrder: i, Active: true}
 		if err := DB.Create(&divs[i]).Error; err != nil {
 			return fmt.Errorf("climutua division: %w", err)
 		}
@@ -250,7 +264,24 @@ func climutuaStaffIDs() ([]uint, error) {
 		}
 		staff[i] = u.ID
 	}
+	for i, skills := range climutuaSkills {
+		if err := linkClimutuaSkills(staff[firstPhysio+i], skills...); err != nil {
+			return nil, err
+		}
+	}
+	// cm.fisio7 left at the end of July; the record stays, sign-in does not
+	left := time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC)
+	if err := DB.Model(&models.User{}).Where("id = ? AND employment_status <> ?", staff[len(staff)-1], "left").
+		Updates(map[string]any{"employment_status": "left", "employment_since": left, "is_active": false,
+			"employment_note": "Mudou-se para Lisboa."}).Error; err != nil {
+		return nil, err
+	}
 	return staff, nil
+}
+
+// linkClimutuaSkills gives a Climutua physio their skills.
+func linkClimutuaSkills(userID uint, names ...string) error {
+	return staff.LinkSkills(DB, userID, names...)
 }
 
 // climutuaExisting reloads staff ids (by username order) and divisions.
@@ -277,6 +308,17 @@ func planClimutuaShifts(staff []uint, divs []schedule.Division, from, to time.Ti
 	has := map[string]bool{}
 	for _, s := range existing {
 		has[fmt.Sprintf("%s/%d", s.Date.Format("2006-01-02"), s.TherapistID)] = true
+	}
+	// Nobody is planned on days they are away
+	var absences []schedule.Absence
+	if err := DB.Where("clinic_id = ? AND \"from\" <= ? AND \"to\" >= ?", ClimutuaClinicID, to.Format("2006-01-02"), from.Format("2006-01-02")).
+		Find(&absences).Error; err != nil {
+		return nil, err
+	}
+	for _, ab := range absences {
+		for d := ab.From; !d.After(ab.To); d = d.AddDate(0, 0, 1) {
+			has[fmt.Sprintf("%s/%d", d.Format("2006-01-02"), ab.TherapistID)] = true
+		}
 	}
 	out := existing
 	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
@@ -581,6 +623,10 @@ func createClimutuaPatients(staff []uint, divs []schedule.Division, shifts []sch
 			}
 		}
 	}
+	// Inês is on holiday next week; João covers and she leaves a handover
+	if err := climutuaHoliday(staff, today); err != nil {
+		return err
+	}
 	// Save the stock as it is after the sessions
 	for _, it := range items {
 		if err := DB.Model(&inventory.Item{}).Where("id = ?", it.ID).Updates(map[string]any{
@@ -590,6 +636,37 @@ func createClimutuaPatients(staff []uint, divs []schedule.Division, shifts []sch
 		}
 	}
 	return nil
+}
+
+// climutuaHoliday records cm.fisio1's holiday next week through the real
+// time-board rules (her patients move to cm.fisio4 where he has room).
+func climutuaHoliday(staff []uint, today time.Time) error {
+	monday := today.AddDate(0, 0, 8-int(today.Weekday()))
+	if today.Weekday() == time.Sunday {
+		monday = today.AddDate(0, 0, 1)
+	}
+	var patients []string
+	if err := DB.Model(&schedule.Appointment{}).Distinct("patient_id").
+		Where("therapist_id = ? AND date BETWEEN ? AND ? AND status = ?", staff[firstPhysio], monday.Format("2006-01-02"),
+			monday.AddDate(0, 0, 4).Format("2006-01-02"), schedule.StatusBooked).Limit(3).Pluck("patient_id", &patients).Error; err != nil {
+		return err
+	}
+	notes := []string{
+		"Progredir para agachamento unipodal se sem dor; manter gelo no fim.",
+		"Ainda com dor noturna — privilegiar terapia manual, evitar carga acima da cabeça.",
+		"Cumpre bem o plano domiciliário; reavaliar amplitude na sexta.",
+	}
+	cover := staff[firstPhysio+3]
+	req := schedule.AbsenceRequest{TherapistID: staff[firstPhysio], CoverID: &cover, Reason: "vacation",
+		From: monday.Format("2006-01-02"), To: monday.AddDate(0, 0, 4).Format("2006-01-02"), MovePatients: true,
+		Handover: "Férias de uma semana. Planos de cada utente na pasta partilhada «Fisioterapia/Inês». " +
+			"Os utentes do Gabinete 1 passam para o Ginásio com o João sempre que possível."}
+	for i, p := range patients {
+		req.Notes = append(req.Notes, schedule.HandoverInput{PatientID: p, Note: notes[i%len(notes)]})
+	}
+	svc := schedule.NewService(schedule.NewGormRepository(DB), clinic.NewGormResolver(DB))
+	_, err := svc.CreateAbsence(context.Background(), schedule.Actor{ID: staff[0], Role: models.RoleCoordinator}, req)
+	return err
 }
 
 // useForSession records what an attended session used automatically.

@@ -26,7 +26,7 @@ func TestClimutuaSeed(t *testing.T) {
 		}
 		return n
 	}
-	if n := count("staff", "users", "home_facility_id = ?", cid); n != 13 {
+	if n := count("staff", "users", "home_facility_id = ? AND employment_status = 'active'", cid); n != 13 {
 		t.Errorf("staff: %d", n)
 	}
 	if n := count("patients", "patients", "facility_id = ?", cid); n != database.ClimutuaPatients {
@@ -40,6 +40,21 @@ func TestClimutuaSeed(t *testing.T) {
 	}
 	if n := count("future", "appointments", "clinic_id = ? AND status = 'booked'", cid); n < 300 {
 		t.Errorf("booked sessions: %d", n)
+	}
+	if n := count("former staff", "users", "home_facility_id = ? AND employment_status = 'left' AND NOT is_active", cid); n != 1 {
+		t.Errorf("former staff kept as a record: %d", n)
+	}
+	if n := count("physio skills", "user_skills", "user_id IN (SELECT id FROM users WHERE username LIKE 'cm.fisio%')"); n < 12 {
+		t.Errorf("physio skills: %d", n)
+	}
+	if n := count("holiday", "absences", "clinic_id = ? AND reason = 'vacation' AND cover_id IS NOT NULL", cid); n != 1 {
+		t.Errorf("Inês's holiday: %d", n)
+	}
+	if n := count("handover", "handover_notes", "absence_id IN (SELECT id FROM absences WHERE clinic_id = ?)", cid); n == 0 {
+		t.Error("the holiday should come with handover notes")
+	}
+	if n := count("floors", "divisions", "clinic_id = ? AND floor = 3", cid); n != 1 {
+		t.Errorf("third floor divisions: %d", n)
 	}
 	if n := count("PT diagnosis", "referrals", "facility_id = ? AND diagnosis = ?", cid, "Sequelas de AVC isquémico"); n == 0 {
 		t.Error("expected Portuguese diagnoses")

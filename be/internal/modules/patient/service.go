@@ -109,6 +109,15 @@ func (s *Service) List(ctx context.Context, a Actor, q ListQuery) ([]models.Pati
 	return s.repo.List(ctx, sc, q)
 }
 
+// Stats summarises the visible patients matching q (for metrics).
+func (s *Service) Stats(ctx context.Context, a Actor, q ListQuery) (*Stats, error) {
+	sc, err := s.scope(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.Stats(ctx, sc, q, s.now())
+}
+
 // Get returns one visible patient.
 func (s *Service) Get(ctx context.Context, a Actor, id string) (*models.Patient, error) {
 	if uuid.Validate(id) != nil {

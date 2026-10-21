@@ -57,6 +57,11 @@ func (f *fakeRepo) Update(_ context.Context, id string, fields map[string]any) e
 	return nil
 }
 
+func (f *fakeRepo) Stats(_ context.Context, s Scope, q ListQuery, _ time.Time) (*Stats, error) {
+	f.lastScope, f.lastQuery = s, q
+	return &Stats{Total: int64(len(f.patients))}, nil
+}
+
 // Candidates mirrors the SQL pre-filter of GormRepository.Candidates.
 func (f *fakeRepo) Candidates(_ context.Context, _ Scope, q DuplicateQuery) ([]models.Patient, error) {
 	var out []models.Patient

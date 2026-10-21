@@ -96,6 +96,8 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] Duplicate detection with confirmation: same NIF/SNS in the clinic is blocked (also by a partial unique index); similar name + same birth date or phone asks "different person?".
 - [ ] Rest of the old "centralized patient creation" spec (from `.kiro`): draft auto-save, retry on network errors, accessibility checks, browser E2E of the flow, ≥80 % coverage. Backend model grows to match: emergency contact (name/relationship), address parts, insurance, structured allergies/medications/conditions.
 - [x] Portuguese identifiers: NIF (mod-11 check digit) and SNS number (9 digits), stored normalised.
+- [x] Patient filters (care level, age band, gender, clinic) with metrics of the match; search by name, NIF or SNS number.
+- [ ] Patient metrics next: export CSV; trends over time; filter by physio / diagnosis.
 - [ ] Patient timeline: referrals, sessions, notes and documents in one view.
 - [ ] Consent records (GDPR) per patient.
 
@@ -108,6 +110,9 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] Clicking a patient on the board opens a pop-up: age, contact, care level, allergies, the doctor's referral and the doctor–physio thread, links to the patient and referral pages.
 - [x] **Home page** (logo / Início) per role: physio "my day" (mark sessions in place), coordinator clinic load + what needs attention, doctor's referrals, front-desk arrivals, notifications.
 - [x] Second demo clinic **Climutua** (PT-PT, 120 patients, realistic load) — see README.
+- [x] **Floors** and filters (floor / division / physio); physio drill-down with patient names per hour; decluttered cells with a legend.
+- [x] **Absences with cover**: patients move to the cover physio at the same hour (preview first), handover document + note per patient, cover reads the absent physio's referrals; absent physios can't be booked.
+- [ ] Absences next: partial days; move sessions to several cover physios; notify the cover physio.
 - [ ] Next on the board: drag to move an appointment; reschedule a whole plan; waiting list; a physio's own "my day" view; print the day sheet.
 - [ ] Link board appointments to referrals (field exists) and book the whole series of N sessions at once; receptionists manage them.
 - [ ] Therapist availability from the timetable; room/section capacity; conflict checks.
@@ -132,6 +137,8 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] **Reorder list** with suggested quantities (up to a target level) and CSV export.
 - [ ] Inventory next: suppliers and order history; batch / expiry dates of sealed stock.
 - [ ] Wire the existing clock in/out button and time-log history (`Users/ClockInOutButton`, `Users/TimeLogHistory` — built but never shown); time-tracking reports and exports.
+- [x] People list with simple filters; employment status (active / on leave / left — kept on record, no sign-in); skills and clinic tabs (`internal/modules/staff`).
+- [ ] People next: edit/deactivate from the list; remove the old `ManageUsers`/`UserFilter`/`LinkedSkills*`/`LinkedFacilities*` screens; tests for the legacy `ListUsers` handler.
 - [ ] Organisations with several clinics (switch clinic, per-clinic admins) on top of `internal/clinic`.
 - [ ] Dashboards: referrals by status, waiting time to first session, therapist load, outcomes.
 

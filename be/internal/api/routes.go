@@ -16,6 +16,7 @@ import (
 	"klyniva/internal/modules/patient"
 	"klyniva/internal/modules/referral"
 	"klyniva/internal/modules/schedule"
+	"klyniva/internal/modules/staff"
 	"klyniva/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -58,20 +59,12 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	users.PATCH("/:username/", userHandler.PartialUpdateUser)
 	users.DELETE("/:username/", userHandler.DeleteUser)
 	users.GET("/:username/check_availability/", userHandler.CheckUsername)
-	users.GET("/:username/skill/", userHandler.ListUserSkills)
-	users.POST("/:username/skill/", userHandler.AddUserSkill)
-	users.DELETE("/:username/skill/:id/", userHandler.DeleteUserSkill)
-	users.GET("/:username/get_facilities/", userHandler.ListUserFacilities)
-	users.PUT("/:username/add_facility/", userHandler.AddUserFacility)
-	users.DELETE("/:username/delete_facility/", userHandler.DeleteUserFacility)
-	users.DELETE("/:username/clear_home_facility/", userHandler.ClearHomeFacility)
 	users.PATCH("/:username/profile_picture/", userHandler.UpdateProfilePicture)
 	users.DELETE("/:username/profile_picture/", userHandler.DeleteProfilePicture)
 	users.GET("/:username/pnconfig/", userHandler.GetPNConfig)
 	users.PATCH("/:username/pnconfig/", userHandler.UpdatePNConfig)
 
 	protected.PUT("/password_change/", authHandler.UpdatePassword)
-	protected.GET("/skill/", userHandler.ListAllSkills)
 
 	// Facilities (a facility = a clinic; see CONTEXT.md "Clinics")
 	facilities := protected.Group("/facility")
@@ -136,7 +129,11 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	stock := inventory.RegisterRoutes(protected, db)
 
 	// Time board: divisions, physio shifts, patients per physio per hour
-	schedule.RegisterRoutes(protected, db, stock) // attended sessions use consumables
+	board := schedule.RegisterRoutes(protected, db, stock) // attended sessions use consumables
+	referrals.WithCovers(board)                            // cover physios see the referrals they cover
+
+	// Skills, clinic and employment status of staff
+	staff.RegisterRoutes(protected, staff.NewService(staff.NewGormRepository(db)))
 
 	// Admin-only CSV exports
 	admin := protected.Group("")

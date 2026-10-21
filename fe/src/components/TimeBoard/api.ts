@@ -1,11 +1,15 @@
 import { PatientModel } from "@/components/Patient/models";
 import {
+  Absence,
+  AbsenceRequest,
+  AbsenceResult,
   Appointment,
   AppointmentRequest,
   AppointmentStatus,
   Board,
   Division,
   DivisionRequest,
+  PatientHandover,
   RangeView,
   SeriesRequest,
   SeriesResult,
@@ -50,6 +54,27 @@ const BoardRoutes = {
     method: "POST",
     TBody: Type<{ week_start: string; weeks: number }>(),
     TRes: Type<{ copied: number }>(),
+  },
+  absences: {
+    path: "/api/v1/schedule/absences/",
+    method: "GET",
+    TRes: Type<Absence[]>(),
+  },
+  createAbsence: {
+    path: "/api/v1/schedule/absences/",
+    method: "POST",
+    TBody: Type<AbsenceRequest>(),
+    TRes: Type<AbsenceResult>(),
+  },
+  deleteAbsence: {
+    path: "/api/v1/schedule/absences/{id}/",
+    method: "DELETE",
+    TRes: Type<void>(),
+  },
+  handover: {
+    path: "/api/v1/schedule/handover/",
+    method: "GET",
+    TRes: Type<PatientHandover[]>(),
   },
   divisions: {
     path: "/api/v1/schedule/divisions/",

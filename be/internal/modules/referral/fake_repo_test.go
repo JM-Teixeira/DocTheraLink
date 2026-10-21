@@ -2,6 +2,7 @@ package referral
 
 import (
 	"context"
+	"slices"
 	"sync"
 )
 
@@ -86,7 +87,7 @@ func (f *fakeRepo) List(_ context.Context, flt ListFilter) ([]Referral, int64, e
 			continue
 		}
 		if flt.TherapistID != 0 {
-			assigned := r.TherapistID != nil && *r.TherapistID == flt.TherapistID
+			assigned := r.TherapistID != nil && (*r.TherapistID == flt.TherapistID || slices.Contains(flt.AlsoTherapists, *r.TherapistID))
 			open := flt.InboxForTherapist && r.TherapistID == nil && r.Status == StatusPending &&
 				(flt.ClinicID == nil || r.FacilityID == nil || *r.FacilityID == *flt.ClinicID)
 			if !assigned && !open {

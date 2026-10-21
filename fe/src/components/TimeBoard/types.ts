@@ -16,6 +16,7 @@ export interface Division {
   color: DivisionColor;
   capacity: number; // patients per physiotherapist per hour
   credit_limit: number; // care-level credits per physiotherapist per hour
+  floor: number; // building floor
   sort_order: number;
   active: boolean;
 }
@@ -74,6 +75,7 @@ export interface Board {
   divisions: Division[];
   therapists: BoardTherapist[];
   permissions: { manage_shifts: boolean; book_patients: boolean };
+  absences: Absence[];
 }
 
 export interface DivisionRequest {
@@ -81,6 +83,7 @@ export interface DivisionRequest {
   color: DivisionColor;
   capacity: number;
   credit_limit?: number;
+  floor?: number;
   sort_order?: number;
 }
 
@@ -132,6 +135,7 @@ export interface RangeView {
   divisions: Division[];
   therapists: { id: number; first_name: string; last_name: string }[];
   days: DaySummary[];
+  absences: Absence[];
   permissions: { manage_shifts: boolean; book_patients: boolean };
 }
 
@@ -173,4 +177,60 @@ export interface SeriesResult {
   series_id?: string;
   booked: string[];
   skipped: { date: string; reason: SkipReason }[];
+}
+
+/** A physiotherapist away, optionally covered by a colleague. */
+export type AbsenceReason = "vacation" | "sick" | "training" | "other";
+
+export interface HandoverNote {
+  id: string;
+  patient_id: string;
+  patient?: { id: string; name: string; care_level: number };
+  note: string;
+}
+
+export interface Absence {
+  id: string;
+  therapist_id: number;
+  cover_id?: number | null;
+  from: string;
+  to: string;
+  reason: AbsenceReason;
+  handover: string;
+  notes: HandoverNote[];
+  therapist?: { id: number; first_name: string; last_name: string };
+  cover?: { id: number; first_name: string; last_name: string } | null;
+}
+
+export interface AbsenceRequest {
+  therapist_id: number;
+  cover_id?: number;
+  from: string;
+  to: string;
+  reason: AbsenceReason;
+  handover: string;
+  notes: { patient_id: string; note: string }[];
+  move_patients: boolean;
+  dry_run?: boolean;
+}
+
+export interface MovedSession {
+  appointment_id: string;
+  date: string;
+  hour: number;
+  patient_id: string;
+  patient_name: string;
+  moved: boolean;
+  reason?: string;
+}
+
+export interface AbsenceResult {
+  absence?: Absence;
+  sessions: MovedSession[];
+  patients: { id: string; name: string; care_level: number }[];
+}
+
+export interface PatientHandover {
+  absence: Absence;
+  note: string;
 }

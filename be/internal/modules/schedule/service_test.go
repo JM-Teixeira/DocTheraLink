@@ -21,6 +21,7 @@ type fakeRepo struct {
 	patients   map[string]int // id → care level
 	shifts     map[string]Shift
 	appts      map[string]Appointment
+	absences   []Absence
 }
 
 func between(d, from, to time.Time) bool {
@@ -96,6 +97,7 @@ func (f *fakeRepo) Appointments(_ context.Context, cid string, from, to time.Tim
 	var out []Appointment
 	for _, a := range f.appts {
 		if a.ClinicID == cid && between(a.Date, from, to) {
+			a.Patient = &PatientSummary{ID: a.PatientID, Name: "Patient " + a.PatientID[:4], CareLevel: a.Credits} // as Preload does
 			out = append(out, a)
 		}
 	}
@@ -151,6 +153,57 @@ func (f *fakeRepo) DeleteSeriesFrom(_ context.Context, cid, seriesID string, fro
 		}
 	}
 	return n, nil
+}
+func (f *fakeRepo) MoveAppointment(_ context.Context, a *Appointment, to uint, capacity, limit int) error {
+	n, credits := 0, 0
+	for _, o := range f.appts {
+		if o.TherapistID == to && sameDate(o.Date, a.Date) && o.Hour == a.Hour {
+			n++
+			credits += o.Credits
+		}
+	}
+	if n >= capacity {
+		return ErrFull
+	}
+	if credits+a.Credits > limit {
+		return ErrOverCredits
+	}
+	ap := f.appts[a.ID]
+	ap.TherapistID = to
+	f.appts[a.ID] = ap
+	return nil
+}
+func (f *fakeRepo) CreateAbsence(_ context.Context, a *Absence) error {
+	a.ID = uuid.NewString()
+	f.absences = append(f.absences, *a)
+	return nil
+}
+func (f *fakeRepo) Absences(_ context.Context, cid string, from, to time.Time) ([]Absence, error) {
+	out := []Absence{}
+	for _, a := range f.absences {
+		if a.ClinicID == cid && a.From.Format(dateLayout) <= to.Format(dateLayout) && a.To.Format(dateLayout) >= from.Format(dateLayout) {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+func (f *fakeRepo) DeleteAbsence(_ context.Context, cid, id string) error {
+	for i, a := range f.absences {
+		if a.ID == id && a.ClinicID == cid {
+			f.absences = append(f.absences[:i], f.absences[i+1:]...)
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+func (f *fakeRepo) CoveredBy(_ context.Context, coverID uint, at time.Time) ([]uint, error) {
+	var out []uint
+	for _, a := range f.absences {
+		if a.CoverID != nil && *a.CoverID == coverID && a.Covers(at) {
+			out = append(out, a.TherapistID)
+		}
+	}
+	return out, nil
 }
 func (f *fakeRepo) MonthlyStats(context.Context, string, int) ([]MonthStats, error) {
 	return make([]MonthStats, 12), nil
@@ -435,5 +488,84 @@ func TestBoardRangeAndRepeat(t *testing.T) {
 	}
 	if n, _ := f.svc.CopyDay(ctx, coordinator, CopyRequest{FromDate: monday, ToDate: "2026-11-02"}); n != 0 {
 		t.Errorf("copying onto a planned day skips: %d", n)
+	}
+}
+
+func TestAbsenceAndCover(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	f.svc.now = func() time.Time { return time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC) }
+	tuesday := "2026-10-27"
+	for _, d := range []string{monday, tuesday} {
+		f.shift(t, d, sarah.ID, f.gym, 8, 13)
+		f.shift(t, d, sarah.ID, f.room, 14, 16)
+		f.shift(t, d, tiago.ID, f.gym, 9, 12)
+	}
+	ana, bruno := f.patient(2), f.patient(5)
+	morning, _ := f.book(coordinator, sarah.ID, 9, ana)  // Tiago works at 9 → moves
+	later, _ := f.book(coordinator, sarah.ID, 14, bruno) // Tiago is off at 14 → stays
+	cover := tiago.ID
+	req := AbsenceRequest{TherapistID: sarah.ID, CoverID: &cover, From: monday, To: tuesday, Reason: "vacation",
+		Handover: "Plano de exercícios na pasta partilhada.", MovePatients: true, DryRun: true}
+	req.Notes = []HandoverInput{{ana, "Progredir carga no agachamento."}}
+
+	preview, err := f.svc.CreateAbsence(ctx, coordinator, req)
+	if err != nil || len(preview.Sessions) != 2 || len(preview.Patients) != 2 || preview.Absence != nil {
+		t.Fatalf("preview: %+v %v", preview, err)
+	}
+	if f.repo.appts[morning.ID].TherapistID != sarah.ID || len(f.repo.absences) != 0 {
+		t.Fatal("a preview must not change anything")
+	}
+
+	req.DryRun = false
+	res, err := f.svc.CreateAbsence(ctx, coordinator, req)
+	if err != nil || res.Absence == nil {
+		t.Fatal(err)
+	}
+	byID := map[string]MovedSession{}
+	for _, s := range res.Sessions {
+		byID[s.AppointmentID] = s
+	}
+	if !byID[morning.ID].Moved || byID[later.ID].Moved || byID[later.ID].Reason != SkipNotOnShift {
+		t.Fatalf("sessions: %+v", res.Sessions)
+	}
+	if f.repo.appts[morning.ID].TherapistID != tiago.ID || f.repo.appts[later.ID].TherapistID != sarah.ID {
+		t.Error("the 9:00 session goes to Tiago, the 14:00 one stays to be placed by hand")
+	}
+	// Sarah's empty shifts are gone; the one still holding Bruno stays
+	left := 0
+	for _, s := range f.repo.shifts {
+		if s.TherapistID == sarah.ID {
+			left++
+		}
+	}
+	if left != 1 {
+		t.Errorf("sarah's shifts left: %d", left)
+	}
+	var conflict *ConflictError
+	if _, err := f.svc.Book(ctx, coordinator, AppointmentRequest{Date: monday, Hour: 14, TherapistID: sarah.ID, PatientID: f.patient(1)}); !errors.As(err, &conflict) {
+		t.Errorf("booking an absent physio: %v", err)
+	}
+	if _, err := f.svc.CreateAbsence(ctx, coordinator, AbsenceRequest{TherapistID: sarah.ID, From: tuesday, To: tuesday, Reason: "sick"}); !errors.As(err, &conflict) {
+		t.Errorf("overlapping absence: %v", err)
+	}
+	if _, err := f.svc.CreateAbsence(ctx, sarahActor, req); !errors.Is(err, ErrForbidden) {
+		t.Errorf("physios do not record absences: %v", err)
+	}
+
+	notes, err := f.svc.Handover(ctx, sarahActor, ana)
+	if err != nil || len(notes) != 1 || notes[0].Note != "Progredir carga no agachamento." {
+		t.Fatalf("handover: %+v %v", notes, err)
+	}
+	covered, _ := f.svc.CoveredBy(ctx, tiago.ID, time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC))
+	if !slices.Equal(covered, []uint{sarah.ID}) {
+		t.Errorf("tiago covers sarah on monday: %v", covered)
+	}
+	b, _ := f.svc.Board(ctx, coordinator, monday)
+	if len(b.Absences) != 1 {
+		t.Errorf("the board shows the absence: %d", len(b.Absences))
+	}
+	if err := f.svc.DeleteAbsence(ctx, coordinator, res.Absence.ID); err != nil {
+		t.Errorf("delete: %v", err)
 	}
 }

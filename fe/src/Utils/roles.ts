@@ -41,3 +41,16 @@ export const canWritePatients = (u: RoleUser) => !isReadOnly(u);
  */
 export const canSeeReferrals = (u: RoleUser) =>
   isAdmin(u) || isDoctor(u) || isTherapist(u);
+
+/**
+ * Who manages a person's clinic, status and skills: admins everyone,
+ * coordinators the people of their own clinic (be/internal/modules/staff).
+ */
+export const managesStaff = (
+  u: RoleUser & { home_facility?: string },
+  target: { home_facility?: string },
+) =>
+  isAdmin(u) ||
+  (isCoordinator(u) &&
+    !!u.home_facility &&
+    u.home_facility === target.home_facility);

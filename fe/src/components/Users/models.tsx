@@ -54,6 +54,9 @@ export type UserModel = UserBareMinimum & {
   doctor_medical_council_registration?: string;
   weekly_working_hours?: string | null;
   user_flags?: FeatureFlag[];
+  employment_status?: "active" | "on_leave" | "left";
+  employment_since?: string | null;
+  employment_note?: string;
 };
 
 export type UserBaseModel = {

@@ -52,9 +52,12 @@ function Bar({ credits, capacity }: { credits: number; capacity: number }) {
 export function WeekView({
   date,
   onOpenDay,
+  physios = [],
 }: {
   date: string;
   onOpenDay: (d: string) => void;
+  /** Only these physios (empty = all). */
+  physios?: number[];
 }) {
   const { t } = useTranslation();
   const start = weekStart(date);
@@ -88,57 +91,59 @@ export function WeekView({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {v.therapists.map((th) => (
-            <tr key={th.id}>
-              <th className="sticky left-0 z-10 border-r border-gray-200 bg-white p-3 text-left font-medium text-gray-900">
-                {th.first_name} {th.last_name}
-              </th>
-              {days.map((d) => {
-                const day = byDate
-                  .get(d)
-                  ?.therapists.find((x) => x.id === th.id);
-                return (
-                  <td key={d} className="p-1.5 align-top">
-                    {day ? (
-                      <button
-                        type="button"
-                        onClick={() => onOpenDay(d)}
-                        className="w-full rounded-md p-1.5 text-left hover:bg-gray-50"
-                      >
-                        <div className="flex flex-wrap gap-1">
-                          {day.shifts.map((s) => {
-                            const div = divisionOf(v, s.division_id);
-                            return (
-                              <span
-                                key={s.id}
-                                className={cn(
-                                  "rounded px-1 text-[11px]",
-                                  div
-                                    ? DIVISION_COLORS[div.color].chip
-                                    : "bg-gray-100",
-                                )}
-                              >
-                                {s.start_hour}–{s.end_hour} {div?.name}
-                              </span>
-                            );
-                          })}
-                        </div>
-                        <p className="mt-1 text-xs text-gray-600">
-                          {t("n_patients", { count: day.patients })}
-                        </p>
-                        <Bar
-                          credits={day.credits}
-                          capacity={day.credit_capacity}
-                        />
-                      </button>
-                    ) : (
-                      <p className="p-1.5 text-xs text-gray-300">—</p>
-                    )}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+          {v.therapists
+            .filter((th) => !physios.length || physios.includes(th.id))
+            .map((th) => (
+              <tr key={th.id}>
+                <th className="sticky left-0 z-10 border-r border-gray-200 bg-white p-3 text-left font-medium text-gray-900">
+                  {th.first_name} {th.last_name}
+                </th>
+                {days.map((d) => {
+                  const day = byDate
+                    .get(d)
+                    ?.therapists.find((x) => x.id === th.id);
+                  return (
+                    <td key={d} className="p-1.5 align-top">
+                      {day ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenDay(d)}
+                          className="w-full rounded-md p-1.5 text-left hover:bg-gray-50"
+                        >
+                          <div className="flex flex-wrap gap-1">
+                            {day.shifts.map((s) => {
+                              const div = divisionOf(v, s.division_id);
+                              return (
+                                <span
+                                  key={s.id}
+                                  className={cn(
+                                    "rounded px-1 text-[11px]",
+                                    div
+                                      ? DIVISION_COLORS[div.color].chip
+                                      : "bg-gray-100",
+                                  )}
+                                >
+                                  {s.start_hour}–{s.end_hour} {div?.name}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <p className="mt-1 text-xs text-gray-600">
+                            {t("n_patients", { count: day.patients })}
+                          </p>
+                          <Bar
+                            credits={day.credits}
+                            capacity={day.credit_capacity}
+                          />
+                        </button>
+                      ) : (
+                        <p className="p-1.5 text-xs text-gray-300">—</p>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
           <tr className="bg-gray-50 text-xs text-gray-600">
             <th className="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-3 text-left font-medium">
               {t("total")}

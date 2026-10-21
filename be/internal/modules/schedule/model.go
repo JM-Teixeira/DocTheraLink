@@ -41,6 +41,7 @@ type Division struct {
 	Color       string    `json:"color" gorm:"size:20;not null;default:teal"`
 	Capacity    int       `json:"capacity" gorm:"not null;default:3"`     // patients per physio per hour
 	CreditLimit int       `json:"credit_limit" gorm:"not null;default:8"` // care-level credits per physio per hour
+	Floor       int       `json:"floor" gorm:"not null;default:1"`        // building floor (1, 2, 3…)
 	SortOrder   int       `json:"sort_order" gorm:"not null;default:0"`
 	Active      bool      `json:"active" gorm:"not null;default:true"`
 	CreatedAt   time.Time `json:"created_date"`
@@ -103,7 +104,9 @@ type Appointment struct {
 }
 
 // Models lists the tables for AutoMigrate.
-func Models() []any { return []any{&Division{}, &Shift{}, &Appointment{}} }
+func Models() []any {
+	return []any{&Division{}, &Shift{}, &Appointment{}, &Absence{}, &HandoverNote{}}
+}
 
 // SessionHook reacts to sessions being held, e.g. the inventory using the
 // consumables every session needs. Warnings are shown to the user.
@@ -126,6 +129,7 @@ type DivisionRequest struct {
 	Color       string `json:"color" binding:"omitempty,oneof=teal indigo amber sky rose violet emerald orange"`
 	Capacity    int    `json:"capacity" binding:"required,min=1,max=20"`
 	CreditLimit int    `json:"credit_limit" binding:"omitempty,min=1,max=40"`
+	Floor       int    `json:"floor" binding:"min=-3,max=50"`
 	SortOrder   int    `json:"sort_order"`
 }
 

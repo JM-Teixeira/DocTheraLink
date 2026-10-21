@@ -2,7 +2,6 @@
  * Constants for Patient Creation feature
  * Feature: Centralized Patient Creation
  */
-
 import {
   AllergySeverity,
   ConditionStatus,
@@ -95,8 +94,7 @@ export const AUTO_SAVE_CONFIG = {
 
 export const VALIDATION_PATTERNS = {
   NAME: /^[a-zA-Z\s\-']+$/,
-  PHONE:
-    /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/,
+  PHONE: /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/,
   EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
 } as const;
 

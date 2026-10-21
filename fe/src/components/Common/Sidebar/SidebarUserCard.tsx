@@ -2,8 +2,6 @@ import { Link } from "raviger";
 import React from "react";
 import { useTranslation } from "react-i18next";
 
-import CareIcon from "@/CAREUI/icons/CareIcon";
-
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -58,13 +56,6 @@ const SidebarUserCard: React.FC<SidebarUserCardProps> = ({ shrinked }) => {
                   </p>
                 )}
               </div>
-            </div>
-            <div className="flex shrink-0 items-center justify-center rounded-full bg-gray-300/50">
-              <CareIcon
-                icon="l-angle-up"
-                className="text-xl text-gray-600"
-                aria-label="Up arrow icon"
-              />
             </div>
           </Button>
         </DropdownMenuTrigger>

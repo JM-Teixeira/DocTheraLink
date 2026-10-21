@@ -174,6 +174,35 @@ func TestCoordinatorReadsOnly(t *testing.T) {
 	}
 }
 
+// covers is a fixed holiday cover: cover → physios covered.
+type covers map[uint][]uint
+
+func (c covers) CoveredBy(_ context.Context, id uint, _ time.Time) ([]uint, error) { return c[id], nil }
+
+// TestHolidayCover: a physio covering a colleague reads and posts on the
+// colleague's referrals while covering; others still cannot.
+func TestHolidayCover(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newTestService(t)
+	r := mustCreate(t, s, ptrUint(physio.ID))
+	if _, err := s.Get(ctx, otherPhysio, r.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("before cover: %v", err)
+	}
+	s.WithCovers(covers{otherPhysio.ID: {physio.ID}})
+	if _, err := s.Get(ctx, otherPhysio, r.ID); err != nil {
+		t.Errorf("cover reads: %v", err)
+	}
+	if _, err := s.AddNote(ctx, otherPhysio, r.ID, NoteRequest{Body: "Sessão 3: boa evolução."}); err != nil {
+		t.Errorf("cover posts: %v", err)
+	}
+	if _, total, _ := s.List(ctx, otherPhysio, ListFilter{}); total != 1 {
+		t.Errorf("cover's inbox includes it: %d", total)
+	}
+	if _, err := s.Get(ctx, farPhysio, r.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("not covering: %v", err)
+	}
+}
+
 func TestReassign(t *testing.T) {
 	ctx := context.Background()
 	handOver := func(to uint) ReassignRequest { return ReassignRequest{TherapistID: to, Reason: "Holiday cover"} }

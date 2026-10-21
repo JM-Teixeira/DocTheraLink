@@ -6,8 +6,8 @@ import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
 import { userChildProps } from "@/components/Common/UserColumns";
 import Error404 from "@/components/ErrorPages/404";
-import LinkedFacilitiesTab from "@/components/Users/LinkedFacilitiesTab";
-import LinkedSkillsTab from "@/components/Users/LinkedSkillsTab";
+import EmploymentTab from "@/components/Staff/EmploymentTab";
+import SkillsTab from "@/components/Staff/SkillsTab";
 import UserBanner from "@/components/Users/UserBanner";
 import UserSummaryTab from "@/components/Users/UserSummary";
 import { UserModel } from "@/components/Users/models";
@@ -16,6 +16,7 @@ import useAuthUser from "@/hooks/useAuthUser";
 
 import * as Notification from "@/Utils/Notifications";
 import { editUserPermissions } from "@/Utils/permissions";
+import { managesStaff } from "@/Utils/roles";
 import routes from "@/Utils/request/api";
 import useTanStackQueryInstead from "@/Utils/request/useQuery";
 import { classNames, formatName, keysOf } from "@/Utils/utils";
@@ -73,13 +74,11 @@ export default function UserHome(props: UserHomeProps) {
     FACILITIES: tabChildProp;
   } = {
     PROFILE: { body: UserSummaryTab },
-    SKILLS: {
-      body: LinkedSkillsTab,
-      hidden: !editPermissions,
-    },
+    SKILLS: { body: SkillsTab },
+    // Clinic and employment status (hired, on leave, left)
     FACILITIES: {
-      body: LinkedFacilitiesTab,
-      hidden: !editPermissions,
+      body: EmploymentTab,
+      hidden: !editPermissions && !managesStaff(authUser, userData),
     },
   };
 
@@ -124,7 +123,7 @@ export default function UserHome(props: UserHomeProps) {
                           <Link
                             key={p}
                             className={classNames(
-                              "min-w-max-content cursor-pointer whitespace-nowrap text-sm font-semibold capitalize",
+                              "min-w-max-content cursor-pointer whitespace-nowrap text-sm font-semibold",
                               currentTab === p
                                 ? "border-b-2 border-primary-500 text-primary-600 hover:border-secondary-300"
                                 : "text-secondary-700 hover:text-secondary-700",
@@ -144,7 +143,6 @@ export default function UserHome(props: UserHomeProps) {
             <SelectedTab
               userData={userData}
               username={username}
-              {...props}
               refetchUserData={refetchUserDetails}
             />
           </>

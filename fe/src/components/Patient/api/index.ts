@@ -16,6 +16,8 @@ export const patientKeys = {
   detail: (id: string) => [...patientKeys.details(), id] as const,
   search: (filters: QueryParams) =>
     [...patientKeys.all, "search", filters] as const,
+  stats: (filters: QueryParams) =>
+    [...patientKeys.all, "stats", filters] as const,
 };
 
 export function useCreatePatient() {
@@ -76,6 +78,15 @@ export function usePatientList(
     enabled: options?.enabled ?? true,
     staleTime: 60000,
     retry: 2,
+  });
+}
+
+/** Metrics for the patients matching the list filters. */
+export function usePatientStats(filters: QueryParams = {}) {
+  return useQuery({
+    queryKey: patientKeys.stats(filters),
+    queryFn: query(PatientRoutes.patientStats, { queryParams: filters }),
+    staleTime: 60000,
   });
 }
 

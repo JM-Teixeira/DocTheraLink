@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  absenceOf,
   addDays,
   boardHours,
+  coveringFor,
+  filterBoard,
+  floorsOf,
   formatHour,
   hourIsFull,
   hourOf,
@@ -65,6 +69,7 @@ const board: Board = {
       color: "teal",
       capacity: 4,
       credit_limit: 8,
+      floor: 1,
       sort_order: 0,
       active: true,
     },
@@ -74,12 +79,14 @@ const board: Board = {
       color: "indigo",
       capacity: 1,
       credit_limit: 8,
+      floor: 1,
       sort_order: 1,
       active: true,
     },
   ],
   therapists: [sarah],
   permissions: { manage_shifts: true, book_patients: true },
+  absences: [],
 };
 
 describe("time board helpers", () => {
@@ -144,5 +151,68 @@ describe("time board helpers", () => {
     expect(october[0][0]).toBe("2026-09-28");
     expect(october.at(-1)?.at(-1)).toBe("2026-11-01");
     expect(october).toHaveLength(5);
+  });
+});
+
+describe("board filters", () => {
+  const twoFloors: Board = {
+    ...board,
+    divisions: [
+      { ...board.divisions[0], floor: 1 },
+      { ...board.divisions[1], floor: 2 },
+    ],
+    therapists: [
+      sarah,
+      { ...sarah, id: 11, first_name: "Tiago", hours: [sarah.hours[0]] },
+    ],
+  };
+
+  it("lists the floors", () => {
+    expect(floorsOf(twoFloors.divisions)).toEqual([1, 2]);
+  });
+
+  it("keeps only a floor's divisions, hours and physios", () => {
+    const f = filterBoard(twoFloors, { floor: 2, divisions: [], physios: [] });
+    expect(f.divisions.map((d) => d.id)).toEqual(["room"]);
+    expect(f.therapists.map((t) => t.id)).toEqual([10]);
+    expect(f.therapists[0].hours.map((h) => h.hour)).toEqual([14]);
+  });
+
+  it("filters by physio without hiding their other hours", () => {
+    const f = filterBoard(twoFloors, {
+      floor: null,
+      divisions: [],
+      physios: [11],
+    });
+    expect(f.therapists.map((t) => t.id)).toEqual([11]);
+    expect(f.divisions).toHaveLength(2);
+  });
+
+  it("filters by division", () => {
+    const f = filterBoard(twoFloors, {
+      floor: null,
+      divisions: ["gym"],
+      physios: [],
+    });
+    expect(f.therapists.map((t) => t.hours.length)).toEqual([2, 1]);
+  });
+
+  it("finds absences and covers", () => {
+    const abs = [
+      {
+        id: "a",
+        therapist_id: 10,
+        cover_id: 11,
+        from: "",
+        to: "",
+        reason: "vacation" as const,
+        handover: "",
+        notes: [],
+      },
+    ];
+    expect(absenceOf(abs, 10)?.cover_id).toBe(11);
+    expect(absenceOf(abs, 11)).toBeUndefined();
+    expect(coveringFor(abs, 11)).toHaveLength(1);
+    expect(coveringFor(undefined, 11)).toEqual([]);
   });
 });

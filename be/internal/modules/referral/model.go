@@ -197,6 +197,7 @@ type ListFilter struct {
 	Priority   Priority   `form:"priority" binding:"omitempty,oneof=routine urgent"`
 	Search     string     `form:"search"`    // patient name contains
 	AssignedTo uint       `form:"therapist"` // assigned physiotherapist
+	ByDoctor   uint       `form:"doctor"`    // referring doctor
 	From       *time.Time `form:"from" time_format:"2006-01-02"`
 	To         *time.Time `form:"to" time_format:"2006-01-02"`
 	Limit      int        `form:"limit"`
@@ -211,4 +212,6 @@ type ListFilter struct {
 	ClinicID          *string `form:"-"`
 	// OnlyClinic restricts to one clinic's referrals (coordinators).
 	OnlyClinic *string `form:"-"`
+	// AlsoTherapists: physios the inbox owner is covering (holiday cover).
+	AlsoTherapists []uint `form:"-"`
 }

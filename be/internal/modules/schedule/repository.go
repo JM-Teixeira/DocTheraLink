@@ -51,6 +51,16 @@ type Repository interface {
 	DeleteSeriesFrom(ctx context.Context, clinicID, seriesID string, from time.Time) (int64, error)
 
 	MonthlyStats(ctx context.Context, clinicID string, year int) ([]MonthStats, error)
+
+	// MoveAppointment gives a booked session to another physio at the same
+	// hour, under the same limits and lock as Book.
+	MoveAppointment(ctx context.Context, a *Appointment, to uint, capacity, creditLimit int) error
+	CreateAbsence(ctx context.Context, a *Absence) error
+	// Absences overlapping from..to, with handover notes, therapist and cover.
+	Absences(ctx context.Context, clinicID string, from, to time.Time) ([]Absence, error)
+	DeleteAbsence(ctx context.Context, clinicID, id string) error
+	// CoveredBy lists the physios a cover physio is covering on a date.
+	CoveredBy(ctx context.Context, coverID uint, at time.Time) ([]uint, error)
 }
 
 // GormRepository implements Repository on PostgreSQL via GORM.
@@ -206,6 +216,62 @@ func (g *GormRepository) DeleteSeriesFrom(ctx context.Context, clinicID, seriesI
 	res := g.db.WithContext(ctx).Where("clinic_id = ? AND series_id = ? AND date >= ? AND status = ?",
 		clinicID, seriesID, day(from), StatusBooked).Delete(&Appointment{})
 	return res.RowsAffected, res.Error
+}
+
+func (g *GormRepository) MoveAppointment(ctx context.Context, a *Appointment, to uint, capacity, creditLimit int) error {
+	return g.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		key := fmt.Sprintf("appt:%s:%d:%s:%d", a.ClinicID, to, day(a.Date), a.Hour)
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", key).Error; err != nil {
+			return err
+		}
+		var load struct {
+			N       int
+			Credits int
+		}
+		if err := tx.Model(&Appointment{}).Select("COUNT(*) AS n, COALESCE(SUM(credits), 0) AS credits").
+			Where("therapist_id = ? AND date = ? AND hour = ?", to, day(a.Date), a.Hour).Scan(&load).Error; err != nil {
+			return err
+		}
+		switch {
+		case load.N >= capacity:
+			return ErrFull
+		case load.Credits+a.Credits > creditLimit:
+			return ErrOverCredits
+		}
+		return tx.Model(&Appointment{}).Where("id = ?", a.ID).Update("therapist_id", to).Error
+	})
+}
+
+func (g *GormRepository) CreateAbsence(ctx context.Context, a *Absence) error {
+	return g.db.WithContext(ctx).Omit("Therapist", "Cover", "Notes.Patient").Create(a).Error
+}
+
+func (g *GormRepository) Absences(ctx context.Context, clinicID string, from, to time.Time) ([]Absence, error) {
+	out := []Absence{}
+	err := g.db.WithContext(ctx).Preload("Notes.Patient").Preload("Therapist").Preload("Cover").
+		Where("clinic_id = ? AND \"from\" <= ? AND \"to\" >= ?", clinicID, day(to), day(from)).
+		Order("\"from\"").Find(&out).Error
+	return out, err
+}
+
+func (g *GormRepository) DeleteAbsence(ctx context.Context, clinicID, id string) error {
+	return g.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Where("clinic_id = ? AND id = ?", clinicID, id).Delete(&Absence{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrNotFound
+		}
+		return tx.Where("absence_id = ?", id).Delete(&HandoverNote{}).Error
+	})
+}
+
+func (g *GormRepository) CoveredBy(ctx context.Context, coverID uint, at time.Time) ([]uint, error) {
+	var ids []uint
+	err := g.db.WithContext(ctx).Model(&Absence{}).Where("cover_id = ? AND \"from\" <= ? AND \"to\" >= ?", coverID, day(at), day(at)).
+		Pluck("therapist_id", &ids).Error
+	return ids, err
 }
 
 // MonthlyStats aggregates a year of sessions (appointments) and referrals.

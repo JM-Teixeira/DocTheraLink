@@ -17,15 +17,22 @@ func SeedDemo(db *gorm.DB, clinicID string, today time.Time) error {
 	}
 	if n == 0 {
 		for i, d := range []Division{
-			{Name: "Gym", Color: "teal", Capacity: 4},
-			{Name: "Treatment room 1", Color: "indigo", Capacity: 1},
-			{Name: "Treatment room 2", Color: "amber", Capacity: 1},
-			{Name: "Hydrotherapy pool", Color: "sky", Capacity: 3},
+			{Name: "Gym", Color: "teal", Capacity: 4, Floor: 1},
+			{Name: "Treatment room 1", Color: "indigo", Capacity: 1, Floor: 2},
+			{Name: "Treatment room 2", Color: "amber", Capacity: 1, Floor: 2},
+			{Name: "Hydrotherapy pool", Color: "sky", Capacity: 3, Floor: 3},
 		} {
 			d.ClinicID, d.SortOrder, d.Active = clinicID, i, true
 			if err := db.Create(&d).Error; err != nil {
 				return fmt.Errorf("seed division %s: %w", d.Name, err)
 			}
+		}
+	}
+	// Floors for demo databases created before floors existed
+	for name, floor := range map[string]int{"Treatment room 1": 2, "Treatment room 2": 2, "Hydrotherapy pool": 3} {
+		if err := db.Model(&Division{}).Where("clinic_id = ? AND name = ? AND floor = 1", clinicID, name).
+			Update("floor", floor).Error; err != nil {
+			return err
 		}
 	}
 	var divs []Division

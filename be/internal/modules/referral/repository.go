@@ -77,6 +77,9 @@ func filtered(q *gorm.DB, f ListFilter, withStatus bool) *gorm.DB {
 		q = q.Where("doctor_id = ?", f.DoctorID)
 	}
 	switch {
+	case f.TherapistID != 0 && f.InboxForTherapist && f.ClinicID != nil && len(f.AlsoTherapists) > 0:
+		q = q.Where("(therapist_id = ? OR therapist_id IN ? OR (therapist_id IS NULL AND status = ? AND (facility_id IS NULL OR facility_id = ?)))",
+			f.TherapistID, f.AlsoTherapists, StatusPending, *f.ClinicID)
 	case f.TherapistID != 0 && f.InboxForTherapist && f.ClinicID != nil:
 		// A therapist's inbox: everything assigned to them plus open, unassigned
 		// referrals of their clinic (or without a clinic).
@@ -93,6 +96,9 @@ func filtered(q *gorm.DB, f ListFilter, withStatus bool) *gorm.DB {
 	// Optional user-facing filters
 	if f.Priority != "" {
 		q = q.Where("priority = ?", f.Priority)
+	}
+	if f.ByDoctor != 0 {
+		q = q.Where("doctor_id = ?", f.ByDoctor)
 	}
 	if f.AssignedTo != 0 {
 		q = q.Where("therapist_id = ?", f.AssignedTo)

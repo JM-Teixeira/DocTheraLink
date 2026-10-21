@@ -9,9 +9,11 @@ import (
 
 // RegisterRoutes wires the time-board API onto an authenticated group.
 // hook runs when sessions are held (e.g. inventory uses consumables).
-func RegisterRoutes(protected *gin.RouterGroup, db *gorm.DB, hook SessionHook) {
+// It returns the service (referrals ask it who covers whom).
+func RegisterRoutes(protected *gin.RouterGroup, db *gorm.DB, hook SessionHook) *Service {
 	svc := NewService(NewGormRepository(db), clinic.NewGormResolver(db)).WithSessionHook(hook)
 	mount(protected.Group("/schedule"), NewHandler(svc))
+	return svc
 }
 
 // mount is the route table, shared with the handler tests.
@@ -36,5 +38,9 @@ func mount(g *gin.RouterGroup, h *Handler) {
 	g.DELETE("/appointments/:id/", h.Unbook)
 
 	g.POST("/series/", h.Series)
+	g.GET("/absences/", h.Absences)
+	g.POST("/absences/", h.CreateAbsence)
+	g.DELETE("/absences/:id/", h.DeleteAbsence)
+	g.GET("/handover/", h.Handover)
 	g.DELETE("/series/:id/", h.CancelSeries)
 }

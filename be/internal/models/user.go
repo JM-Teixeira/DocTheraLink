@@ -66,6 +66,12 @@ type User struct {
 	StateID        *uint   `json:"state"`
 	HomeFacilityID *string `json:"home_facility"`
 
+	// Employment: active, on_leave or left (kept as a record; "left" users
+	// cannot sign in).
+	EmploymentStatus string     `json:"employment_status" gorm:"size:12;not null;default:active"`
+	EmploymentSince  *time.Time `json:"employment_since" gorm:"type:date"`
+	EmploymentNote   string     `json:"employment_note" gorm:"size:300"`
+
 	// Relationships
 	LocalBody    *LocalBody  `json:"local_body_object" gorm:"foreignKey:LocalBodyID"`
 	District     *District   `json:"district_object" gorm:"foreignKey:DistrictID"`
@@ -109,6 +115,9 @@ type UserBareMinimum struct {
 	UserType          UserRole   `json:"user_type"`
 	LastLogin         *time.Time `json:"last_login"`
 	ProfilePictureURL *string    `json:"read_profile_picture_url"`
+	EmploymentStatus  string     `json:"employment_status"`
+	EmploymentSince   *time.Time `json:"employment_since"`
+	ClinicName        string     `json:"clinic_name,omitempty"`
 }
 
 // LoginRequest represents login credentials

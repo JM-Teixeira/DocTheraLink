@@ -3,6 +3,14 @@ import { PaginatedResponse } from "@/Utils/request/types";
 
 import { PatientModel } from "../models";
 
+export interface PatientStats {
+  total: number;
+  care_levels: Record<string, number>;
+  genders: Record<string, number>;
+  age_bands: Record<string, number>;
+  average_age: number;
+}
+
 /**
  * Patient API Routes
  * Defines API endpoints for patient-related operations
@@ -37,6 +45,16 @@ const PatientRoutes = {
     path: "/api/v1/patient/",
     method: "GET" as const,
     TRes: Type<PaginatedResponse<PatientModel>>(),
+  },
+
+  /**
+   * Counts by care level, gender and age band for the same filters as the list
+   * GET /api/v1/patient/stats/
+   */
+  patientStats: {
+    path: "/api/v1/patient/stats/",
+    method: "GET" as const,
+    TRes: Type<PatientStats>(),
   },
 
   /**

@@ -13,6 +13,7 @@ import (
 	"klyniva/internal/modules/patient"
 	"klyniva/internal/modules/referral"
 	"klyniva/internal/modules/schedule"
+	"klyniva/internal/modules/staff"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -228,6 +229,10 @@ func SeedData(includeDemoUsers bool) error {
 		if err := DB.FirstOrCreate(&skill, models.Skill{Name: skill.Name}).Error; err != nil {
 			return fmt.Errorf("failed to seed skill %s: %w", skill.Name, err)
 		}
+	}
+
+	if err := staff.SeedSkills(DB); err != nil {
+		return fmt.Errorf("skills catalogue: %w", err)
 	}
 
 	if !includeDemoUsers {

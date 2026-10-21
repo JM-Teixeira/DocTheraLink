@@ -15,6 +15,7 @@ const (
 	SkipFull        = "full"
 	SkipOverCredits = "over_credits"
 	SkipPatientBusy = "patient_busy"
+	SkipAbsent      = "absent"
 )
 
 // Planning looks at most this far ahead and gives up after this many skips.
@@ -123,8 +124,9 @@ func skipReason(err error) string {
 // planner checks plan dates against the loaded board data, counting the
 // sessions it has planned so far (so a preview is accurate too).
 type planner struct {
-	data  *boardData
-	level int
+	data    *boardData
+	level   int
+	exclude map[string]bool // appointments left out of the checks (they are moving)
 }
 
 func (p *planner) problem(d time.Time, hour int, therapistID uint, patientID string) (string, *Division) {
@@ -138,6 +140,9 @@ func (p *planner) problem(d time.Time, hour int, therapistID uint, patientID str
 	if on == nil {
 		return SkipNotOnShift, nil
 	}
+	if absentOn(p.data.absences, therapistID, d) {
+		return SkipAbsent, nil
+	}
 	var div *Division
 	for i := range p.data.divisions {
 		if p.data.divisions[i].ID == on.DivisionID {
@@ -149,6 +154,9 @@ func (p *planner) problem(d time.Time, hour int, therapistID uint, patientID str
 	}
 	n, credits := 0, 0
 	for _, ap := range p.data.appts {
+		if p.exclude[ap.ID] && ap.ID != "" {
+			continue
+		}
 		if !sameDate(ap.Date, d) || ap.Hour != hour {
 			continue
 		}

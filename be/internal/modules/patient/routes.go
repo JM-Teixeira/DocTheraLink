@@ -16,6 +16,7 @@ func RegisterRoutes(patients *gin.RouterGroup, db *gorm.DB) {
 	patients.POST("/", h.Create)
 	// search/ is kept for the frontend duplicate check; it accepts the same filters as the list.
 	patients.GET("/search/", h.List)
+	patients.GET("/stats/", h.Stats)
 	patients.GET("/:id/", h.Get)
 	patients.PUT("/:id/", h.Update)
 	patients.PATCH("/:id/", h.Update)

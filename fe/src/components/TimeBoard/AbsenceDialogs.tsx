@@ -1,0 +1,413 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
+import {
+  ArrowRight,
+  CircleCheck,
+  CircleX,
+  Plane,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import { cn } from "@/lib/utils";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+import { apiError } from "@/components/TimeBoard/BoardDialogs";
+import BoardRoutes from "@/components/TimeBoard/api";
+import { addDays, formatHour, today } from "@/components/TimeBoard/boardUtils";
+import { AbsenceReason, AbsenceResult } from "@/components/TimeBoard/types";
+
+import * as Notification from "@/Utils/Notifications";
+import query, { callApi } from "@/Utils/request/query";
+
+const fieldClass =
+  "mt-1 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500";
+const REASONS: AbsenceReason[] = ["vacation", "sick", "training", "other"];
+
+type Physio = { id: number; first_name: string; last_name: string };
+const fullName = (p?: Physio | null) =>
+  p ? `${p.first_name} ${p.last_name}` : "";
+
+/** Current and upcoming absences, with their handover, and "new absence". */
+export function AbsencesDialog({
+  open,
+  physios,
+  onClose,
+  onChanged,
+}: {
+  open: boolean;
+  physios: Physio[];
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const { t } = useTranslation();
+  const [creating, setCreating] = useState(false);
+  const from = today();
+  const { data: absences, refetch } = useQuery({
+    queryKey: ["absences", from],
+    queryFn: query(BoardRoutes.absences, {
+      queryParams: { from, to: addDays(from, 180) },
+    }),
+    enabled: open,
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) =>
+      callApi(BoardRoutes.deleteAbsence, { pathParams: { id }, silent: true }),
+    onSuccess: () => {
+      refetch();
+      onChanged();
+    },
+    onError: (e: Error) => apiError(e, t("board_save_failed")),
+  });
+
+  return (
+    <>
+      <Dialog open={open && !creating} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t("absences")}</DialogTitle>
+            <DialogDescription>{t("absences_help")}</DialogDescription>
+          </DialogHeader>
+          {!absences?.length ? (
+            <p className="text-sm text-gray-500">{t("no_absences")}</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {absences.map((a) => (
+                <li
+                  key={a.id}
+                  className="rounded-lg border border-gray-200 p-3 text-sm"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Plane className="size-4 text-amber-600" aria-hidden />
+                    <span className="font-medium text-gray-900">
+                      {fullName(a.therapist)}
+                    </span>
+                    <span className="text-gray-600">
+                      {t(`absence_reason__${a.reason}`)} ·{" "}
+                      {dayjs(a.from).format("D MMM")} –{" "}
+                      {dayjs(a.to).format("D MMM YYYY")}
+                    </span>
+                    {a.cover && (
+                      <span className="flex items-center gap-1 text-gray-600">
+                        <ArrowRight className="size-3.5" aria-hidden />
+                        {fullName(a.cover)}
+                      </span>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="ml-auto"
+                      aria-label={t("delete")}
+                      onClick={() =>
+                        window.confirm(t("confirm_delete_absence")) &&
+                        remove.mutate(a.id)
+                      }
+                    >
+                      <Trash2 className="size-4 text-rose-600" aria-hidden />
+                    </Button>
+                  </div>
+                  {a.handover && (
+                    <p className="mt-2 whitespace-pre-wrap rounded bg-gray-50 p-2 text-gray-700">
+                      {a.handover}
+                    </p>
+                  )}
+                  {!!a.notes.length && (
+                    <ul className="mt-2 flex flex-col gap-1">
+                      {a.notes.map((n) => (
+                        <li key={n.id} className="text-gray-700">
+                          <span className="font-medium">
+                            {n.patient?.name}:
+                          </span>{" "}
+                          {n.note}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <DialogFooter>
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              <Plus className="mr-1 size-4" aria-hidden />
+              {t("new_absence")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <NewAbsenceDialog
+        open={open && creating}
+        physios={physios}
+        onClose={() => setCreating(false)}
+        onDone={() => {
+          setCreating(false);
+          refetch();
+          onChanged();
+        }}
+      />
+    </>
+  );
+}
+
+/**
+ * New absence in two steps: who, when, cover → preview of where each
+ * session goes and a handover note per patient → confirm.
+ */
+function NewAbsenceDialog({
+  open,
+  physios,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  physios: Physio[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const [therapist, setTherapist] = useState(0);
+  const [cover, setCover] = useState(0);
+  const [from, setFrom] = useState(today());
+  const [to, setTo] = useState(addDays(today(), 4));
+  const [reason, setReason] = useState<AbsenceReason>("vacation");
+  const [handover, setHandover] = useState("");
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<AbsenceResult | null>(null);
+  useEffect(() => {
+    if (open) {
+      setTherapist(0);
+      setCover(0);
+      setHandover("");
+      setNotes({});
+      setPreview(null);
+    }
+  }, [open]);
+  useEffect(() => setPreview(null), [therapist, cover, from, to]);
+
+  const body = (dry: boolean) => ({
+    therapist_id: therapist,
+    cover_id: cover || undefined,
+    from,
+    to,
+    reason,
+    handover,
+    notes: Object.entries(notes)
+      .filter(([, v]) => v.trim())
+      .map(([patient_id, note]) => ({ patient_id, note })),
+    move_patients: true,
+    dry_run: dry,
+  });
+  const fail = (e: Error) => apiError(e, t("board_save_failed"));
+  const check = useMutation({
+    mutationFn: () =>
+      callApi(BoardRoutes.createAbsence, { body: body(true), silent: true }),
+    onSuccess: setPreview,
+    onError: fail,
+  });
+  const save = useMutation({
+    mutationFn: () =>
+      callApi(BoardRoutes.createAbsence, { body: body(false), silent: true }),
+    onSuccess: (r) => {
+      const moved = r.sessions.filter((s) => s.moved).length;
+      Notification.Success({
+        msg: t("absence_saved", { moved, total: r.sessions.length }),
+      });
+      onDone();
+    },
+    onError: fail,
+  });
+  const valid = therapist > 0 && from && to && to >= from;
+  const moved = preview?.sessions.filter((s) => s.moved).length ?? 0;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{t("new_absence")}</DialogTitle>
+          <DialogDescription>{t("new_absence_help")}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-medium text-gray-700">
+            {t("absent_physio")}
+            <select
+              value={therapist}
+              onChange={(e) => setTherapist(Number(e.target.value))}
+              className={fieldClass}
+            >
+              <option value={0}>—</option>
+              {physios.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {fullName(p)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            {t("cover_physio")}
+            <select
+              value={cover}
+              onChange={(e) => setCover(Number(e.target.value))}
+              className={fieldClass}
+            >
+              <option value={0}>{t("no_cover")}</option>
+              {physios
+                .filter((p) => p.id !== therapist)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {fullName(p)}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            {t("from")}
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className={fieldClass}
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            {t("until")}
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className={fieldClass}
+            />
+          </label>
+          <fieldset className="sm:col-span-2">
+            <legend className="text-sm font-medium text-gray-700">
+              {t("reason")}
+            </legend>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {REASONS.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  aria-pressed={reason === r}
+                  onClick={() => setReason(r)}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-sm ring-1 ring-inset",
+                    reason === r
+                      ? "bg-primary-600 text-white ring-primary-600"
+                      : "ring-gray-300",
+                  )}
+                >
+                  {t(`absence_reason__${r}`)}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <label className="text-sm font-medium text-gray-700 sm:col-span-2">
+            {t("handover_document")}
+            <textarea
+              rows={4}
+              value={handover}
+              onChange={(e) => setHandover(e.target.value)}
+              placeholder={t("handover_placeholder")}
+              className="mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            />
+          </label>
+        </div>
+
+        {preview && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium text-gray-900">
+              {t("absence_preview", { moved, total: preview.sessions.length })}
+            </p>
+            {!!preview.sessions.length && (
+              <ul className="max-h-48 divide-y divide-gray-100 overflow-auto rounded-lg border border-gray-200 text-sm">
+                {preview.sessions.map((s) => (
+                  <li
+                    key={s.appointment_id}
+                    className="flex items-center gap-2 px-3 py-1.5"
+                  >
+                    {s.moved ? (
+                      <CircleCheck
+                        className="size-4 text-emerald-600"
+                        aria-hidden
+                      />
+                    ) : (
+                      <CircleX className="size-4 text-amber-600" aria-hidden />
+                    )}
+                    <span className="w-28 capitalize text-gray-600">
+                      {dayjs(s.date).format("ddd D MMM")}
+                    </span>
+                    <span className="w-12 font-mono">{formatHour(s.hour)}</span>
+                    <span className="flex-1 truncate">{s.patient_name}</span>
+                    <span className="text-xs text-gray-500">
+                      {s.moved
+                        ? t("moves_to_cover")
+                        : t(`skip_reason__${s.reason}`)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!!preview.patients.length && (
+              <div>
+                <p className="mb-1 text-sm font-medium text-gray-700">
+                  {t("handover_per_patient")}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {preview.patients.map((p) => (
+                    <label key={p.id} className="text-sm text-gray-700">
+                      {p.name}
+                      <input
+                        value={notes[p.id] ?? ""}
+                        maxLength={2000}
+                        onChange={(e) =>
+                          setNotes((n) => ({ ...n, [p.id]: e.target.value }))
+                        }
+                        placeholder={t("handover_patient_placeholder")}
+                        className={fieldClass}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            {t("cancel")}
+          </Button>
+          {preview ? (
+            <Button
+              type="button"
+              variant="primary"
+              disabled={save.isPending}
+              onClick={() => save.mutate()}
+            >
+              {t("confirm_absence")}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="primary"
+              disabled={!valid || check.isPending}
+              onClick={() => check.mutate()}
+            >
+              {t("preview")}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

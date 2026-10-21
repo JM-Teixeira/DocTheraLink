@@ -46,6 +46,7 @@ const board: Board = {
       color: "teal",
       capacity: 4,
       credit_limit: 8,
+      floor: 1,
       sort_order: 0,
       active: true,
     },
@@ -89,6 +90,7 @@ const board: Board = {
     },
   ],
   permissions: { manage_shifts: false, book_patients: false },
+  absences: [],
 };
 
 describe("home helpers", () => {

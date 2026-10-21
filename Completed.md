@@ -7,6 +7,36 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-21 — M4 patients (branch `feat/m4-patients`)
 
+### 23:30 · Calmer time board, holiday cover, people & patient filters (user request)
+- **Time board**: floors (divisions get a floor; Climutua has 3), filters
+  by floor / division / physio (remembered per browser), decluttered cells
+  (count + credit bar, details on hover), legend, division view grouped by
+  floor. Click a physio → **their day** with every patient's name per hour.
+- **Holiday cover**: coordinators record an absence (vacation, sick,
+  training, other) with a cover physio; preview shows which sessions move
+  at the same hour and which can't; a **handover document** plus a note per
+  patient. The cover physio sees it on the home page and in the patient
+  pop-up, and can read/post on the absent physio's referrals. Absent
+  physios can't be booked; weekly plans skip their days.
+- **Assign patient**: search by name, NIF or SNS number (IDs shown).
+- **People** (`/users`): new list with one search box (full name too),
+  role and status chips, clinic for admins; non-admins see only their clinic.
+- **Employment status** (active / on leave / left, date, note): "left"
+  keeps the record but blocks sign-in. **Skills** (14 PT-PT physio skills)
+  and **clinic** profile tabs rebuilt (they were calling removed endpoints).
+- **Patients**: filters by care level, age band, gender, clinic (admins),
+  with metrics of the match (total, average age, care level, age and
+  gender spread — `GET /patient/stats/`).
+- **Referrals**: filters by referring doctor, physio and date range.
+- Translations: dates follow the language; breadcrumbs translated and only
+  collapse ("•••") on long paths; "doente" → "utente"; sidebar user card
+  without the arrow.
+- Tests: staff, absence/cover and referral-cover unit tests; Climutua
+  integration (floors, holiday, skills, former staff); e2e
+  `TestPeopleAndEmployment`, `TestPatientFiltersAndStats`,
+  `TestReferralDoctorFilter`, `TestHolidayCover`; frontend filter/query
+  helpers and array query params (113 tests).
+
 ### 18:00 · Home page, Climutua demo clinic, inventory kinds, People fix (user request)
 - **Fix**: Clinic → People failed ("Something went wrong"): the
   `/facility/:id/get_users/` endpoint was a 501 stub; now lists the clinic's

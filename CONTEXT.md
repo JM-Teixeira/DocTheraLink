@@ -42,7 +42,11 @@ be/                Go backend (Go module name: klyniva)
       inventory/   clinic consumables: unit items (use) and containers (open/finish),
                    per-division session use, reorder list, audit
       schedule/    time board: divisions, shifts, appointments per physio-hour,
-                   weekly plans (series), range/year stats; SessionHook → inventory
+                   weekly plans (series), range/year stats; SessionHook → inventory;
+                   divisions have a floor; absences with cover + handover notes
+                   (CoveredBy → referral.WithCovers lets the cover read referrals)
+      staff/       skills catalogue + user skills, home clinic, employment
+                   status (active / on_leave / left → is_active false)
     storage/       file Store interface (Local today, S3 later)
     mailer/        SMTP or log-only mailer (no patient data in e-mails)
     clinic/        which clinic a user works in (Resolver) — scope new data with it

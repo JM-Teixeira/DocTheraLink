@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import PatientIds from "@/components/Patient/PatientIds";
 import { apiError } from "@/components/TimeBoard/BoardDialogs";
 import { PatientRef } from "@/components/TimeBoard/HourDialog";
 import BoardRoutes from "@/components/TimeBoard/api";
@@ -191,7 +192,8 @@ export function SeriesDialog({
                         }
                         className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
                       >
-                        {p.name}
+                        <span className="block font-medium">{p.name}</span>
+                        <PatientIds nif={p.nif} sns={p.sns_number} />
                       </button>
                     </li>
                   ))}

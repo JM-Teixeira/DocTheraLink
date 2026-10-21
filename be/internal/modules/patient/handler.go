@@ -82,6 +82,25 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, models.PaginatedResponse{Count: int(total), Results: items})
 }
 
+// Stats handles GET /patient/stats/ (same filters as the list).
+func (h *Handler) Stats(c *gin.Context) {
+	actor, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var q ListQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: err.Error()})
+		return
+	}
+	st, err := h.svc.Stats(c.Request.Context(), actor, q)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, st)
+}
+
 // Create godoc
 // @Summary Register a patient
 // @Tags patients
