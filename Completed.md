@@ -35,7 +35,7 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
   integration (floors, holiday, skills, former staff); e2e
   `TestPeopleAndEmployment`, `TestPatientFiltersAndStats`,
   `TestReferralDoctorFilter`, `TestHolidayCover`; frontend filter/query
-  helpers and array query params (113 tests).
+  helpers and array query params (105 tests).
 
 ### 18:00 · Home page, Climutua demo clinic, inventory kinds, People fix (user request)
 - **Fix**: Clinic → People failed ("Something went wrong"): the

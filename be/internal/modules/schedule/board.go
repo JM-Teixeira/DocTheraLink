@@ -1,6 +1,9 @@
 package schedule
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // Default opening hours shown on the board; shifts outside widen it.
 const (
@@ -67,6 +70,8 @@ func buildBoard(date time.Time, divs []Division, therapists []UserSummary, shift
 			b.CloseHour = max(b.CloseHour, sh.EndHour)
 		}
 	}
+	// Hours in time order, whatever order the shifts came in
+	slices.SortStableFunc(dayShifts, func(a, b Shift) int { return a.StartHour - b.StartHour })
 
 	b.Therapists = []BoardTherapist{}
 	for _, t := range therapists {
