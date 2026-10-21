@@ -15,7 +15,37 @@ operations such as facilities, staff time tracking and timetables.
 | [TODO.md](TODO.md) | Prioritised backlog |
 | [Completed.md](Completed.md) | What has been done, with timestamps |
 
-## Quick start (Docker)
+## Open the local app
+
+The development copy runs in a local Kubernetes cluster (k3d) on the Docker
+engine **inside WSL (Ubuntu-22.04)**. It is only reachable from this computer.
+
+1. Double-click `scriptsstart-klyniva.cmd` (from Explorer:
+   `\wsl.localhostUbuntu-22.04ootdoctheraDocTheraLinkscripts`), or in a
+   WSL terminal run `make k8s-start`.
+2. Wait for "Klyniva is running"; the browser opens <http://localhost:8088>.
+3. **Keep that window open** — Windows stops WSL (and the app) when nothing is
+   attached to it, which shows as "this site can't be reached".
+
+Demo logins (local demo data only), password **`1234@1`** for all:
+
+| Username | Who | Can do |
+|---|---|---|
+| `doctor` | Dr. John Smith | patients, create/follow referrals |
+| `physiotherapist` | Sarah Johnson | referral inbox, accept/treat/complete |
+| `physiotherapist2` | Tiago Martins | second therapist (hand-over) |
+| `receptionist` | Rita Lopes | register/edit patients, no clinical referrals |
+| `nurse`, `staff` | clinic staff | patients |
+| `stateadmin` | administrator | everything, all clinics |
+
+The accounts are created by `SEED_DEMO_USERS=true` (local overlay/compose
+only); production must run with it off. First time ever (no cluster yet):
+`make k8s-up` in WSL (builds images, ~5 min).
+
+Troubleshooting: `make k8s-status` shows the pods; `http://localhost:4000`
+is the Docker Compose variant below and is not running unless you `make up`.
+
+## Quick start (Docker Compose)
 
 Prerequisites: Docker with Compose v2.
 
@@ -28,8 +58,7 @@ make up                   # or: docker compose up -d --build --wait
 - API: <http://localhost:9000> — Swagger UI at `/swagger/index.html` when `ENABLE_SWAGGER=true`
 - Database UI (optional): `docker compose --profile tools up -d` → <http://localhost:8080>
 
-Demo accounts (local only, `SEED_DEMO_USERS=true`), password `1234@1`:
-`doctor`, `physiotherapist`, `nurse`, `staff`, `stateadmin`.
+Same demo accounts as above (password `1234@1`).
 
 Try the core flow: log in as **doctor** → *Referrals* → *New referral* →
 log in as **physiotherapist** → accept, start and complete it from the inbox.
@@ -61,10 +90,11 @@ CI runs on every push and pull request (`.github/workflows/ci.yml`).
 
 - **Docker:** set `GIN_MODE=release`, a strong `JWT_SECRET`, `SEED_DEMO_USERS=false`
   and `PUBLIC_URL` in `.env`. Release mode refuses to start with weak settings.
-- **Local Kubernetes (k3d in Docker Desktop):** `make k8s-up` creates a cluster
+- **Local Kubernetes (k3d on Docker in WSL):** `make k8s-up` creates a cluster
   called `klyniva`, builds and imports the images and deploys
   `k8s/overlays/local` → <http://localhost:8088>. `make k8s-e2e` runs the
-  end-to-end tests against it; `make k8s-down` removes it. The cluster uses
+  end-to-end tests against it; `make k8s-start` brings it back after a
+  reboot; `make k8s-down` removes it. The cluster uses
   its own kubeconfig (`~/.kube/klyniva.yaml`) and never changes your default context.
 - **Production Kubernetes:** see the header of `k8s/overlays/production/kustomization.yaml`
   (create the secret, set domain/e-mail/image tags, then `kubectl apply -k k8s/overlays/production`).

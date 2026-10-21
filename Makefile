@@ -4,7 +4,7 @@
 COMPOSE := docker compose
 
 .PHONY: help up down logs build test test-be test-be-integration test-fe check k8s-render \
-	k8s-up k8s-deploy k8s-e2e k8s-status k8s-down e2e-compose
+	k8s-up k8s-start k8s-deploy k8s-e2e k8s-status k8s-down e2e-compose
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -42,6 +42,9 @@ check: ## Everything CI runs (except image builds)
 
 k8s-up: ## Local Kubernetes (k3d): create cluster, build, deploy → http://localhost:8088
 	bash scripts/k8s-local.sh up
+
+k8s-start: ## Start the existing local cluster after a reboot and print the logins
+	bash scripts/k8s-local.sh start
 
 k8s-deploy: ## Rebuild images and roll out to the local cluster
 	bash scripts/k8s-local.sh deploy

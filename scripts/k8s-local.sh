@@ -2,6 +2,7 @@
 # Local Kubernetes for Klyniva using k3d (k3s in Docker).
 #
 #   scripts/k8s-local.sh up       create cluster (if needed), build, import, deploy
+#   scripts/k8s-local.sh start    start an existing cluster (e.g. after a reboot) and wait until it answers
 #   scripts/k8s-local.sh deploy   rebuild images and roll out (cluster must exist)
 #   scripts/k8s-local.sh e2e      run the end-to-end API tests against the cluster
 #   scripts/k8s-local.sh status   show pods, services and ingress
@@ -24,10 +25,10 @@ log() { printf '\033[36m==>\033[0m %s\n' "$*"; }
 
 cluster_exists() { k3d cluster list -o json | grep -q "\"name\":\"$CLUSTER\""; }
 
-# k3s needs many inotify instances; Docker Desktop's VM defaults to 128, which
-# is exhausted when several k3d clusters run ("too many open files" and the
-# node never registers). Raise it (only if lower) — not persistent across
-# Docker Desktop restarts, so this runs on every up/deploy.
+# k3s needs many inotify instances; the Docker/WSL kernel defaults to 128,
+# which is exhausted when several k3d clusters run ("too many open files" and
+# the node never registers). Raise it (only if lower) — not persistent across
+# WSL/Docker restarts, so this runs on every up/start/deploy.
 ensure_inotify() {
   local want=1024
   local cur
@@ -80,11 +81,47 @@ deploy() {
   "${KUBECTL[@]}" rollout status statefulset/postgres --timeout=180s
   "${KUBECTL[@]}" rollout status deployment/backend --timeout=180s
   "${KUBECTL[@]}" rollout status deployment/frontend --timeout=120s
-  log "Ready: $URL  (demo users: doctor / physiotherapist / nurse, password 1234@1)"
+  log "Ready: $URL"
+}
+
+print_access() {
+  cat <<INFO
+
+  Klyniva is running: $URL   (open it in a browser on this computer)
+
+  Demo logins (local demo data only) — password for all: 1234@1
+    doctor            Dr. John Smith (refers patients)
+    physiotherapist   Sarah Johnson
+    physiotherapist2  Tiago Martins
+    receptionist      Rita Lopes (patients, no clinical referrals)
+    nurse, staff      other clinic staff
+    stateadmin        administrator (all clinics)
+
+INFO
+}
+
+# start: bring an existing cluster back after WSL/Docker restarted.
+start() {
+  cluster_exists || { echo "No cluster yet — run: $0 up" >&2; exit 1; }
+  ensure_inotify
+  k3d cluster start "$CLUSTER" >/dev/null
+  k3d kubeconfig get "$CLUSTER" > "$KUBECONFIG"
+  log "Waiting for the app (can take 1–2 minutes after a restart)"
+  "${KUBECTL[@]}" rollout status statefulset/postgres --timeout=300s >/dev/null
+  "${KUBECTL[@]}" rollout status deployment/backend --timeout=300s >/dev/null
+  "${KUBECTL[@]}" rollout status deployment/frontend --timeout=300s >/dev/null
+  for _ in $(seq 1 60); do
+    code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/api/v1/auth/login/"       -H 'Content-Type: application/json' -d '{}' || true)
+    [[ "$code" =~ ^4 ]] && { print_access; return; }
+    sleep 2
+  done
+  echo "The cluster started but $URL does not answer yet; check: $0 status" >&2
+  exit 1
 }
 
 case "${1:-up}" in
-  up) ensure_inotify; create_cluster; build_and_import; deploy ;;
+  up) ensure_inotify; create_cluster; build_and_import; deploy; print_access ;;
+  start) start ;;
   deploy) ensure_inotify; build_and_import; deploy ;;
   e2e)
     log "Running end-to-end tests against $URL"
@@ -92,5 +129,5 @@ case "${1:-up}" in
     ;;
   status) "${KUBECTL[@]}" get pods,svc,ingress,pvc ;;
   down) k3d cluster delete "$CLUSTER" && rm -f "$KUBECONFIG" ;;
-  *) echo "usage: $0 {up|deploy|e2e|status|down}" >&2; exit 2 ;;
+  *) echo "usage: $0 {up|start|deploy|e2e|status|down}" >&2; exit 2 ;;
 esac

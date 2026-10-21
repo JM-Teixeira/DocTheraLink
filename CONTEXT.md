@@ -152,6 +152,7 @@ make check                   # + gofmt/vet, Postgres integration tests, typechec
 make e2e-compose             # e2e API journeys against the compose stack
 
 make k8s-up                  # local Kubernetes (k3d) → http://localhost:8088
+make k8s-start               # after a reboot (or scripts/start-klyniva.cmd on Windows)
 make k8s-e2e                 # same e2e journeys against the cluster
 make k8s-deploy | k8s-status | k8s-down
 ```
