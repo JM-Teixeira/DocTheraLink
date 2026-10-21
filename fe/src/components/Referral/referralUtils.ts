@@ -66,6 +66,10 @@ export function canPostNote(r: Referral, u: CurrentUser) {
   return isAdmin(u) || r.doctor_id === u.id || isAssignedTherapist(r, u);
 }
 
+/** Language for the catalog API: Portuguese for any "pt*" UI language. */
+export const catalogLang = (uiLanguage?: string) =>
+  uiLanguage?.toLowerCase().startsWith("pt") ? "pt" : "en";
+
 /** Visual style per status: tailwind classes for badges and the accent bar. */
 export const STATUS_STYLES: Record<
   ReferralStatus,

@@ -1,0 +1,200 @@
+[
+  {
+    "key": "low-back-pain",
+    "icd_code": "M54.5",
+    "priority": "routine",
+    "recommended_sessions": 10,
+    "text": {
+      "en": {
+        "name": "Low back pain",
+        "diagnosis": "Non-specific low back pain",
+        "reason": "Assessment and active rehabilitation: education, graded exercise, core stabilisation and return to usual activities.",
+        "goals": "Reduce pain; restore lumbar mobility; return to work and daily activities; self-management plan.",
+        "precautions": "Refer back urgently if red flags appear (saddle anaesthesia, bladder/bowel changes, progressive weakness)."
+      },
+      "pt": {
+        "name": "Lombalgia",
+        "diagnosis": "Lombalgia inespecífica",
+        "reason": "Avaliação e reabilitação ativa: educação, exercício progressivo, estabilização lombo-pélvica e regresso às atividades habituais.",
+        "goals": "Diminuir a dor; recuperar a mobilidade lombar; regresso ao trabalho e às atividades diárias; plano de autogestão.",
+        "precautions": "Reencaminhar com urgência perante sinais de alarme (anestesia em sela, alterações vesicais/intestinais, fraqueza progressiva)."
+      }
+    }
+  },
+  {
+    "key": "neck-pain",
+    "icd_code": "M54.2",
+    "priority": "routine",
+    "recommended_sessions": 8,
+    "text": {
+      "en": {
+        "name": "Neck pain",
+        "diagnosis": "Mechanical neck pain",
+        "reason": "Manual therapy, posture and ergonomic advice, deep neck flexor and scapular strengthening.",
+        "goals": "Reduce pain; restore cervical range of motion; reduce headache frequency; ergonomic self-management.",
+        "precautions": "No high-velocity cervical manipulation without screening; refer back if neurological signs worsen."
+      },
+      "pt": {
+        "name": "Cervicalgia",
+        "diagnosis": "Cervicalgia mecânica",
+        "reason": "Terapia manual, educação postural e ergonómica, fortalecimento dos flexores profundos do pescoço e da musculatura escapular.",
+        "goals": "Diminuir a dor; recuperar a amplitude cervical; reduzir a frequência das cefaleias; autogestão ergonómica.",
+        "precautions": "Sem manipulação cervical de alta velocidade sem rastreio prévio; reencaminhar se os sinais neurológicos agravarem."
+      }
+    }
+  },
+  {
+    "key": "frozen-shoulder",
+    "icd_code": "M75.0",
+    "priority": "routine",
+    "recommended_sessions": 15,
+    "text": {
+      "en": {
+        "name": "Frozen shoulder",
+        "diagnosis": "Adhesive capsulitis of the shoulder",
+        "reason": "Pain management and progressive mobilisation of the glenohumeral joint; home stretching programme.",
+        "goals": "Reduce pain; regain elevation and external rotation; independence in dressing and personal care.",
+        "precautions": "Respect pain in the freezing phase; avoid aggressive end-range stretching."
+      },
+      "pt": {
+        "name": "Ombro congelado",
+        "diagnosis": "Capsulite adesiva do ombro",
+        "reason": "Controlo da dor e mobilização progressiva da articulação glenoumeral; programa de alongamentos em casa.",
+        "goals": "Diminuir a dor; recuperar a elevação e a rotação externa; autonomia no vestir e na higiene pessoal.",
+        "precautions": "Respeitar a dor na fase inflamatória; evitar alongamentos agressivos em fim de amplitude."
+      }
+    }
+  },
+  {
+    "key": "rotator-cuff",
+    "icd_code": "M75.1",
+    "priority": "routine",
+    "recommended_sessions": 12,
+    "text": {
+      "en": {
+        "name": "Rotator cuff tendinopathy",
+        "diagnosis": "Rotator cuff syndrome",
+        "reason": "Progressive loading of the rotator cuff, scapular control and activity modification.",
+        "goals": "Pain-free overhead activity; restore strength; return to work/sport.",
+        "precautions": "Monitor for night pain or weakness suggesting a full-thickness tear."
+      },
+      "pt": {
+        "name": "Tendinopatia da coifa",
+        "diagnosis": "Síndrome da coifa dos rotadores",
+        "reason": "Carga progressiva da coifa dos rotadores, controlo escapular e modificação de atividades.",
+        "goals": "Atividades acima da cabeça sem dor; recuperar a força; regresso ao trabalho/desporto.",
+        "precautions": "Vigiar dor noturna ou fraqueza sugestivas de rotura completa."
+      }
+    }
+  },
+  {
+    "key": "acl-reconstruction",
+    "icd_code": "S83.5",
+    "priority": "urgent",
+    "recommended_sessions": 24,
+    "text": {
+      "en": {
+        "name": "ACL reconstruction rehab",
+        "diagnosis": "Anterior cruciate ligament reconstruction",
+        "reason": "Post-operative ACL rehabilitation following the surgeon's protocol: swelling control, full extension, quadriceps activation, progressive strengthening and neuromuscular training.",
+        "goals": "Full extension and ≥120° flexion by week 6; normal gait; return to sport after criteria-based testing.",
+        "precautions": "Follow graft-specific restrictions; brace and weight-bearing as instructed by the surgeon; watch for signs of DVT or infection."
+      },
+      "pt": {
+        "name": "Reabilitação pós-LCA",
+        "diagnosis": "Reconstrução do ligamento cruzado anterior",
+        "reason": "Reabilitação pós-operatória do LCA segundo o protocolo do cirurgião: controlo do edema, extensão completa, ativação do quadricípite, fortalecimento progressivo e treino neuromuscular.",
+        "goals": "Extensão completa e flexão ≥120° à 6.ª semana; marcha normal; regresso ao desporto após testes por critérios.",
+        "precautions": "Cumprir as restrições do enxerto; ortótese e carga conforme indicação do cirurgião; vigiar sinais de TVP ou infeção."
+      }
+    }
+  },
+  {
+    "key": "knee-osteoarthritis",
+    "icd_code": "M17.9",
+    "priority": "routine",
+    "recommended_sessions": 12,
+    "text": {
+      "en": {
+        "name": "Knee osteoarthritis",
+        "diagnosis": "Knee osteoarthritis",
+        "reason": "Strengthening, mobility and education programme; weight management advice.",
+        "goals": "Reduce pain; improve walking distance and stair climbing; long-term home exercise programme.",
+        "precautions": "Adapt load to flare-ups."
+      },
+      "pt": {
+        "name": "Artrose do joelho",
+        "diagnosis": "Gonartrose",
+        "reason": "Programa de fortalecimento, mobilidade e educação; aconselhamento sobre controlo do peso.",
+        "goals": "Diminuir a dor; aumentar a distância de marcha e a capacidade de subir escadas; programa de exercício domiciliário.",
+        "precautions": "Ajustar a carga nos períodos de agudização."
+      }
+    }
+  },
+  {
+    "key": "hip-replacement",
+    "icd_code": "Z96.6",
+    "priority": "urgent",
+    "recommended_sessions": 15,
+    "text": {
+      "en": {
+        "name": "Total hip replacement",
+        "diagnosis": "Total hip arthroplasty — post-operative rehabilitation",
+        "reason": "Gait re-education, hip strengthening, transfers and functional independence.",
+        "goals": "Independent walking without aids; safe stairs; return to daily activities.",
+        "precautions": "Follow the surgeon's hip precautions (approach-dependent); weight-bearing as instructed; watch for signs of DVT or dislocation."
+      },
+      "pt": {
+        "name": "Prótese total da anca",
+        "diagnosis": "Artroplastia total da anca — reabilitação pós-operatória",
+        "reason": "Reeducação da marcha, fortalecimento da anca, transferências e autonomia funcional.",
+        "goals": "Marcha independente sem auxiliares; escadas em segurança; regresso às atividades diárias.",
+        "precautions": "Cumprir as precauções indicadas pelo cirurgião (dependem da via de abordagem); carga conforme indicação; vigiar sinais de TVP ou luxação."
+      }
+    }
+  },
+  {
+    "key": "ankle-sprain",
+    "icd_code": "S93.4",
+    "priority": "routine",
+    "recommended_sessions": 8,
+    "text": {
+      "en": {
+        "name": "Ankle sprain",
+        "diagnosis": "Lateral ankle sprain",
+        "reason": "Swelling control, mobility, strengthening and proprioceptive training to prevent recurrence.",
+        "goals": "Normal gait; full range of motion; single-leg balance; return to sport.",
+        "precautions": "Exclude fracture (Ottawa rules) if not yet done."
+      },
+      "pt": {
+        "name": "Entorse do tornozelo",
+        "diagnosis": "Entorse lateral do tornozelo",
+        "reason": "Controlo do edema, mobilidade, fortalecimento e treino propriocetivo para prevenir recidivas.",
+        "goals": "Marcha normal; amplitude completa; equilíbrio unipodal; regresso ao desporto.",
+        "precautions": "Excluir fratura (regras de Ottawa) se ainda não foi feito."
+      }
+    }
+  },
+  {
+    "key": "stroke-rehab",
+    "icd_code": "I69.3",
+    "priority": "urgent",
+    "recommended_sessions": 30,
+    "text": {
+      "en": {
+        "name": "Post-stroke rehab",
+        "diagnosis": "Sequelae of stroke",
+        "reason": "Neurological rehabilitation: motor control, balance, gait training and functional independence; carer education.",
+        "goals": "Safe transfers; independent or assisted walking; reduce fall risk; maximise independence in daily activities.",
+        "precautions": "Monitor blood pressure; fall risk; shoulder care of the affected side."
+      },
+      "pt": {
+        "name": "Reabilitação pós-AVC",
+        "diagnosis": "Sequelas de AVC",
+        "reason": "Reabilitação neurológica: controlo motor, equilíbrio, treino de marcha e autonomia funcional; educação do cuidador.",
+        "goals": "Transferências seguras; marcha independente ou assistida; reduzir o risco de queda; maximizar a autonomia nas atividades diárias.",
+        "precautions": "Vigiar a tensão arterial; risco de queda; cuidados com o ombro do lado afetado."
+      }
+    }
+  }
+]

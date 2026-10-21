@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Check, Search, TriangleAlert } from "lucide-react";
+import { Check, Search, Sparkles, TriangleAlert } from "lucide-react";
 import { navigate } from "raviger";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,13 +10,19 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 import Page from "@/components/Common/Page";
+import IcdPicker from "@/components/Referral/IcdPicker";
 import ReferralRoutes from "@/components/Referral/api";
 import { useTherapists } from "@/components/Referral/hooks";
-import { ageFromDob, initials } from "@/components/Referral/referralUtils";
+import {
+  ageFromDob,
+  catalogLang,
+  initials,
+} from "@/components/Referral/referralUtils";
 import {
   CreateReferralRequest,
   Referral,
   ReferralPriority,
+  ReferralTemplate,
 } from "@/components/Referral/types";
 
 import useDebouncedValue from "@/hooks/useDebouncedValue";
@@ -31,7 +37,7 @@ const inputClass =
 const textareaClass =
   "w-full rounded-lg border border-gray-300 p-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500";
 
-interface Form {
+export interface Form {
   diagnosis: string;
   icd_code: string;
   reason: string;
@@ -71,8 +77,32 @@ export function toRequest(patientId: string, f: Form): CreateReferralRequest {
   };
 }
 
+/** Clinical fields a template fills in (routing to a therapist is kept). */
+export function applyTemplate(f: Form, tpl: ReferralTemplate): Form {
+  return {
+    ...f,
+    diagnosis: tpl.diagnosis,
+    icd_code: tpl.icd_code,
+    reason: tpl.reason,
+    goals: tpl.goals,
+    precautions: tpl.precautions,
+    priority: tpl.priority,
+    recommended_sessions: tpl.recommended_sessions
+      ? String(tpl.recommended_sessions)
+      : "",
+  };
+}
+
+/** True if the doctor already typed clinical text a template would replace. */
+export const hasClinicalText = (f: Form) =>
+  [f.diagnosis, f.icd_code, f.reason, f.goals, f.precautions].some((v) =>
+    v.trim(),
+  );
+
 export default function CreateReferral({ patientId }: { patientId?: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = catalogLang(i18n.language);
+  const [templateKey, setTemplateKey] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search);
   const [patient, setPatient] = useState<{ id: string; name: string } | null>(
@@ -103,6 +133,19 @@ export default function CreateReferral({ patientId }: { patientId?: string }) {
   });
 
   const { data: therapists } = useTherapists();
+
+  const { data: templates } = useQuery({
+    queryKey: ["referral-templates", lang],
+    queryFn: query(ReferralRoutes.templates, { queryParams: { lang } }),
+    staleTime: Infinity, // reference data
+  });
+
+  const chooseTemplate = (tpl: ReferralTemplate) => {
+    if (hasClinicalText(form) && !window.confirm(t("replace_with_template")))
+      return;
+    setForm((f) => applyTemplate(f, tpl));
+    setTemplateKey(tpl.key);
+  };
 
   const { mutate: create, isPending } = useMutation({
     mutationFn: mutate(ReferralRoutes.create),
@@ -204,6 +247,32 @@ export default function CreateReferral({ patientId }: { patientId?: string }) {
 
         {/* 2. Clinical information */}
         <Step n={2} title={t("clinical_details")}>
+          {!!templates?.length && (
+            <div>
+              <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                <Sparkles className="size-4 text-primary-600" aria-hidden />
+                {t("start_from_template")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.key}
+                    type="button"
+                    aria-pressed={templateKey === tpl.key}
+                    onClick={() => chooseTemplate(tpl)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-sm transition",
+                      templateKey === tpl.key
+                        ? "border-primary-500 bg-primary-50 text-primary-800"
+                        : "border-gray-200 text-gray-700 hover:border-primary-300 hover:bg-gray-50",
+                    )}
+                  >
+                    {tpl.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="sm:col-span-2">
               <Label htmlFor="diagnosis">{t("diagnosis")} *</Label>
@@ -218,12 +287,17 @@ export default function CreateReferral({ patientId }: { patientId?: string }) {
             </div>
             <div>
               <Label htmlFor="icd">{t("icd_code")}</Label>
-              <input
+              <IcdPicker
                 id="icd"
-                maxLength={32}
                 value={form.icd_code}
-                placeholder="M54.5"
-                onChange={(e) => set("icd_code", e.target.value)}
+                onChange={(v) => set("icd_code", v)}
+                onPick={(c) =>
+                  setForm((f) => ({
+                    ...f,
+                    icd_code: c.code,
+                    diagnosis: f.diagnosis.trim() ? f.diagnosis : c.description,
+                  }))
+                }
                 className={cn(inputClass, "mt-1")}
               />
             </div>

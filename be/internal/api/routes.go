@@ -10,6 +10,7 @@ import (
 	"klyniva/internal/mailer"
 	"klyniva/internal/models"
 	"klyniva/internal/modules/attachment"
+	"klyniva/internal/modules/catalog"
 	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/patient"
 	"klyniva/internal/modules/referral"
@@ -123,6 +124,9 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 
 	// Doctor → physiotherapist referrals (module, core Klyniva workflow)
 	referrals := referral.RegisterRoutes(protected, db, notifications)
+
+	// Reference data for the referral form (ICD-10 subset, templates)
+	catalog.RegisterRoutes(protected, catalog.MustLoad())
 
 	// Files attached to referrals (access follows the referral)
 	uploads, err := storage.NewLocal(cfg.Upload.Path)

@@ -115,3 +115,22 @@ export type ReferralAction =
   | "cancel"
   | "reassign"
   | "reopen";
+
+/** One ICD-10 code from GET /catalog/icd10/ (description in the UI language). */
+export interface IcdCode {
+  code: string;
+  description: string;
+}
+
+/** Built-in referral template from GET /catalog/referral-templates/. */
+export interface ReferralTemplate {
+  key: string;
+  name: string;
+  icd_code: string;
+  diagnosis: string;
+  reason: string;
+  goals: string;
+  precautions: string;
+  priority: ReferralPriority;
+  recommended_sessions: number;
+}

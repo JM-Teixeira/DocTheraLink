@@ -39,6 +39,7 @@ be/                Go backend (Go module name: klyniva)
       patient/     same layout
       notification/ in-app + e-mail notifications fed by referral events
       attachment/  files on referrals; access follows the referral
+      catalog/     embedded ICD-10 subset + referral templates (EN/PT, read-only)
     storage/       file Store interface (Local today, S3 later)
     mailer/        SMTP or log-only mailer (no patient data in e-mails)
     clinic/        which clinic a user works in (Resolver) — scope new data with it

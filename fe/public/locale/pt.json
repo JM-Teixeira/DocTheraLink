@@ -316,5 +316,8 @@
   "attachment_error__too_large": "O ficheiro tem mais de 10 MB.",
   "attachment_error__type": "Este tipo de ficheiro não é permitido.",
   "attachment_error__forbidden": "Apenas os participantes do encaminhamento podem adicionar ficheiros.",
-  "attachment_error__generic": "Ocorreu um erro com o ficheiro. Tente novamente."
+  "attachment_error__generic": "Ocorreu um erro com o ficheiro. Tente novamente.",
+  "icd_code_placeholder": "Código ou palavras, ex. M54.5",
+  "start_from_template": "Começar a partir de um modelo",
+  "replace_with_template": "Substituir os detalhes clínicos que escreveu por este modelo?"
 }

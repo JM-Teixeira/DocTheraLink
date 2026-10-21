@@ -426,3 +426,20 @@ func TestAttachments(t *testing.T) {
 	code, _, _ = physio.download("/attachments/" + aid + "/download/")
 	expect(t, "deleted file is gone", code, 404)
 }
+
+// TestCatalog: the referral form's ICD-10 search and templates, per language.
+func TestCatalog(t *testing.T) {
+	doctor, _ := login(t, "doctor")
+	var codes []map[string]string
+	expect(t, "icd search", doctor.call("GET", "/catalog/icd10/?search=lombalgia&lang=pt", nil, &codes), 200)
+	if len(codes) == 0 || codes[0]["code"] != "M54.5" || codes[0]["description"] != "Lombalgia" {
+		t.Fatalf("icd search: %v", codes)
+	}
+	var tpls []map[string]any
+	expect(t, "templates", doctor.call("GET", "/catalog/referral-templates/?lang=en", nil, &tpls), 200)
+	if len(tpls) == 0 || tpls[0]["name"] == "" || tpls[0]["icd_code"] == "" {
+		t.Fatalf("templates: %v", tpls)
+	}
+	anon := &client{t: t, base: doctor.base}
+	expect(t, "catalog needs login", anon.call("GET", "/catalog/icd10/?search=m54", nil, nil), 401)
+}

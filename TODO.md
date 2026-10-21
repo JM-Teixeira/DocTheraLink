@@ -87,7 +87,8 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] Attachments on referrals (imaging, reports, PDFs; content-sniffed, 10 MB, participants upload, uploader/admin delete) — replaced the `/files` stubs.
 - [x] Re-assign / hand-over to another therapist; re-open a declined referral to another therapist.
 - [x] Filters & search on the referral list (patient, priority, date, therapist) and counts per status tab.
-- [ ] ICD-10 code picker; referral templates for common conditions (ACL rehab, low back pain, frozen shoulder…).
+- [x] ICD-10 code picker (curated physio subset, EN/PT, code or word search); 9 built-in referral templates.
+- [ ] Later: clinic-defined templates stored in the database; optional full ICD-10 import (licensed data, PT edition).
 - [ ] Printable referral / discharge letter (PDF).
 
 ### M4 — Patients (P1)

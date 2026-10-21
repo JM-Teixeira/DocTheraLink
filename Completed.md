@@ -7,6 +7,18 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-21 — M1 referral loop (branch `feat/m1-referral-loop`)
 
+### 10:15 · ICD-10 picker and referral templates
+- Backend `modules/catalog`: embedded, validated-at-start-up data — 65
+  physiotherapy-relevant ICD-10 codes and 9 templates (low back pain, neck
+  pain, frozen shoulder, rotator cuff, ACL reconstruction, knee OA, hip
+  replacement, ankle sprain, post-stroke), EN/PT. `GET /catalog/icd10/`
+  searches by code or accent-insensitive words; `GET /catalog/referral-templates/`.
+- Frontend: ICD combobox (keyboard + mouse, fills an empty diagnosis) and
+  "Start from a template" chips on the new-referral form (asks before
+  overwriting typed text).
+- Tests: data integrity, search ranking, language fallback, HTTP; form
+  helpers; e2e `TestCatalog`.
+
 ### 09:30 · Attachments on referrals
 - Backend: `internal/storage` (Store interface, atomic local files) and
   `modules/attachment`: upload (multipart, content sniffed — PDF, JPEG,
