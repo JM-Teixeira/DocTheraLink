@@ -509,7 +509,11 @@ function PhysioGrid({
             const absence = absenceOf(board.absences, th.id);
             const pct = utilisation(th);
             return (
-              <tr key={th.id} data-physio-row className={cn(absence && "bg-amber-50/40")}>
+              <tr
+                key={th.id}
+                data-physio-row
+                className={cn(absence && "bg-amber-50/40")}
+              >
                 <th className={nameCell}>
                   <button
                     type="button"
