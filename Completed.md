@@ -12,6 +12,7 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
   that laptop. The local cluster now uses `same-origin`: the app calls the
   API on the address it was opened from (localhost, the PC name or its IP).
   The `fe/public/config.js` edit is not needed for this.
+  docker compose uses the same (`FRONTEND_API_URL` overrides it).
 - User menu says "Sobre"; the page keeps the title "Sobre o Klyniva".
 
 ### Patient consents, GDPR (TODO)

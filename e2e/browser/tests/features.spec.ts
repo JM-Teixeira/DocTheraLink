@@ -55,9 +55,11 @@ test("the app talks to the server on the address it was opened from (other lapto
   page.on("request", (r) => {
     if (r.url().includes("/api/v1/")) apiHosts.add(new URL(r.url()).host);
   });
-  await page.goto("http://127.0.0.1:8088/");
+  const other = new URL(process.env.E2E_WEB_URL ?? "http://localhost:8088");
+  other.hostname = "127.0.0.1";
+  await page.goto(other.toString());
   await expect(page.locator("#user-profile-name")).toBeVisible();
-  expect([...apiHosts]).toEqual(["127.0.0.1:8088"]);
+  expect([...apiHosts]).toEqual([other.host]);
 });
 
 test("stock permissions: the coordinator gives Pedro floor 2, Pedro can then restock only there", async ({ browser, page, request }) => {
