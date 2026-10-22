@@ -7,13 +7,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 import Page from "@/components/Common/Page";
-import { roleKey } from "@/components/Staff/staffUtils";
+import { STATUS_STYLES } from "@/components/Settings/SuggestionsCard";
 import SuggestionRoutes, {
   SUGGESTION_STATUSES,
   Suggestion,
   SuggestionStatus,
 } from "@/components/Settings/api";
-import { STATUS_STYLES } from "@/components/Settings/SuggestionsCard";
+import { roleKey } from "@/components/Staff/staffUtils";
 
 import useDateFormat from "@/hooks/useDateFormat";
 
@@ -34,9 +34,12 @@ export default function SuggestionsAdmin() {
   });
 
   return (
-    <Page title={t("suggestions")} hideBack>
-      <p className="mb-3 max-w-3xl text-sm text-gray-600">{t("suggestions_admin_help")}</p>
-      <div role="group" aria-label={t("status")} className="mb-4 flex flex-wrap gap-2">
+    <Page title={t("suggestions")} hideBack help="suggestions">
+      <div
+        role="group"
+        aria-label={t("status")}
+        className="mb-4 flex flex-wrap gap-2"
+      >
         {(["", ...SUGGESTION_STATUSES] as const).map((s) => (
           <button
             key={s || "all"}
@@ -79,7 +82,8 @@ function SuggestionItem({ s }: { s: Suggestion }) {
   const review = useMutation({
     mutationFn: (body: { status?: SuggestionStatus; admin_note?: string }) =>
       callApi(SuggestionRoutes.review, { pathParams: { id: s.id }, body }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["suggestions"] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["suggestions"] }),
   });
   const who = s.author
     ? `${s.author.first_name} ${s.author.last_name} (${t(roleKey(s.author.user_type), { defaultValue: s.author.user_type })})`
@@ -88,7 +92,12 @@ function SuggestionItem({ s }: { s: Suggestion }) {
   return (
     <li className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-        <span className={cn("rounded-full px-2 py-0.5 font-medium", STATUS_STYLES[s.status])}>
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 font-medium",
+            STATUS_STYLES[s.status],
+          )}
+        >
           {t(`suggestion_status__${s.status}`)}
         </span>
         <span>{t(`suggestion_kind__${s.kind}`)}</span>
@@ -102,7 +111,9 @@ function SuggestionItem({ s }: { s: Suggestion }) {
           <select
             value={s.status}
             disabled={review.isPending}
-            onChange={(e) => review.mutate({ status: e.target.value as SuggestionStatus })}
+            onChange={(e) =>
+              review.mutate({ status: e.target.value as SuggestionStatus })
+            }
             className="mt-1 block h-9 rounded-md border border-gray-300 px-2 text-sm"
           >
             {SUGGESTION_STATUSES.map((st) => (

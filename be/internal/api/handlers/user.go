@@ -83,9 +83,13 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 		return
 	}
 	if !auth.IsAdmin(claims.UserType) {
-		var me models.User
-		if err := db.Select("id", "home_facility_id").First(&me, claims.UserID).Error; err == nil && me.HomeFacilityID != nil {
-			query = query.Where("home_facility_id = ?", *me.HomeFacilityID)
+		// Their own clinic (currentActor also applies an admin's "view as")
+		a, ok := currentActor(c, db)
+		if !ok {
+			return
+		}
+		if a.Clinic != nil {
+			query = query.Where("home_facility_id = ?", *a.Clinic)
 		} else {
 			query = query.Where("id = ?", claims.UserID)
 		}
@@ -107,7 +111,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 	}
 
 	// Convert to bare minimum for list view
-	var userList []models.UserBareMinimum
+	userList := []models.UserBareMinimum{} // [] not null when nobody matches
 	for _, user := range users {
 		clinicName := ""
 		if user.HomeFacility != nil {
@@ -172,6 +176,22 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
+	// Viewing as a role: the app shows that role and clinic, and says so
+	if va, ok := auth.ViewingAs(c); ok {
+		user.UserType = va.Role
+		clinicID := va.Clinic
+		user.HomeFacilityID = &clinicID
+		user.HomeFacility = nil
+		var f models.Facility
+		if db.First(&f, "id = ?", clinicID).Error == nil {
+			user.HomeFacility = &f
+		}
+		c.JSON(http.StatusOK, struct {
+			models.User
+			ViewAs auth.ViewAs `json:"view_as"`
+		}{user, va})
+		return
+	}
 	c.JSON(http.StatusOK, user)
 }
 

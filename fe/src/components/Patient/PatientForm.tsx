@@ -209,6 +209,7 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
 
   return (
     <Page
+      help="patient_form"
       title={editing ? t("edit_patient") : t("new_patient")}
       backUrl={editing ? `/patients/${patientId}` : "/patients"}
       crumbsReplacements={

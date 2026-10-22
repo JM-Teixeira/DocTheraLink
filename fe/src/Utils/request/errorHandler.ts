@@ -1,3 +1,4 @@
+import i18next from "i18next";
 import { navigate } from "raviger";
 
 import * as Notifications from "@/Utils/Notifications";
@@ -22,6 +23,11 @@ export function handleHttpError(error: Error) {
   }
 
   const cause = error.cause;
+
+  if (cause?.error === "view_as_read_only") {
+    Notifications.Warn({ msg: i18next.t("view_as_read_only") });
+    return;
+  }
 
   if (isSessionExpired(cause)) {
     handleSessionExpired();

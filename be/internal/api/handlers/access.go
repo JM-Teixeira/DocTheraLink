@@ -40,6 +40,10 @@ func currentActor(c *gin.Context, db *gorm.DB) (*actor, bool) {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "unauthorized", Message: "User not authenticated"})
 		return nil, false
 	}
+	if va, ok := auth.ViewingAs(c); ok { // an admin looking as a clinic role (read-only)
+		clinicID := va.Clinic
+		return &actor{ID: me.ID, Role: va.Role, Clinic: &clinicID}, true
+	}
 	return &actor{ID: me.ID, Role: me.UserType, Clinic: me.HomeFacilityID}, true
 }
 

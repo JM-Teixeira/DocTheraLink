@@ -1,5 +1,5 @@
 import { Link } from "raviger";
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { Avatar } from "@/components/Common/Avatar";
+import { ViewAsDialog } from "@/components/Common/ViewAs";
 
 import useAuthUser, { useAuthContext } from "@/hooks/useAuthUser";
 
+import { isAdmin } from "@/Utils/roles";
 import { formatDisplayName, formatName } from "@/Utils/utils";
 
 interface SidebarUserCardProps {
@@ -24,6 +26,7 @@ const SidebarUserCard: React.FC<SidebarUserCardProps> = ({ shrinked }) => {
   const { t } = useTranslation();
   const user = useAuthUser();
   const { signOut } = useAuthContext();
+  const [viewAsOpen, setViewAsOpen] = useState(false);
 
   return (
     <div
@@ -78,11 +81,20 @@ const SidebarUserCard: React.FC<SidebarUserCardProps> = ({ shrinked }) => {
               <div id="about-button">{t("about")}</div>
             </DropdownMenuItem>
           </Link>
+          {isAdmin(user) && (
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onSelect={() => setViewAsOpen(true)}
+            >
+              <div id="view-as-button">{t("view_as")}</div>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={signOut} className="cursor-pointer">
             <div id="sign-out-button">{t("sign_out")}</div>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <ViewAsDialog open={viewAsOpen} onClose={() => setViewAsOpen(false)} />
     </div>
   );
 };

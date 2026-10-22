@@ -117,6 +117,7 @@ export default function ReferralList() {
 
   return (
     <Page
+      help="referrals"
       title={isTherapist(user) ? t("referral_inbox") : t("referrals")}
       hideBack
       options={

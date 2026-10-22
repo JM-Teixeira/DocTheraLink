@@ -120,6 +120,7 @@ export default function StaffList() {
 
   return (
     <Page
+      help="people"
       title={t("people")}
       hideBack
       options={

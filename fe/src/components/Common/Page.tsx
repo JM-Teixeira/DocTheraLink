@@ -2,6 +2,7 @@ import { RefObject, useContext, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 
+import PageHelp from "@/components/Common/PageHelp";
 import PageTitle, { PageTitleProps } from "@/components/Common/PageTitle";
 import { SidebarShrinkContext } from "@/components/Common/Sidebar/Sidebar";
 
@@ -18,6 +19,8 @@ interface PageProps extends PageTitleProps {
    **/
   collapseSidebar?: boolean;
   hideTitleOnPage?: boolean;
+  /** Topic of the "?" help pop-up next to the title (locale help__<topic>) */
+  help?: string;
 }
 
 export default function Page(props: PageProps) {
@@ -54,6 +57,11 @@ export default function Page(props: PageProps) {
           isInsidePage={true}
           hideTitleOnPage={props.hideTitleOnPage}
         />
+        {props.help && (
+          <div className="md:mr-auto md:-ml-4">
+            <PageHelp topic={props.help} title={props.title} />
+          </div>
+        )}
         {props.options}
       </div>
       {props.children}

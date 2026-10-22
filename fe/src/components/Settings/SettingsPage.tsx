@@ -57,7 +57,7 @@ export default function SettingsPage() {
   const today = new Date();
 
   return (
-    <Page title={t("settings")} hideBack>
+    <Page title={t("settings")} hideBack help="settings">
       <div className="flex max-w-3xl flex-col gap-6">
         <Card title={t("appearance")}>
           <Choice
@@ -82,8 +82,13 @@ export default function SettingsPage() {
         <Card title={t("language_and_dates")}>
           <Choice
             label={t("language")}
-            value={user.language || (i18n.language.startsWith("en") ? "en" : "pt")}
-            options={LANGUAGES.map((v) => ({ value: v, label: t(`language__${v}`) }))}
+            value={
+              user.language || (i18n.language.startsWith("en") ? "en" : "pt")
+            }
+            options={LANGUAGES.map((v) => ({
+              value: v,
+              label: t(`language__${v}`),
+            }))}
             onChange={(language) => {
               i18n.changeLanguage(language);
               save.mutate({ language });
@@ -109,14 +114,19 @@ export default function SettingsPage() {
             label={t("start_page")}
             hint={t("start_page_help")}
             value={user.start_page || "home"}
-            options={START_PAGES.map((v) => ({ value: v, label: t(`start_page__${v}`) }))}
+            options={START_PAGES.map((v) => ({
+              value: v,
+              label: t(`start_page__${v}`),
+            }))}
             onChange={(start_page) => save.mutate({ start_page })}
             pending={save.isPending}
           />
         </Card>
 
         <Card title={t("software_update")}>
-          <p className="mb-3 text-sm text-gray-600">{t("software_update_explained")}</p>
+          <p className="mb-3 text-sm text-gray-600">
+            {t("software_update_explained")}
+          </p>
           <UserSoftwareUpdate />
         </Card>
 
@@ -158,7 +168,11 @@ function Choice({
     <div>
       <p className="text-sm font-medium text-gray-700">{label}</p>
       {hint && <p className="text-xs text-gray-500">{hint}</p>}
-      <div role="radiogroup" aria-label={label} className="mt-2 grid gap-2 sm:grid-cols-3">
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className="mt-2 grid gap-2 sm:grid-cols-3"
+      >
         {options.map((o) => (
           <button
             key={o.value}
@@ -176,9 +190,13 @@ function Choice({
           >
             <span>
               <span className="block font-medium text-gray-900">{o.label}</span>
-              {o.detail && <span className="block text-xs text-gray-500">{o.detail}</span>}
+              {o.detail && (
+                <span className="block text-xs text-gray-500">{o.detail}</span>
+              )}
             </span>
-            {value === o.value && <Check className="size-4 text-primary-600" aria-hidden />}
+            {value === o.value && (
+              <Check className="size-4 text-primary-600" aria-hidden />
+            )}
           </button>
         ))}
       </div>

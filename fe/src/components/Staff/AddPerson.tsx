@@ -129,7 +129,7 @@ export default function AddPerson() {
   });
 
   return (
-    <Page title={t("add_person")} backUrl="/users">
+    <Page title={t("add_person")} backUrl="/users" help="add_person">
       <form
         noValidate
         className="mx-auto flex max-w-2xl flex-col gap-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"

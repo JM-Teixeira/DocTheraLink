@@ -98,6 +98,7 @@ export default function PatientList() {
 
   return (
     <Page
+      help="patients"
       title={t("patients")}
       hideBack
       options={
@@ -161,7 +162,7 @@ export default function PatientList() {
             className="h-10 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
           >
             <option value="">{t("all_physios")}</option>
-            {physios?.results.map((p) => (
+            {physios?.results?.map((p) => (
               <option key={p.id} value={p.id}>
                 {`${p.first_name} ${p.last_name}`.trim() || p.username}
               </option>

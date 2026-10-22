@@ -10,6 +10,7 @@ import {
   SIDEBAR_SHRINK_PREFERENCE_KEY,
   SidebarShrinkContext,
 } from "@/components/Common/Sidebar/Sidebar";
+import { ViewAsBanner } from "@/components/Common/ViewAs";
 import Error404 from "@/components/ErrorPages/404";
 import SessionExpired from "@/components/ErrorPages/SessionExpired";
 import HomePage from "@/components/Home/HomePage";
@@ -114,6 +115,7 @@ export default function AppRouter() {
         </>
 
         <div className="relative flex w-full flex-1 flex-col overflow-hidden bg-gray-100 print:overflow-visible">
+          <ViewAsBanner />
           <div className="relative z-10 flex h-16 shrink-0 bg-white shadow md:hidden">
             <button
               onClick={() => setSidebarOpen(true)}

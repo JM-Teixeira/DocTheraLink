@@ -204,6 +204,7 @@ export default function InventoryPage() {
 
   return (
     <Page
+      help="inventory"
       title={t("inventory")}
       options={
         canCreate && (
@@ -214,9 +215,6 @@ export default function InventoryPage() {
         )
       }
     >
-      <p className="mb-3 max-w-3xl text-sm text-gray-600">
-        {t("inventory_help_kinds")}
-      </p>
       <div className="mb-4 max-w-3xl">
         <PerSessionHelp />
       </div>

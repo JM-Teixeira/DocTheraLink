@@ -73,6 +73,11 @@ func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 			return
 		}
 
+		// Admins may look at the app as a clinic role (read-only, viewas.go)
+		if !applyViewAs(ctx, payload) {
+			return
+		}
+
 		ctx.Set(AuthorizationPayloadKey, payload)
 		ctx.Set(UserIDKey, payload.UserID)
 		ctx.Next()

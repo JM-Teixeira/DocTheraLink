@@ -66,6 +66,7 @@ export default function PatientDetail({ id }: { id: string }) {
 
   return (
     <Page
+      help="patient"
       title={t("patient")}
       backUrl="/patients"
       crumbsReplacements={{ [id]: { name: patient.name ?? "" } }}

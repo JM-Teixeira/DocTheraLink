@@ -188,6 +188,7 @@ export default function TimeBoardPage() {
 
   return (
     <Page
+      help="time_board"
       title={t("time_board")}
       options={
         manage && (

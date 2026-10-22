@@ -96,6 +96,7 @@ export default function UserHome(props: UserHomeProps) {
   return (
     <>
       <Page
+        help="person"
         title={formatName(userData) || userData.username || t("manage_user")}
         crumbsReplacements={
           loggedInUser

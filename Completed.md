@@ -5,6 +5,21 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.15.0 (branch `feat/m4-patients`)
+
+### Page help and "view as" (batch 3, parts D and E)
+- A "?" next to each page title opens what the page is for and what it
+  can do (texts `help__<page>` in the locales; a unit test checks every
+  page has one in both languages). The long inventory explanation moved
+  there.
+- Admins: user menu → "Ver como…" a role of a clinic. A yellow banner shows
+  who you are viewing as, with "Voltar a administrador". The server runs
+  those requests with that role and clinic and refuses anything that
+  changes data, so looking around never acts as someone (auth/viewas.go).
+- Fix found on the way: the people list answered `null` instead of `[]`
+  when nobody matched, which crashed the patients page (e.g. a clinic with
+  no physios).
+
 ## 2026-10-22 · Klyniva 0.14.0 (branch `feat/m4-patients`)
 
 ### Settings and suggestions (batch 3, part C)

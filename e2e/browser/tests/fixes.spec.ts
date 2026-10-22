@@ -57,6 +57,40 @@ test("the coordinator adds a person; the username follows the clinic standard", 
   await page.getByLabel(/^Email/).fill(`joao.${last.toLowerCase()}@example.test`);
   await page.getByLabel(/^Palavra-passe/).fill("Seguro#2026");
   await page.getByLabel(/^Confirmar palavra-passe/i).fill("Seguro#2026");
-  await page.getByRole("button", { name: "Adicionar pessoa" }).click();
+  await page.getByRole("button", { name: "Adicionar pessoa", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/users/cm\.joao\.${last.toLowerCase()}$`));
+});
+
+test("the ? next to the title explains the page in a pop-up", async ({ page, request }) => {
+  await signIn(page, request, "cm.ana.ferreira");
+  await page.goto("/inventory");
+  await expect(page.getByText(/Os artigos descartáveis/)).toHaveCount(0); // no longer on the page
+  await page.getByRole("button", { name: "Ajuda: Inventário" }).click();
+  const help = page.getByRole("dialog");
+  await expect(help.getByRole("heading", { name: "Inventário" })).toBeVisible();
+  await expect(help.getByRole("listitem").first()).toBeVisible();
+  await expect(help.getByText(/descartáveis/)).toBeVisible();
+});
+
+test("an admin views the app as a physio of Climutua, read-only, and comes back", async ({ page, request }) => {
+  await signIn(page, request, "paula.neves");
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "Sugestões" })).toBeVisible(); // admin menu
+  await page.locator("#user-profile-name").click();
+  await page.getByRole("menuitem", { name: "Ver como…" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Função").selectOption("PhysioTherapist");
+  await dialog.getByLabel("Clínica").selectOption({ label: "Climutua · Medicina Física e Reabilitação" });
+  await dialog.getByRole("button", { name: "Ver", exact: true }).click();
+
+  const banner = page.getByRole("status").filter({ hasText: "A ver como Fisioterapeuta" });
+  await expect(banner).toContainText("só leitura");
+  await expect(page.getByRole("link", { name: "Sugestões" })).toHaveCount(0); // a physio has no admin menu
+  await page.goto("/patients");
+  await expect(page.locator("tbody tr").first()).toBeVisible(); // Climutua's patients
+  await expect(page.getByRole("button", { name: "Exportar CSV" })).toHaveCount(0);
+
+  await banner.getByRole("button", { name: "Voltar a administrador" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "A ver como" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Sugestões" })).toBeVisible();
 });

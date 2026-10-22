@@ -7,7 +7,8 @@ import pt from "../../public/locale/pt.json";
 // "one", so a count of 0 would show the singular text ("1 pessoa"). Every
 // pt plural pair needs a _zero form (and no long dashes in what people read).
 describe("locales", () => {
-  const ptKeys = pt as Record<string, string>;
+  const ptKeys = pt as unknown as Record<string, string>;
+  const enKeys = en as unknown as Record<string, string>;
 
   it("every Portuguese plural has a zero form", () => {
     const missing = Object.keys(ptKeys)
@@ -25,5 +26,22 @@ describe("locales", () => {
       .filter(([, v]) => typeof v === "string" && /[—–]/.test(v))
       .map(([k]) => k);
     expect(withDash).toEqual([]);
+  });
+
+  it("every page help topic has a text in both languages", () => {
+    // The source of every component, to find the help="<topic>" of each page
+    const sources = import.meta.glob("../components/**/*.tsx", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>;
+    const topics = new Set<string>();
+    for (const src of Object.values(sources))
+      for (const m of src.matchAll(/\shelp="([a-z_]+)"/g)) topics.add(m[1]);
+    expect(topics.size).toBeGreaterThan(10);
+    const missing = [...topics].filter(
+      (k) => !enKeys[`help__${k}`] || !ptKeys[`help__${k}`],
+    );
+    expect(missing).toEqual([]);
   });
 });

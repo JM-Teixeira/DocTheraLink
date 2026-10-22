@@ -51,6 +51,7 @@ export const FacilityList = () => {
 
   return (
     <Page
+      help="clinics"
       title={t("facilities")}
       breadcrumbs={false}
       hideBack

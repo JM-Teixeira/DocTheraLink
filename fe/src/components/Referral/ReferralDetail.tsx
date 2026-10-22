@@ -146,6 +146,7 @@ export default function ReferralDetail({ id }: { id: string }) {
 
   return (
     <Page
+      help="referral"
       title={t("referral")}
       backUrl="/referrals"
       options={

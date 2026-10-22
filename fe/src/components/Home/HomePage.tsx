@@ -109,7 +109,7 @@ export default function HomePage() {
   const minePatients = mine.reduce((n, h) => n + h.appointments.length, 0);
 
   return (
-    <Page title={t("home")} hideTitleOnPage>
+    <Page title={t("home")} hideTitleOnPage help="home">
       {/* Greeting */}
       <section className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-primary-700 to-primary-500 p-6 text-white shadow-sm">
         <p className="text-sm capitalize text-white/80">

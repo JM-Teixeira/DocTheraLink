@@ -53,7 +53,9 @@ export default function SuggestionsCard() {
       aria-label={t("suggestions")}
       className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
     >
-      <h2 className="text-base font-semibold text-gray-900">{t("suggestions")}</h2>
+      <h2 className="text-base font-semibold text-gray-900">
+        {t("suggestions")}
+      </h2>
       <p className="mb-3 text-sm text-gray-600">{t("suggestions_help")}</p>
       <form
         className="flex flex-col gap-3"
@@ -62,7 +64,11 @@ export default function SuggestionsCard() {
           if (text.trim().length >= 5) send.mutate();
         }}
       >
-        <div role="radiogroup" aria-label={t("suggestion_kind")} className="flex flex-wrap gap-2">
+        <div
+          role="radiogroup"
+          aria-label={t("suggestion_kind")}
+          className="flex flex-wrap gap-2"
+        >
           {SUGGESTION_KINDS.map((k) => (
             <button
               key={k}
@@ -93,7 +99,11 @@ export default function SuggestionsCard() {
           />
         </label>
         <div className="flex justify-end">
-          <Button type="submit" variant="primary" disabled={text.trim().length < 5 || send.isPending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={text.trim().length < 5 || send.isPending}
+          >
             {t("send_suggestion")}
           </Button>
         </div>
@@ -101,21 +111,33 @@ export default function SuggestionsCard() {
 
       {!!mine?.length && (
         <div className="mt-4">
-          <h3 className="mb-2 text-sm font-semibold text-gray-800">{t("my_suggestions")}</h3>
+          <h3 className="mb-2 text-sm font-semibold text-gray-800">
+            {t("my_suggestions")}
+          </h3>
           <ul className="space-y-2">
             {mine.map((s) => (
-              <li key={s.id} className="rounded-lg border border-gray-100 p-3 text-sm">
+              <li
+                key={s.id}
+                className="rounded-lg border border-gray-100 p-3 text-sm"
+              >
                 <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                   <span>{fmt(s.created_date)}</span>
                   <span>· {t(`suggestion_kind__${s.kind}`)}</span>
-                  <span className={cn("rounded-full px-2 py-0.5 font-medium", STATUS_STYLES[s.status])}>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 font-medium",
+                      STATUS_STYLES[s.status],
+                    )}
+                  >
                     {t(`suggestion_status__${s.status}`)}
                   </span>
                 </div>
                 <p className="whitespace-pre-wrap text-gray-800">{s.text}</p>
                 {s.admin_note && (
                   <p className="mt-2 rounded bg-gray-50 p-2 text-xs text-gray-700">
-                    <span className="font-medium">{t("suggestion_answer")}: </span>
+                    <span className="font-medium">
+                      {t("suggestion_answer")}:{" "}
+                    </span>
                     {s.admin_note}
                   </p>
                 )}

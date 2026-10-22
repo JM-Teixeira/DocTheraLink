@@ -34,7 +34,7 @@ export default function AboutPage() {
   const mismatch = !!server && server.version !== APP_VERSION;
 
   return (
-    <Page title={t("about_klyniva")}>
+    <Page title={t("about_klyniva")} help="about">
       <div className="flex max-w-3xl flex-col gap-5">
         <section className="flex items-center gap-5 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <img
