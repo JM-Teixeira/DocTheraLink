@@ -111,6 +111,9 @@ type Referral struct {
 	Doctor    *UserSummary    `json:"doctor,omitempty" gorm:"foreignKey:DoctorID;->;-:migration"`
 	Therapist *UserSummary    `json:"therapist,omitempty" gorm:"foreignKey:TherapistID;->;-:migration"`
 
+	// Questions on the thread waiting for the viewer to answer (lists only)
+	OpenQuestions int `json:"open_questions" gorm:"-"`
+
 	CreatedAt time.Time      `json:"created_date"`
 	UpdatedAt time.Time      `json:"modified_date"`
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
@@ -128,13 +131,18 @@ func (r *Referral) BeforeCreate(*gorm.DB) error {
 
 // Note is one message on the shared doctor ↔ therapist thread of a referral.
 type Note struct {
-	ID         string       `json:"id" gorm:"primaryKey;type:uuid"`
-	ReferralID string       `json:"referral_id" gorm:"type:uuid;not null;index"`
-	AuthorID   uint         `json:"author_id" gorm:"not null"`
-	Kind       NoteKind     `json:"kind" gorm:"type:varchar(16);not null"`
-	Body       string       `json:"body" gorm:"type:text;not null"`
-	Author     *UserSummary `json:"author,omitempty" gorm:"foreignKey:AuthorID;->;-:migration"`
-	CreatedAt  time.Time    `json:"created_date"`
+	ID         string   `json:"id" gorm:"primaryKey;type:uuid"`
+	ReferralID string   `json:"referral_id" gorm:"type:uuid;not null;index"`
+	AuthorID   uint     `json:"author_id" gorm:"not null"`
+	Kind       NoteKind `json:"kind" gorm:"type:varchar(16);not null"`
+	Body       string   `json:"body" gorm:"type:text;not null"`
+	// A reply answers one question of the same thread
+	ReplyToID *string `json:"reply_to_id" gorm:"type:uuid;index"`
+	// Progress notes: pain on a 0-10 scale (NRS), for the evolution chart
+	Pain      *int         `json:"pain"`
+	Answered  bool         `json:"answered" gorm:"-"` // questions: someone replied
+	Author    *UserSummary `json:"author,omitempty" gorm:"foreignKey:AuthorID;->;-:migration"`
+	CreatedAt time.Time    `json:"created_date"`
 }
 
 func (Note) TableName() string { return "referral_notes" }
@@ -175,6 +183,10 @@ type ReasonRequest struct {
 type NoteRequest struct {
 	Kind NoteKind `json:"kind" binding:"omitempty,oneof=progress question reply"`
 	Body string   `json:"body" binding:"required"`
+	// Replies: the question answered (required for kind reply)
+	ReplyTo string `json:"reply_to" binding:"omitempty,uuid"`
+	// Progress notes: pain 0-10 (optional)
+	Pain *int `json:"pain" binding:"omitempty,min=0,max=10"`
 }
 
 // ReassignRequest is the body of POST /referrals/:id/reassign/ (hand-over).
@@ -202,8 +214,11 @@ type ListFilter struct {
 	To         *time.Time `form:"to" time_format:"2006-01-02"`
 	Limit      int        `form:"limit"`
 	Offset     int        `form:"offset"`
+	// Only referrals with questions waiting for the viewer to answer
+	OpenQuestions bool `form:"open_questions"`
 
 	// Set by the service from the actor's role, never from the request.
+	Viewer      uint `form:"-"` // who is asking (for OpenQuestions)
 	DoctorID    uint `form:"-"`
 	TherapistID uint `form:"-"`
 	// InboxForTherapist also includes unassigned pending referrals

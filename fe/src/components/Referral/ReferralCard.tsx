@@ -1,6 +1,11 @@
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { ArrowRight, Stethoscope, TriangleAlert } from "lucide-react";
+import {
+  ArrowRight,
+  CircleHelp,
+  Stethoscope,
+  TriangleAlert,
+} from "lucide-react";
 import { Link } from "raviger";
 import { useTranslation } from "react-i18next";
 
@@ -54,6 +59,12 @@ export default function ReferralCard({ referral }: { referral: Referral }) {
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <ReferralStatusBadge status={referral.status} />
+            {!!referral.open_questions && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                <CircleHelp className="size-3.5" aria-hidden />
+                {t("n_questions_waiting", { count: referral.open_questions })}
+              </span>
+            )}
             {urgent && (
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600">
                 <TriangleAlert className="size-3.5" aria-hidden />

@@ -60,6 +60,8 @@ export interface Referral {
   therapist?: UserSummary | null;
   created_date: string;
   modified_date: string;
+  /** Questions on the thread waiting for the viewer to answer. */
+  open_questions?: number;
 }
 
 export interface ReferralNote {
@@ -68,6 +70,12 @@ export interface ReferralNote {
   author_id: number;
   kind: NoteKind;
   body: string;
+  /** Replies: the question answered. */
+  reply_to_id?: string | null;
+  /** Progress notes: pain 0-10. */
+  pain?: number | null;
+  /** Questions: someone replied. */
+  answered?: boolean;
   author?: UserSummary;
   created_date: string;
 }
@@ -91,6 +99,8 @@ export interface ReasonRequest {
 export interface NoteRequest {
   kind?: Exclude<NoteKind, "system">;
   body: string;
+  reply_to?: string;
+  pain?: number;
 }
 
 export interface ReassignRequest {

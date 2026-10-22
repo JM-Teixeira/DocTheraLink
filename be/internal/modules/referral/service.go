@@ -217,6 +217,7 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (*Referral, e
 // their own referrals, therapists their inbox, coordinators their clinic's
 // (read only). Other roles are forbidden.
 func (s *Service) scoped(ctx context.Context, actor Actor, f ListFilter) (ListFilter, error) {
+	f.Viewer = actor.ID // for the "questions waiting for me" filter
 	switch {
 	case actor.isAdmin():
 		// no scoping
@@ -273,7 +274,23 @@ func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referr
 	if f.Offset < 0 {
 		f.Offset = 0
 	}
-	return s.repo.List(ctx, f)
+	items, total, err := s.repo.List(ctx, f)
+	if err != nil || len(items) == 0 {
+		return items, total, err
+	}
+	// Questions waiting for this viewer, shown as a badge on each card
+	ids := make([]string, len(items))
+	for i, r := range items {
+		ids[i] = r.ID
+	}
+	open, err := s.repo.OpenQuestions(ctx, ids, actor.ID)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range items {
+		items[i].OpenQuestions = open[items[i].ID]
+	}
+	return items, total, nil
 }
 
 // Accept lets a physiotherapist take a pending referral. Unassigned referrals
@@ -466,6 +483,23 @@ func (s *Service) AddNote(ctx context.Context, actor Actor, id string, req NoteR
 		kind = NoteProgress
 	}
 	n := &Note{ReferralID: r.ID, AuthorID: actor.ID, Kind: kind, Body: body}
+	switch kind {
+	case NoteReply:
+		// A reply answers a question of this thread asked by someone else
+		if req.ReplyTo == "" {
+			return nil, &ValidationError{"a reply must say which question it answers"}
+		}
+		q, err := s.repo.GetNote(ctx, r.ID, req.ReplyTo)
+		if err != nil {
+			return nil, firstErr(err, ErrNotFound)
+		}
+		if q.Kind != NoteQuestion || q.AuthorID == actor.ID {
+			return nil, &ValidationError{"only questions asked by the other side can be answered"}
+		}
+		n.ReplyToID = &q.ID
+	case NoteProgress:
+		n.Pain = req.Pain
+	}
 	if err := s.repo.AddNote(ctx, n); err != nil {
 		return nil, err
 	}
@@ -478,7 +512,21 @@ func (s *Service) Notes(ctx context.Context, actor Actor, id string) ([]Note, er
 	if _, err := s.Get(ctx, actor, id); err != nil {
 		return nil, err
 	}
-	return s.repo.ListNotes(ctx, id)
+	notes, err := s.repo.ListNotes(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	// A question is answered once any reply points at it
+	replied := map[string]bool{}
+	for _, n := range notes {
+		if n.ReplyToID != nil {
+			replied[*n.ReplyToID] = true
+		}
+	}
+	for i := range notes {
+		notes[i].Answered = notes[i].Kind == NoteQuestion && replied[notes[i].ID]
+	}
+	return notes, nil
 }
 
 // transition loads the referral, checks it is in status from, applies mutate

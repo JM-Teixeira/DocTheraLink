@@ -174,10 +174,12 @@ func TestReferralLifecycle(t *testing.T) {
 	expect(t, "accept twice conflicts", physio.call("POST", "/referrals/"+rid+"/accept/", map[string]any{}, nil), 409)
 	expect(t, "physio sees the referred patient", physio.call("GET", "/patient/"+pid+"/", nil, nil), 200)
 
+	var question map[string]any
 	expect(t, "doctor asks on thread", doctor.call("POST", "/referrals/"+rid+"/notes/",
-		map[string]string{"kind": "question", "body": "Any radicular symptoms?"}, nil), 201)
+		map[string]string{"kind": "question", "body": "Any radicular symptoms?"}, &question), 201)
+	// A reply answers that question
 	expect(t, "physio replies", physio.call("POST", "/referrals/"+rid+"/notes/",
-		map[string]string{"kind": "reply", "body": "None, improving"}, nil), 201)
+		map[string]any{"kind": "reply", "body": "None, improving", "reply_to": question["id"]}, nil), 201)
 	expect(t, "nurse cannot post", nurse.call("POST", "/referrals/"+rid+"/notes/",
 		map[string]string{"body": "hi"}, nil), 404)
 

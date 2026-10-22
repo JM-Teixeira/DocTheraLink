@@ -40,7 +40,7 @@ test("referral journey: refer, accept, treat, talk, complete, letter", async ({ 
   await physio.getByRole("button", { name: "Aceitar encaminhamento" }).click();
   await physio.getByRole("button", { name: "Iniciar tratamento" }).click();
   await expect(physio.getByRole("button", { name: "Concluir tratamento" })).toBeVisible();
-  await physio.getByPlaceholder(/Escreva uma mensagem/).fill(note);
+  await physio.getByLabel("Mensagem", { exact: true }).fill(note);
   await physio.getByRole("button", { name: "Enviar" }).click();
   await expect(physio.getByText(note)).toBeVisible();
 
@@ -79,4 +79,58 @@ test("referral journey: refer, accept, treat, talk, complete, letter", async ({ 
 test("front desk cannot open referrals", async ({ page, request }) => {
   const token = await signIn(page, request, "cm.rececao1");
   expect((await api(request, token, "GET", "/referrals/")).status()).toBe(403);
+});
+
+// The conversation: the doctor asks, the physio sees "1 por responder" on the
+// card and with the filter, answers that question; progress notes with pain
+// draw the evolution.
+test("questions wait for an answer; progress notes draw the pain", async ({ browser, request }) => {
+  const stamp = Date.now().toString().slice(-7);
+  const doctor = await browser.newPage();
+  const doctorTok = await signIn(doctor, request, "cm.medico2");
+  const physioTok = await (await request.post("/api/v1/auth/login/", { data: { username: "cm.fisio4", password: "1234@1" } })).json();
+  const joao = await (await api(request, physioTok.access, "GET", "/users/getcurrentuser/")).json();
+  const patient = await (await api(request, doctorTok, "POST", "/patient/", { name: `Conversa ${stamp}` })).json();
+  const ref = await (await api(request, doctorTok, "POST", "/referrals/", {
+    patient_id: patient.id, diagnosis: "Tendinopatia rotuliana", reason: "Carga progressiva", therapist_id: joao.id,
+  })).json();
+  await api(request, physioTok.access, "POST", `/referrals/${ref.id}/accept/`, {});
+  const question = `Está a tolerar os agachamentos? (${stamp})`;
+
+  await doctor.goto(`/referrals/${ref.id}`);
+  await doctor.getByRole("radio", { name: "Pergunta" }).click();
+  await doctor.getByLabel("Mensagem", { exact: true }).fill(question);
+  await doctor.getByRole("button", { name: "Enviar" }).click();
+  await expect(doctor.getByText(question)).toBeVisible();
+  await expect(doctor.getByText("Por responder").first()).toBeVisible();
+
+  const physio = await browser.newPage();
+  await signIn(physio, request, "cm.fisio4");
+  await physio.goto("/referrals");
+  await physio.getByRole("button", { name: "Por responder" }).click();
+  const card = physio.getByRole("link", { name: new RegExp(patient.name) });
+  await expect(card).toContainText("1 por responder");
+  await card.click();
+  await expect(physio.getByText(/1 pergunta está à espera da sua resposta/)).toBeVisible();
+  await physio.getByRole("button", { name: "Responder" }).click();
+  await physio.getByLabel("Mensagem", { exact: true }).fill("Sim, sem dor no fim.");
+  await physio.getByRole("button", { name: "Enviar" }).click();
+  await expect(physio.getByText(/Em resposta a:/)).toBeVisible();
+  await expect(physio.getByText("Respondida").first()).toBeVisible();
+
+  for (const [pain, text] of [["6", "Primeira semana"], ["3", "Segunda semana"]] as const) {
+    await physio.getByRole("radio", { name: "Progresso" }).click();
+    await physio.getByLabel("Dor (0-10)").selectOption(pain);
+    await physio.getByLabel("Mensagem", { exact: true }).fill(`${text} ${stamp}`);
+    await physio.getByRole("button", { name: "Enviar" }).click();
+    await expect(physio.getByText(`${text} ${stamp}`)).toBeVisible();
+  }
+  await expect(physio.getByRole("img", { name: "A dor passou de 6 para 3 em 10" })).toBeVisible();
+
+  // The doctor sees the answer and the evolution; nothing waits any more
+  await doctor.reload();
+  await expect(doctor.getByText("Respondida").first()).toBeVisible();
+  await expect(doctor.getByText("de 6 para 3 em 10")).toBeVisible();
+  await doctor.close();
+  await physio.close();
 });

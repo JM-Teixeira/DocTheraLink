@@ -58,7 +58,7 @@ func TestTimeBoard(t *testing.T) {
 	tiagoID := userIDOf(tiago)
 
 	// A date of its own per run, far from the seeded weeks
-	date := time.Date(2040, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, int(time.Now().Unix()%5000)).Format("2006-01-02")
+	date := freeDay(t, coord, tiagoID, time.Date(2040, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, int(time.Now().Unix()%5000)))
 
 	var divisions []map[string]any
 	expect(t, "divisions", coord.call("GET", "/schedule/divisions/", nil, &divisions), 200)
@@ -364,4 +364,29 @@ func TestClimutua(t *testing.T) {
 	// The other clinic's coordinator sees none of it
 	id := patients.Results[0]["id"].(string)
 	expect(t, "other clinic cannot open the patient", other.call("GET", "/patient/"+id+"/", nil, nil), 404)
+}
+
+// freeDay is the first day from start on which the physio has no shift yet
+// (earlier runs may have left shifts on some far-future days).
+func freeDay(t *testing.T, c *client, therapistID float64, start time.Time) string {
+	t.Helper()
+	for i := 0; i < 60; i++ {
+		date := start.AddDate(0, 0, i).Format("2006-01-02")
+		var board struct {
+			Therapists []struct {
+				ID     float64          `json:"id"`
+				Shifts []map[string]any `json:"shifts"`
+			} `json:"therapists"`
+		}
+		c.call("GET", "/schedule/board/?date="+date, nil, &board)
+		busy := false
+		for _, r := range board.Therapists {
+			busy = busy || (r.ID == therapistID && len(r.Shifts) > 0)
+		}
+		if !busy {
+			return date
+		}
+	}
+	t.Fatal("no free day for the physio")
+	return ""
 }

@@ -94,9 +94,25 @@ func (f *fakeRepo) List(_ context.Context, flt ListFilter) ([]Referral, int64, e
 				continue
 			}
 		}
+		if flt.OpenQuestions && !f.hasOpenQuestion(r.ID, flt.Viewer) {
+			continue
+		}
 		out = append(out, r)
 	}
 	return out, int64(len(out)), nil
+}
+
+// hasOpenQuestion: an unanswered question others asked the viewer (lock held).
+func (f *fakeRepo) hasOpenQuestion(referralID string, viewer uint) bool {
+	for _, q := range f.notes {
+		if q.ReferralID != referralID || q.Kind != NoteQuestion || q.AuthorID == viewer {
+			continue
+		}
+		if !slices.ContainsFunc(f.notes, func(r Note) bool { return r.ReplyToID != nil && *r.ReplyToID == q.ID }) {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *fakeRepo) Transition(_ context.Context, r *Referral, from Status, note *Note) error {
@@ -146,4 +162,34 @@ func (f *fakeRepo) UserRole(_ context.Context, id uint) (string, bool, error) {
 		return "", false, nil
 	}
 	return u.role, u.active, nil
+}
+
+func (f *fakeRepo) GetNote(_ context.Context, referralID, id string) (*Note, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, n := range f.notes {
+		if n.ReferralID == referralID && n.ID == id {
+			c := n
+			return &c, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+func (f *fakeRepo) OpenQuestions(_ context.Context, referralIDs []string, viewer uint) (map[string]int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	replied := map[string]bool{}
+	for _, n := range f.notes {
+		if n.ReplyToID != nil {
+			replied[*n.ReplyToID] = true
+		}
+	}
+	out := map[string]int{}
+	for _, n := range f.notes {
+		if n.Kind == NoteQuestion && n.AuthorID != viewer && !replied[n.ID] && slices.Contains(referralIDs, n.ReferralID) {
+			out[n.ReferralID]++
+		}
+	}
+	return out, nil
 }

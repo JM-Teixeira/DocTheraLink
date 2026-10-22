@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Inbox, Plus, Search, X } from "lucide-react";
+import { CircleHelp, Inbox, Plus, Search, X } from "lucide-react";
 import { navigate } from "raviger";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 import DateInput from "@/components/Common/DateInput";
+import { chipClass } from "@/components/Common/FilterChips";
 import Page from "@/components/Common/Page";
 import ReferralCard from "@/components/Referral/ReferralCard";
 import ReferralHelp from "@/components/Referral/ReferralHelp";
@@ -57,12 +58,14 @@ export default function ReferralList() {
   const [therapist, setTherapist] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  // Only referrals with questions waiting for me
+  const [waiting, setWaiting] = useState(false);
   const [page, setPage] = useState(0);
 
   // Any filter change goes back to the first page
   useEffect(
     () => setPage(0),
-    [status, priority, term, doctor, therapist, from, to],
+    [status, priority, term, doctor, therapist, from, to, waiting],
   );
 
   // Shared by the list and the per-status counts
@@ -73,6 +76,7 @@ export default function ReferralList() {
     therapist: therapist || undefined,
     from: from || undefined,
     to: to || undefined,
+    open_questions: waiting || undefined,
   };
   const anyFilter = Object.values(filters).some(Boolean);
 
@@ -200,6 +204,15 @@ export default function ReferralList() {
             className="w-40"
           />
         </label>
+        <button
+          type="button"
+          aria-pressed={waiting}
+          onClick={() => setWaiting((w) => !w)}
+          className={chipClass(waiting)}
+        >
+          <CircleHelp className="size-3.5" aria-hidden />
+          {t("questions_for_me")}
+        </button>
         {anyFilter && (
           <button
             type="button"
@@ -210,6 +223,7 @@ export default function ReferralList() {
               setTherapist("");
               setFrom("");
               setTo("");
+              setWaiting(false);
             }}
             className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"
           >

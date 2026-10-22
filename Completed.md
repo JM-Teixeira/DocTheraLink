@@ -7,6 +7,17 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-22 · Klyniva 0.6.0 (branch `feat/m4-patients`)
 
+### 23:30 · Referral conversation that works (TODO)
+- A *reply* answers one question (refused otherwise); questions show
+  "Respondida" / "Por responder"; the card shows "n por responder" for
+  whoever must answer, and the list has a "Por responder" filter.
+- *Progress* notes can carry pain 0-10, drawn as the patient evolution
+  ("de 6 para 3 em 10"); thread filter Tudo / Progresso / Perguntas.
+- Tests: unit `TestQuestionsAndProgress`, e2e `TestQuestionThread`, browser
+  conversation test; e2e TestTimeBoard picks a day free of old shifts
+  (was flaky after many runs).
+- TODO: proposal to reach the local install from other laptops on the LAN.
+
 ### 22:00 · Stock permissions, per-patient holiday moves, misses, version (user request)
 - **Version** 0.6.0 (major.minor.patch, major 0 for now): shown in the
   menu and in Profile → Preferências (app and server); `GET /api/v1/version/`;
