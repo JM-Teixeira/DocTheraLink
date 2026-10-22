@@ -130,3 +130,34 @@ func TestWaitingList(t *testing.T) {
 		}
 	}
 }
+
+// TestWaitingSlots: an open entry gets the first free hour that suits it in
+// the next two weeks (Climutua has weekly shifts); an impossible wish none.
+func TestWaitingSlots(t *testing.T) {
+	coord, _ := login(t, "cm.ana.ferreira")
+	desk, _ := login(t, "cm.sofia.martins")
+	var p, q map[string]any
+	expect(t, "patient", desk.call("POST", "/patient/", map[string]any{"name": "Vaga " + time.Now().Format("150405.000")}, &p), 201)
+	expect(t, "patient 2", desk.call("POST", "/patient/", map[string]any{"name": "Sem vaga " + time.Now().Format("150405.000")}, &q), 201)
+	var e1, e2 map[string]any
+	expect(t, "any time", coord.call("POST", "/schedule/waiting/", map[string]any{"patient_id": p["id"], "period": "any"}, &e1), 201)
+	expect(t, "sundays only", coord.call("POST", "/schedule/waiting/", map[string]any{"patient_id": q["id"], "weekdays": []int{0}, "period": "any"}, &e2), 201)
+	defer coord.call("PATCH", "/schedule/waiting/"+e1["id"].(string)+"/", map[string]any{"status": "removed"}, nil)
+	defer coord.call("PATCH", "/schedule/waiting/"+e2["id"].(string)+"/", map[string]any{"status": "removed"}, nil)
+
+	var list []map[string]any
+	expect(t, "list", coord.call("GET", "/schedule/waiting/", nil, &list), 200)
+	for _, e := range list {
+		switch e["id"] {
+		case e1["id"]:
+			slot, _ := e["slot"].(map[string]any)
+			if slot == nil || slot["therapist"] == "" || slot["date"] == nil {
+				t.Errorf("a free slot was expected: %v", e["slot"])
+			}
+		case e2["id"]:
+			if e["slot"] != nil {
+				t.Errorf("no shifts on Sundays, slot: %v", e["slot"])
+			}
+		}
+	}
+}

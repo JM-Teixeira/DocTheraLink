@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import {
   Bell,
+  CalendarCheck,
   CalendarClock,
   CalendarDays,
   Check,
@@ -675,6 +676,15 @@ function NeedsAttention({ pending }: { pending: number }) {
   return (
     <Card title={t("needs_attention")}>
       <ul className="flex flex-col gap-2 text-sm">
+        {!!waiting?.filter((w) => w.slot).length && (
+          <AttentionRow
+            icon={CalendarCheck}
+            to="/time-board"
+            text={t("n_with_free_slot", {
+              count: waiting.filter((w) => w.slot).length,
+            })}
+          />
+        )}
         {!!waiting?.length && (
           <AttentionRow
             icon={ListOrdered}

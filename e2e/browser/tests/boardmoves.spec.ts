@@ -131,3 +131,19 @@ test("waiting list: add a patient, book their plan, they leave the list", async 
     for (const e of list) if (e.patient?.name === name) await api(request, coordTok, "PATCH", `/schedule/waiting/${e.id}/`, { status: "removed" });
   }
 });
+
+test("waiting list: an entry with a free slot stands out and books into it", async ({ page, request }) => {
+  const coordTok = await signIn(page, request, "cm.ana.ferreira");
+  const patient = await (await api(request, coordTok, "POST", "/patient/", { name: `Vaga Livre ${stamp()}` })).json();
+  const entry = await (await api(request, coordTok, "POST", "/schedule/waiting/", { patient_id: patient.id, period: "any" })).json();
+  try {
+    await page.goto("/time-board");
+    await page.getByRole("button", { name: /Lista de espera/ }).click();
+    const item = page.getByRole("dialog").getByRole("listitem").filter({ hasText: patient.name });
+    await expect(item.getByText(/^Vaga disponível: /)).toBeVisible();
+    await item.getByRole("button", { name: "Marcar plano" }).click();
+    await expect(page.getByRole("dialog").getByText(patient.name).first()).toBeVisible();
+  } finally {
+    await api(request, coordTok, "PATCH", `/schedule/waiting/${entry.id}/`, { status: "removed" });
+  }
+});

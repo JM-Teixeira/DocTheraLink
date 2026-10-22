@@ -202,6 +202,17 @@ export default function TimeBoardPage() {
                   {waiting.length}
                 </span>
               )}
+              {/* how many of them have a free slot that suits them now */}
+              {!!waiting?.filter((w) => w.slot).length && (
+                <span
+                  title={t("n_with_free_slot", {
+                    count: waiting.filter((w) => w.slot).length,
+                  })}
+                  className="ml-1 rounded-full bg-emerald-600 px-1.5 text-xs font-semibold text-white"
+                >
+                  {waiting.filter((w) => w.slot).length}
+                </span>
+              )}
             </Button>
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
@@ -521,10 +532,14 @@ export default function TimeBoardPage() {
                   care_level: e.patient.care_level,
                 }
               : null,
+            // the free slot when there is one, otherwise the preferences
             therapistId:
-              e.preferred_therapist_id ?? board.therapists[0]?.id ?? 0,
-            hour: e.period === "afternoon" ? 15 : 9,
-            startDate: date,
+              e.slot?.therapist_id ??
+              e.preferred_therapist_id ??
+              board.therapists[0]?.id ??
+              0,
+            hour: e.slot?.hour ?? (e.period === "afternoon" ? 15 : 9),
+            startDate: e.slot?.date ?? date,
             weekdays: e.weekdays,
           });
         }}

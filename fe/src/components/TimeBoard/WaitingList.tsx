@@ -107,7 +107,11 @@ export default function WaitingListDialog({
             {list.map((e) => (
               <li
                 key={e.id}
-                className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm"
+                className={cn(
+                  "flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm",
+                  // a free hour that suits the patient: stands out
+                  e.slot && "bg-emerald-50 ring-1 ring-inset ring-emerald-300",
+                )}
               >
                 <div className="min-w-48 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium text-gray-900">
@@ -146,6 +150,14 @@ export default function WaitingListDialog({
                       .join(" · ")}
                   </p>
                   {e.note && <p className="text-xs text-gray-700">{e.note}</p>}
+                  {e.slot && (
+                    <p className="mt-1 text-xs font-semibold text-emerald-800">
+                      {t("slot_available", {
+                        when: `${dayjs(e.slot.date).format("ddd D/M")} ${String(e.slot.hour).padStart(2, "0")}:00`,
+                        physio: e.slot.therapist,
+                      })}
+                    </p>
+                  )}
                 </div>
                 <Button size="sm" variant="primary" onClick={() => onPlan(e)}>
                   <CalendarRange className="mr-1 size-4" aria-hidden />

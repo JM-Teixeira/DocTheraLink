@@ -35,6 +35,8 @@ type WaitingEntry struct {
 	CreatedByID          uint            `json:"created_by_id"`
 	CreatedAt            time.Time       `json:"created_date"`
 	ClosedAt             *time.Time      `json:"closed_at"`
+	// First free hour that suits the patient (open entries, computed)
+	Slot *Slot `json:"slot,omitempty" gorm:"-"`
 }
 
 func (WaitingEntry) TableName() string { return "waiting_list" }
@@ -71,7 +73,11 @@ func (s *Service) WaitingList(ctx context.Context, a Actor, status string) ([]Wa
 	if status == "" {
 		status = WaitingOpen
 	}
-	return s.repo.Waiting(ctx, cid, status)
+	entries, err := s.repo.Waiting(ctx, cid, status)
+	if err != nil {
+		return nil, err
+	}
+	return entries, s.withSlots(ctx, cid, entries)
 }
 
 // AddWaiting puts a patient of the clinic on the list (once while waiting).

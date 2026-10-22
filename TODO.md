@@ -27,7 +27,7 @@ Features
 - [x] Users: filters (dropdowns) for who can change which stock (category x floor), counting "all floors / all categories" grants.
 - [x] User page: professional situation at a glance (joined on, leave from/to, left on), from a dated history.
 - [x] Clinic code (demo "de", Climutua "cm") and a username standard `<code>.<first>.<last>` (+ number on clash), applied to everyone.
-- [ ] Waiting list: confirm several patients; highlight entries when a matching slot is free (any or a chosen physio) and alert the coordinator.
+- [x] Waiting list: confirm several patients; highlight entries when a matching slot is free (any or a chosen physio) and alert the coordinator.
 - [x] Treatment plan per referral (steps of a session: activity, minutes, sets, machine, notes), versioned, shown on the patient page for whoever covers the physio.
 - [ ] Plan next: plan templates per condition (e.g. shoulder), print the plan for the patient, link steps to the home exercise library (M2).
 

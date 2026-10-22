@@ -311,6 +311,13 @@ export interface WaitingEntry {
   status: WaitingStatus;
   series_id?: string | null;
   created_date: string;
+  /** First free hour that suits the patient in the next 2 weeks (server) */
+  slot?: {
+    date: string;
+    hour: number;
+    therapist_id: number;
+    therapist: string;
+  };
 }
 
 export interface WaitingRequest {

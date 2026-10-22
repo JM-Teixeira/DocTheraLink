@@ -5,6 +5,21 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.17.0 (branch `feat/m4-patients`)
+
+### Waiting list: free slots (batch 3, part G)
+- Confirmed: the waiting list holds any number of patients (one open entry
+  per patient).
+- For each waiting patient the server looks for the first free hour in the
+  next 14 days that suits them: preferred weekdays, morning / afternoon,
+  the chosen physio or any, and the booking rules (on shift, not absent,
+  room and care credits, patient free).
+- Those entries are highlighted in green with "Vaga disponível: ter 28/10
+  10:00 com Rui Costa"; "Marcar plano" opens the plan on that slot. The
+  board button shows a green count and the coordinator home says how many
+  waiting patients have a free slot.
+- Tests: unit `TestFirstSlot`, API e2e `TestWaitingSlots`, browser.
+
 ## 2026-10-22 · Klyniva 0.16.0 (branch `feat/m4-patients`)
 
 ### People: stock permission filter and work history (batch 3, part F)
