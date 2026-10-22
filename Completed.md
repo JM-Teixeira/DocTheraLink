@@ -5,6 +5,19 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.9.1 (branch `feat/m4-patients`)
+
+### Small fixes from use
+- The local cluster showed 0.8.0: it had been deployed before the version
+  bump; deploys now happen after the bump.
+- User menu (click your name): Perfil, Sobre o Klyniva, Terminar sessão.
+- "Procurar atualização" showed two pop-ups; the old "latest version of
+  CARE" one is gone and the update prompt is in Portuguese. The installable
+  app is now called Klyniva (was "Care").
+- Time board header: the waiting list, weekly plan and new shift stay
+  visible; absences, divisions, copy day and repeat week moved into an
+  "Organizar" menu so the header fits on smaller screens.
+
 ## 2026-10-22 · Klyniva 0.9.0 (branch `feat/m4-patients`)
 
 ### Patient form: lists, connection problems, coverage (TODO)

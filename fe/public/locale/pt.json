@@ -1047,5 +1047,11 @@
   "medication_notes": "Outras notas sobre medicação",
   "allergic_to": "Alergias: {{list}}",
   "error__invalid_year": "Indique um ano entre 1900 e o ano atual",
-  "remove": "Remover"
+  "remove": "Remover",
+  "organize": "Organizar",
+  "team": "Equipa",
+  "repeat_shifts": "Repetir turnos",
+  "new_version_available": "Há uma nova versão do Klyniva",
+  "updating": "A atualizar...",
+  "sign_out": "Terminar sessão"
 }

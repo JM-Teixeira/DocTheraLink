@@ -198,7 +198,8 @@ test("holiday cover: patients move to the cover with a handover note", async ({ 
 
     // The coordinator records the absence and the handover in the app
     await page.goto("/time-board");
-    await page.getByRole("button", { name: "Ausências" }).click();
+    await page.getByRole("button", { name: "Organizar" }).click();
+    await page.getByRole("menuitem", { name: "Ausências" }).click();
     await page.getByRole("button", { name: "Nova ausência" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Fisioterapeuta ausente").selectOption({ label: `${away.first_name} ${away.last_name}` });

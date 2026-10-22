@@ -92,7 +92,7 @@ LAN_FILE="$HOME/.klyniva-lan"
 apply_lan() {
   local origins="http://localhost:${PORT}" public="$URL" h
   if [[ -s "$LAN_FILE" ]]; then
-    IFS=, read -ra hs < "$LAN_FILE"
+    IFS=, read -ra hs < "$LAN_FILE" || true # the file has no final newline
     public="http://${hs[0]}:${PORT}"
     for h in "${hs[@]}"; do origins+=",http://${h}:${PORT}"; done
   fi

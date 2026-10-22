@@ -28,6 +28,25 @@ test("the version lives on the profile and the About page, not in the menu", asy
   await expect(page.getByText(/Já tem a versão mais recente|Há uma atualização/).first()).toBeVisible();
 });
 
+test("the user menu has profile, About and sign out; the board keeps rare actions in Organizar", async ({ page, request }) => {
+  await signIn(page, request, "cm.coordenacao");
+  await page.goto("/");
+  await page.locator("#user-profile-name").click();
+  await expect(page.getByRole("menuitem", { name: "Perfil" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Terminar sessão" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Sobre o Klyniva" }).click();
+  await expect(page).toHaveURL(/\/about$/);
+
+  await page.goto("/time-board");
+  for (const name of ["Ausências", "Divisões", "Copiar dia", "Repetir semana"])
+    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Organizar" }).click();
+  for (const name of ["Ausências", "Divisões", "Copiar dia", "Repetir semana"])
+    await expect(page.getByRole("menuitem", { name })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Copiar dia" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+});
+
 test("stock permissions: the coordinator gives Pedro floor 2, Pedro can then restock only there", async ({ browser, page, request }) => {
   const coordTok = await signIn(page, request, "cm.coordenacao");
   const pedroTok = await token(request, "cm.fisio2");
@@ -174,7 +193,8 @@ test("holiday: each patient can go to a different physio", async ({ page, reques
     }
 
     await page.goto("/time-board");
-    await page.getByRole("button", { name: "Ausências" }).click();
+    await page.getByRole("button", { name: "Organizar" }).click();
+    await page.getByRole("menuitem", { name: "Ausências" }).click();
     await page.getByRole("button", { name: "Nova ausência" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Fisioterapeuta ausente").selectOption({ label: name(away) });

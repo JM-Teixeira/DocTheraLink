@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import {
   CalendarRange,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -10,6 +11,7 @@ import {
   Plane,
   Plus,
   Repeat,
+  Settings2,
   Users,
 } from "lucide-react";
 import { useState } from "react";
@@ -18,6 +20,14 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import DateInput from "@/components/Common/DateInput";
 import Loading from "@/components/Common/Loading";
@@ -181,7 +191,8 @@ export default function TimeBoardPage() {
       title={t("time_board")}
       options={
         manage && (
-          <div className="flex flex-wrap gap-2">
+          // Daily actions stay visible; occasional ones live in "Organizar"
+          <div className="flex flex-wrap justify-end gap-2">
             <Button variant="outline" onClick={() => setDialog("waiting")}>
               <ListOrdered className="mr-2 size-4" aria-hidden />
               {t("waiting_list")}
@@ -191,22 +202,36 @@ export default function TimeBoardPage() {
                 </span>
               )}
             </Button>
-            <Button variant="outline" onClick={() => setDialog("absences")}>
-              <Plane className="mr-2 size-4" aria-hidden />
-              {t("absences")}
-            </Button>
-            <Button variant="outline" onClick={() => setDialog("divisions")}>
-              <LayoutGrid className="mr-2 size-4" aria-hidden />
-              {t("divisions")}
-            </Button>
-            <Button variant="outline" onClick={() => setDialog("copy")}>
-              <Copy className="mr-2 size-4" aria-hidden />
-              {t("copy_day")}
-            </Button>
-            <Button variant="outline" onClick={() => setDialog("repeat")}>
-              <Repeat className="mr-2 size-4" aria-hidden />
-              {t("repeat_week")}
-            </Button>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Settings2 className="mr-2 size-4" aria-hidden />
+                  {t("organize")}
+                  <ChevronDown className="ml-1.5 size-4" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>{t("team")}</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => setDialog("absences")}>
+                  <Plane className="mr-2 size-4" aria-hidden />
+                  {t("absences")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setDialog("divisions")}>
+                  <LayoutGrid className="mr-2 size-4" aria-hidden />
+                  {t("divisions")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>{t("repeat_shifts")}</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => setDialog("copy")}>
+                  <Copy className="mr-2 size-4" aria-hidden />
+                  {t("copy_day")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setDialog("repeat")}>
+                  <Repeat className="mr-2 size-4" aria-hidden />
+                  {t("repeat_week")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="outline"
               disabled={!board.therapists.length}

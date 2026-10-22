@@ -139,8 +139,8 @@ export default defineConfig(({ mode }) => {
           maximumFileSizeToCacheInBytes: 7000000,
         },
         manifest: {
-          name: "Care",
-          short_name: "Care",
+          name: "Klyniva",
+          short_name: "Klyniva",
           theme_color: "#0e9f6e",
           background_color: "#ffffff",
           display: "standalone",
