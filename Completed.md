@@ -5,6 +5,21 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.13.0 (branch `feat/m4-patients`)
+
+### Treatment plan per referral (batch 3)
+- On the referral page the physio writes what is done in each session, in
+  order: activity, minutes, sets / repetitions, machine or room, notes
+  ("Ultrassons no ombro · 10 min · Máquina 2", "Massagem · 5 min"), with
+  the total time. Steps can be added, removed and reordered.
+- Every save is a new version with who and when; earlier versions stay
+  visible. Editing: the assigned physio (or whoever covers them), the
+  clinic coordinator and admins, while the referral is accepted or in
+  progress; the doctor reads it.
+- The patient page shows the current plan of each open referral, so a
+  colleague covering a holiday carries on the same way.
+- Tests: unit, API e2e `TestTreatmentPlan`, browser journey.
+
 ## 2026-10-22 · Klyniva 0.12.0 (branch `feat/m4-patients`)
 
 ### Adding people, clinic codes and the username standard (batch 3, part B)

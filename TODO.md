@@ -28,7 +28,8 @@ Features
 - [ ] User page: professional situation at a glance (joined on, leave from/to, left on), from a dated history.
 - [x] Clinic code (demo "de", Climutua "cm") and a username standard `<code>.<first>.<last>` (+ number on clash), applied to everyone.
 - [ ] Waiting list: confirm several patients; highlight entries when a matching slot is free (any or a chosen physio) and alert the coordinator.
-- [ ] User: field for what the person does with patients (to clarify with the product owner).
+- [x] Treatment plan per referral (steps of a session: activity, minutes, sets, machine, notes), versioned, shown on the patient page for whoever covers the physio.
+- [ ] Plan next: plan templates per condition (e.g. shoulder), print the plan for the patient, link steps to the home exercise library (M2).
 
 Repo / docs
 - [ ] Clean up unused files, clear layout, rewrite README.md.

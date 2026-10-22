@@ -21,6 +21,7 @@ import ReferralNotes from "@/components/Referral/ReferralNotes";
 import ReferralProgress from "@/components/Referral/ReferralProgress";
 import ReferralStatusBadge from "@/components/Referral/ReferralStatusBadge";
 import TherapistDialog from "@/components/Referral/TherapistDialog";
+import TreatmentPlanCard from "@/components/Referral/TreatmentPlan";
 import ReferralRoutes from "@/components/Referral/api";
 import {
   actionNeedsReason,
@@ -303,6 +304,7 @@ export default function ReferralDetail({ id }: { id: string }) {
 
         {/* Right: conversation and shared files */}
         <div className="flex flex-col gap-6 lg:col-span-2">
+          <TreatmentPlanCard referralId={referral.id} />
           <ReferralNotes referral={referral} user={user} />
           <ReferralAttachments referral={referral} user={user} />
         </div>

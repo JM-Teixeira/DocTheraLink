@@ -11,6 +11,7 @@ type fakeRepo struct {
 	mu        sync.Mutex
 	referrals map[string]Referral
 	notes     []Note
+	plans     []Plan
 	patients  map[string]bool
 	users     map[uint]struct {
 		role   string
@@ -137,6 +138,27 @@ func (f *fakeRepo) AddNote(_ context.Context, n *Note) error {
 	defer f.mu.Unlock()
 	_ = n.BeforeCreate(nil)
 	f.notes = append(f.notes, *n)
+	return nil
+}
+
+// Plans newest first (appended in time order).
+func (f *fakeRepo) Plans(_ context.Context, referralID string) ([]Plan, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []Plan
+	for i := len(f.plans) - 1; i >= 0; i-- {
+		if f.plans[i].ReferralID == referralID {
+			out = append(out, f.plans[i])
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) AddPlan(_ context.Context, p *Plan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_ = p.BeforeCreate(nil)
+	f.plans = append(f.plans, *p)
 	return nil
 }
 

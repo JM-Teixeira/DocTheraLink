@@ -5,6 +5,8 @@ import {
   CreateReferralRequest,
   IcdCode,
   NoteRequest,
+  PlanItem,
+  PlanView,
   ReasonRequest,
   ReassignRequest,
   Referral,
@@ -85,6 +87,17 @@ const ReferralRoutes = {
     method: "POST",
     TBody: Type<ReasonRequest>(),
     TRes: Type<Referral>(),
+  },
+  plan: {
+    path: "/api/v1/referrals/{id}/plan/",
+    method: "GET",
+    TRes: Type<PlanView>(),
+  },
+  savePlan: {
+    path: "/api/v1/referrals/{id}/plan/",
+    method: "PUT",
+    TBody: Type<{ items: PlanItem[] }>(),
+    TRes: Type<PlanView>(),
   },
   listNotes: {
     path: "/api/v1/referrals/{id}/notes/",

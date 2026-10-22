@@ -157,7 +157,7 @@ func (n *Note) BeforeCreate(*gorm.DB) error {
 
 // Models lists the tables owned by this module, for database migration.
 func Models() []any {
-	return []any{&Referral{}, &Note{}}
+	return []any{&Referral{}, &Note{}, &Plan{}}
 }
 
 // CreateRequest is the body of POST /referrals/.

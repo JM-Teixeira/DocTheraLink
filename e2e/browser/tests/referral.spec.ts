@@ -134,3 +134,41 @@ test("questions wait for an answer; progress notes draw the pain", async ({ brow
   await doctor.close();
   await physio.close();
 });
+
+// The treatment plan: the physio writes the steps of a session; the patient
+// page shows them so a colleague can carry on during a holiday.
+test("the physio writes the treatment plan and the patient page shows it", async ({ browser, request }) => {
+  const stamp = Date.now().toString().slice(-7);
+  const physio = await browser.newPage();
+  const physioTok = await signIn(physio, request, "cm.joao.ribeiro");
+  const joao = await (await api(request, physioTok, "GET", "/users/getcurrentuser/")).json();
+  const doctorTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.helena.carvalho", password: "1234@1" } })).json()).access;
+  const deskTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.sofia.martins", password: "1234@1" } })).json()).access;
+  const patient = await (await api(request, deskTok, "POST", "/patient/", { name: `Plano Ombro ${stamp}` })).json();
+  const ref = await (await api(request, doctorTok, "POST", "/referrals/", {
+    patient_id: patient.id, diagnosis: "Tendinopatia do ombro", reason: "Dor", therapist_id: joao.id,
+  })).json();
+  await api(request, physioTok, "POST", `/referrals/${ref.id}/accept/`, {});
+
+  await physio.goto(`/referrals/${ref.id}`);
+  const card = physio.getByRole("region", { name: "Plano de tratamento" });
+  await card.getByRole("button", { name: "Escrever o plano" }).click();
+  await card.getByLabel("Atividade 1").fill("Ultrassons no ombro");
+  await card.getByLabel("Min. 1").fill("10");
+  await card.getByLabel("Máquina ou sala 1").fill("Máquina 2");
+  await card.getByRole("button", { name: "Adicionar passo" }).click();
+  await card.getByLabel("Atividade 2").fill("Massagem");
+  await card.getByLabel("Min. 2").fill("5");
+  await expect(card.getByText("Total: 15 minutos")).toBeVisible();
+  await card.getByRole("button", { name: "Guardar" }).click();
+  await expect(card.getByText("Ultrassons no ombro")).toBeVisible();
+  await expect(card.getByText(/Alterado por João Ribeiro/)).toBeVisible();
+
+  // The coordinator (planning a holiday) sees it on the patient page
+  const coord = await browser.newPage();
+  await signIn(coord, request, "cm.ana.ferreira");
+  await coord.goto(`/patients/${patient.id}`);
+  const plan = coord.getByRole("region", { name: "Plano de tratamento" });
+  await expect(plan.getByText("Ultrassons no ombro")).toBeVisible();
+  await expect(plan.getByText("Massagem")).toBeVisible();
+});

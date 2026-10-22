@@ -13,6 +13,7 @@ import PatientTimeline from "@/components/Patient/PatientTimeline";
 import { usePatient } from "@/components/Patient/api";
 import { formatId, genderKey } from "@/components/Patient/patientFormUtils";
 import ReferralCard from "@/components/Referral/ReferralCard";
+import TreatmentPlanCard from "@/components/Referral/TreatmentPlan";
 import ReferralRoutes from "@/components/Referral/api";
 import { canCreateReferral } from "@/components/Referral/referralUtils";
 
@@ -21,7 +22,11 @@ import useDateFormat from "@/hooks/useDateFormat";
 
 import { ageFromDob, initials } from "@/Utils/person";
 import query from "@/Utils/request/query";
-import { canSeeReferrals, canWritePatients } from "@/Utils/roles";
+import {
+  canSeeReferrals,
+  canWritePatients,
+  isCoordinator,
+} from "@/Utils/roles";
 
 export default function PatientDetail({ id }: { id: string }) {
   const { t } = useTranslation();
@@ -35,7 +40,8 @@ export default function PatientDetail({ id }: { id: string }) {
     queryFn: query(ReferralRoutes.list, {
       queryParams: { patient: id, limit: 50 },
     }),
-    enabled: canSeeReferrals(user),
+    // coordinators too: they read the treatment plans when covering absences
+    enabled: canSeeReferrals(user) || isCoordinator(user),
   });
 
   if (isLoading) return <Loading />;
@@ -205,6 +211,17 @@ export default function PatientDetail({ id }: { id: string }) {
             />
           </Card>
         </div>
+
+        {/* What is done in each session: lets a colleague covering the physio
+            carry on the same way */}
+        {referrals.data?.results
+          .filter((r) => r.status === "accepted" || r.status === "in_progress")
+          .map((r) => (
+            <div key={r.id}>
+              <p className="mb-1 text-xs text-gray-500">{r.diagnosis}</p>
+              <TreatmentPlanCard referralId={r.id} compact />
+            </div>
+          ))}
 
         {canSeeReferrals(user) && (
           <section>

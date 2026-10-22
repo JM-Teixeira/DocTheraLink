@@ -28,6 +28,9 @@ type Repository interface {
 	Transition(ctx context.Context, r *Referral, from Status, note *Note) error
 	AddNote(ctx context.Context, n *Note) error
 	ListNotes(ctx context.Context, referralID string) ([]Note, error)
+	// Plans are the saved versions of a referral's treatment plan, newest first.
+	Plans(ctx context.Context, referralID string) ([]Plan, error)
+	AddPlan(ctx context.Context, p *Plan) error
 	GetNote(ctx context.Context, referralID, id string) (*Note, error)
 	// OpenQuestions counts per referral the unanswered questions others asked the viewer.
 	OpenQuestions(ctx context.Context, referralIDs []string, viewer uint) (map[string]int, error)
@@ -209,6 +212,17 @@ func (g *GormRepository) Transition(ctx context.Context, r *Referral, from Statu
 		}
 		return nil
 	})
+}
+
+func (g *GormRepository) Plans(ctx context.Context, referralID string) ([]Plan, error) {
+	var out []Plan
+	err := g.db.WithContext(ctx).Preload("Author").Where("referral_id = ?", referralID).
+		Order("created_at DESC").Find(&out).Error
+	return out, err
+}
+
+func (g *GormRepository) AddPlan(ctx context.Context, p *Plan) error {
+	return g.db.WithContext(ctx).Create(p).Error
 }
 
 func (g *GormRepository) AddNote(ctx context.Context, n *Note) error {

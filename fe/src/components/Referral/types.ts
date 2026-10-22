@@ -64,6 +64,30 @@ export interface Referral {
   open_questions?: number;
 }
 
+/** One step of a session in the treatment plan (be/internal/modules/referral/plan.go). */
+export interface PlanItem {
+  activity: string;
+  minutes?: number;
+  dose?: string;
+  equipment?: string;
+  notes?: string;
+}
+
+export interface TreatmentPlan {
+  id: string;
+  referral_id: string;
+  items: PlanItem[];
+  author_id: number;
+  author?: { id: number; first_name: string; last_name: string };
+  created_date: string;
+}
+
+export interface PlanView {
+  current: TreatmentPlan | null;
+  versions: TreatmentPlan[];
+  can_edit: boolean;
+}
+
 export interface ReferralNote {
   id: string;
   referral_id: string;
