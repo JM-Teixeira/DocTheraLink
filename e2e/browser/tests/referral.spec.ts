@@ -14,14 +14,14 @@ test("referral journey: refer, accept, treat, talk, complete, letter", async ({ 
 
   // A fresh patient, registered by the front desk
   const desk = await browser.newPage();
-  const deskToken = await signIn(desk, request, "cm.rececao1");
+  const deskToken = await signIn(desk, request, "cm.sofia.martins");
   const created = await api(request, deskToken, "POST", "/patient/", { name: patientName });
   expect(created.status()).toBe(201);
   await desk.close();
 
   // 1. The doctor refers the patient to Pedro Almeida
   const doctor = await browser.newPage();
-  await signIn(doctor, request, "cm.medico1");
+  await signIn(doctor, request, "cm.miguel.sousa");
   await doctor.goto("/referrals/new");
   await doctor.getByLabel("Pesquisar utente").fill(patientName);
   await doctor.getByRole("button", { name: new RegExp(patientName) }).click();
@@ -35,7 +35,7 @@ test("referral journey: refer, accept, treat, talk, complete, letter", async ({ 
 
   // 2. The physio accepts, starts and writes a progress note
   const physio = await browser.newPage();
-  await signIn(physio, request, "cm.fisio2");
+  await signIn(physio, request, "cm.pedro.almeida");
   await physio.goto(referralUrl);
   await physio.getByRole("button", { name: "Aceitar encaminhamento" }).click();
   await physio.getByRole("button", { name: "Iniciar tratamento" }).click();
@@ -68,7 +68,7 @@ test("referral journey: refer, accept, treat, talk, complete, letter", async ({ 
 
   // 6. Nobody at the other clinic can open it
   const outsider = await browser.newPage();
-  const outsiderToken = await signIn(outsider, request, "physiotherapist");
+  const outsiderToken = await signIn(outsider, request, "de.sarah.johnson");
   const id = referralUrl.split("/").pop();
   expect((await api(request, outsiderToken, "GET", `/referrals/${id}/`)).status()).toBe(404);
   await outsider.close();
@@ -77,7 +77,7 @@ test("referral journey: refer, accept, treat, talk, complete, letter", async ({ 
 });
 
 test("front desk cannot open referrals", async ({ page, request }) => {
-  const token = await signIn(page, request, "cm.rececao1");
+  const token = await signIn(page, request, "cm.sofia.martins");
   expect((await api(request, token, "GET", "/referrals/")).status()).toBe(403);
 });
 
@@ -87,8 +87,8 @@ test("front desk cannot open referrals", async ({ page, request }) => {
 test("questions wait for an answer; progress notes draw the pain", async ({ browser, request }) => {
   const stamp = Date.now().toString().slice(-7);
   const doctor = await browser.newPage();
-  const doctorTok = await signIn(doctor, request, "cm.medico2");
-  const physioTok = await (await request.post("/api/v1/auth/login/", { data: { username: "cm.fisio4", password: "1234@1" } })).json();
+  const doctorTok = await signIn(doctor, request, "cm.helena.carvalho");
+  const physioTok = await (await request.post("/api/v1/auth/login/", { data: { username: "cm.joao.ribeiro", password: "1234@1" } })).json();
   const joao = await (await api(request, physioTok.access, "GET", "/users/getcurrentuser/")).json();
   const patient = await (await api(request, doctorTok, "POST", "/patient/", { name: `Conversa ${stamp}` })).json();
   const ref = await (await api(request, doctorTok, "POST", "/referrals/", {
@@ -105,7 +105,7 @@ test("questions wait for an answer; progress notes draw the pain", async ({ brow
   await expect(doctor.getByText("Por responder").first()).toBeVisible();
 
   const physio = await browser.newPage();
-  await signIn(physio, request, "cm.fisio4");
+  await signIn(physio, request, "cm.joao.ribeiro");
   await physio.goto("/referrals");
   await physio.getByRole("button", { name: "Por responder" }).click();
   const card = physio.getByRole("link", { name: new RegExp(patient.name) });

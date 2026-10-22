@@ -119,8 +119,15 @@ func (h *FacilityHandler) CreateFacility(c *gin.Context) {
 		return
 	}
 
+	code := normalizeCode(req.Code)
+	if err := checkClinicCode(db, code, "", ""); err != nil {
+		clinicCodeFailed(c, err)
+		return
+	}
+
 	facility := models.Facility{
 		Name:              req.Name,
+		Code:              code,
 		FacilityType:      req.FacilityType,
 		Address:           req.Address,
 		MiddlewareAddress: req.MiddlewareAddress,
@@ -236,6 +243,16 @@ func (h *FacilityHandler) UpdateFacility(c *gin.Context) {
 	}
 
 	// Update facility
+	code := normalizeCode(req.Code)
+	if !auth.IsAdmin(a.Role) && code != facility.Code { // only admins set a code
+		forbid(c)
+		return
+	}
+	if err := checkClinicCode(db, code, facility.ID, facility.Code); err != nil {
+		clinicCodeFailed(c, err)
+		return
+	}
+	facility.Code = code
 	facility.Name = req.Name
 	facility.FacilityType = req.FacilityType
 	facility.Address = req.Address
@@ -306,7 +323,21 @@ func (h *FacilityHandler) PartialUpdateFacility(c *gin.Context) {
 	}
 
 	// Only known clinic fields (never ids, timestamps or soft-delete)
-	if err := db.Model(&facility).Updates(clinicUpdate(updateData)).Error; err != nil {
+	fields := clinicUpdate(updateData)
+	if raw, sent := updateData["code"]; sent {
+		code, _ := raw.(string)
+		code = normalizeCode(code)
+		if !auth.IsAdmin(a.Role) && code != facility.Code {
+			forbid(c)
+			return
+		}
+		if err := checkClinicCode(db, code, facility.ID, facility.Code); err != nil {
+			clinicCodeFailed(c, err)
+			return
+		}
+		fields["code"] = code
+	}
+	if err := db.Model(&facility).Updates(fields).Error; err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
 			Message: "Failed to update facility",
@@ -552,4 +583,15 @@ func (h *FacilityHandler) GetWard(c *gin.Context) {
 
 func (h *FacilityHandler) DownloadFacility(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+}
+
+// clinicCodeFailed answers 400 for a bad code, 500 for anything else.
+func clinicCodeFailed(c *gin.Context, err error) {
+	if codeError(err) {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "validation_error", Message: err.Error(),
+			Details: map[string]string{"code": err.Error()}})
+		return
+	}
+	log.Printf("clinic code: %v", err)
+	c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "internal_error", Message: "Unexpected error"})
 }

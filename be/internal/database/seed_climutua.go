@@ -29,23 +29,23 @@ var climutuaStaff = []struct {
 	username, first, last string
 	role                  models.UserRole
 }{
-	{"cm.coordenacao", "Ana", "Ferreira", models.RoleCoordinator},
-	{"cm.medico1", "Miguel", "Sousa", models.RoleDoctor},    // fisiatra
-	{"cm.medico2", "Helena", "Carvalho", models.RoleDoctor}, // ortopedista
-	{"cm.medico3", "Rui", "Teixeira", models.RoleDoctor},    // neurologista
-	{"cm.fisio1", "Inês", "Moreira", models.RolePhysioTherapist},
-	{"cm.fisio2", "Pedro", "Almeida", models.RolePhysioTherapist},
-	{"cm.fisio3", "Catarina", "Lopes", models.RolePhysioTherapist}, // neurológica
-	{"cm.fisio4", "João", "Ribeiro", models.RolePhysioTherapist},
-	{"cm.fisio5", "Mariana", "Costa", models.RolePhysioTherapist},
-	{"cm.fisio6", "Tiago", "Fonseca", models.RolePhysioTherapist},
-	{"cm.rececao1", "Sofia", "Martins", models.RoleReceptionist},
-	{"cm.rececao2", "Carla", "Pinto", models.RoleReceptionist},
-	{"cm.enfermagem", "Teresa", "Gomes", models.RoleNurse},
-	{"cm.fisio7", "Rui", "Nogueira", models.RolePhysioTherapist}, // left the clinic (kept as a record)
+	{"cm.ana.ferreira", "Ana", "Ferreira", models.RoleCoordinator},
+	{"cm.miguel.sousa", "Miguel", "Sousa", models.RoleDoctor},       // fisiatra
+	{"cm.helena.carvalho", "Helena", "Carvalho", models.RoleDoctor}, // ortopedista
+	{"cm.rui.teixeira", "Rui", "Teixeira", models.RoleDoctor},       // neurologista
+	{"cm.ines.moreira", "Inês", "Moreira", models.RolePhysioTherapist},
+	{"cm.pedro.almeida", "Pedro", "Almeida", models.RolePhysioTherapist},
+	{"cm.catarina.lopes", "Catarina", "Lopes", models.RolePhysioTherapist}, // neurológica
+	{"cm.joao.ribeiro", "João", "Ribeiro", models.RolePhysioTherapist},
+	{"cm.mariana.costa", "Mariana", "Costa", models.RolePhysioTherapist},
+	{"cm.tiago.fonseca", "Tiago", "Fonseca", models.RolePhysioTherapist},
+	{"cm.sofia.martins", "Sofia", "Martins", models.RoleReceptionist},
+	{"cm.carla.pinto", "Carla", "Pinto", models.RoleReceptionist},
+	{"cm.teresa.gomes", "Teresa", "Gomes", models.RoleNurse},
+	{"cm.rui.nogueira", "Rui", "Nogueira", models.RolePhysioTherapist}, // left the clinic (kept as a record)
 }
 
-// Skills of the Climutua physios (cm.fisio1 … cm.fisio6).
+// Skills of the Climutua physios (cm.ines.moreira … cm.tiago.fonseca).
 var climutuaSkills = [][]string{
 	{"Fisioterapia músculo-esquelética", "Terapia manual", "Pavimento pélvico"},
 	{"Hidroterapia", "Reabilitação pós-operatória", "Fisioterapia músculo-esquelética"},
@@ -77,7 +77,7 @@ const (
 	divNeuro
 )
 
-// Weekly shift pattern per physio (index 0 = cm.fisio1); weekday 1–6.
+// Weekly shift pattern per physio (index 0 = cm.ines.moreira); weekday 1–6.
 type shiftPat struct{ weekday, start, end, div int }
 
 var climutuaPatterns = [][]shiftPat{
@@ -105,7 +105,7 @@ func weekdays(day ...shiftPat) []shiftPat {
 type condition struct {
 	diagnosis, icd, reason, goals, precautions string
 	doctor                                     int   // index in climutuaStaff
-	physios                                    []int // physio indexes (0 = cm.fisio1)
+	physios                                    []int // physio indexes (0 = cm.ines.moreira)
 	div                                        int
 	careMin, careMax, perWeek, sessions        int
 	minAge, maxAge                             int
@@ -224,7 +224,7 @@ func seedClimutua(now time.Time) error {
 
 func createClimutua(today time.Time) error {
 	pincode := "4050-180"
-	clinic := models.Facility{ID: ClimutuaClinicID, Name: climutuaName,
+	clinic := models.Facility{ID: ClimutuaClinicID, Name: climutuaName, Code: climutuaClinicCode,
 		Address: "Rua de Cedofeita 312, 4050-180 Porto", Pincode: &pincode}
 	if err := DB.Create(&clinic).Error; err != nil {
 		return fmt.Errorf("climutua clinic: %w", err)
@@ -275,7 +275,7 @@ func climutuaStaffIDs() ([]uint, error) {
 			return nil, err
 		}
 	}
-	// cm.fisio7 left at the end of July; the record stays, sign-in does not
+	// cm.rui.nogueira left at the end of July; the record stays, sign-in does not
 	left := time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC)
 	if err := DB.Model(&models.User{}).Where("id = ? AND employment_status <> ?", staff[len(staff)-1], "left").
 		Updates(map[string]any{"employment_status": "left", "employment_since": left, "is_active": false,
@@ -301,7 +301,7 @@ func climutuaExisting() ([]uint, []schedule.Division, error) {
 	return staff, divs, err
 }
 
-const firstPhysio = 4 // index of cm.fisio1 in climutuaStaff
+const firstPhysio = 4 // index of cm.ines.moreira in climutuaStaff
 
 // planClimutuaShifts creates the weekly pattern on every date of the range
 // where the physio has no shift yet. It returns all shifts of the range.
@@ -644,8 +644,8 @@ func createClimutuaPatients(staff []uint, divs []schedule.Division, shifts []sch
 	return nil
 }
 
-// climutuaHoliday records cm.fisio1's holiday next week through the real
-// time-board rules (her patients move to cm.fisio4 where he has room).
+// climutuaHoliday records cm.ines.moreira's holiday next week through the real
+// time-board rules (her patients move to cm.joao.ribeiro where he has room).
 func climutuaHoliday(staff []uint, today time.Time) error {
 	monday := today.AddDate(0, 0, 8-int(today.Weekday()))
 	if today.Weekday() == time.Sunday {
@@ -746,7 +746,7 @@ func climutuaNIF(r *rand.Rand) string {
 func seedStockAccess() error {
 	var users []models.User
 	if err := DB.Select("id", "username").Where("username IN ?", []string{
-		"nurse", "physiotherapist", "cm.enfermagem", "cm.fisio1", "cm.fisio5",
+		"de.mary.williams", "de.sarah.johnson", "cm.teresa.gomes", "cm.ines.moreira", "cm.mariana.costa",
 	}).Find(&users).Error; err != nil {
 		return err
 	}
@@ -756,7 +756,7 @@ func seedStockAccess() error {
 	}
 	everything := []inventory.GrantRule{{}}
 	if err := inventory.SeedGrants(DB, DemoClinicID, map[uint][]inventory.GrantRule{
-		id["nurse"]: everything, id["physiotherapist"]: everything,
+		id["de.mary.williams"]: everything, id["de.sarah.johnson"]: everything,
 	}); err != nil {
 		return err
 	}
@@ -768,8 +768,8 @@ func seedStockAccess() error {
 		}
 	}
 	return inventory.SeedGrants(DB, ClimutuaClinicID, map[uint][]inventory.GrantRule{
-		id["cm.enfermagem"]: everything,
-		id["cm.fisio1"]:     {{Floors: []int{1}}},
-		id["cm.fisio5"]:     {{Floors: []int{2, 3}, Categories: []string{"Higiene"}}},
+		id["cm.teresa.gomes"]:  everything,
+		id["cm.ines.moreira"]:  {{Floors: []int{1}}},
+		id["cm.mariana.costa"]: {{Floors: []int{2, 3}, Categories: []string{"Higiene"}}},
 	})
 }

@@ -1086,5 +1086,16 @@
   "show_consent_history_zero": "Ver histórico ({{count}} registos)",
   "choose_clinic": "Escolha a clínica",
   "export": "Exportar",
-  "exporting": "A exportar..."
+  "exporting": "A exportar...",
+  "add_person": "Adicionar pessoa",
+  "person_added": "Pessoa adicionada. Utilizador: {{username}}",
+  "person_add_failed": "Não foi possível adicionar a pessoa.",
+  "add_person_names_required": "Preencha o nome e o apelido.",
+  "password_min_8": "A palavra-passe precisa de pelo menos 8 caracteres.",
+  "passwords_do_not_match": "As palavras-passe não coincidem.",
+  "username_will_be": "Nome de utilizador",
+  "username_standard_help": "Formado pelo código da clínica, nome próprio e último apelido (ex.: cm.joao.teixeira); se já existir, junta-se um número.",
+  "clinic_code": "Código da clínica",
+  "clinic_code_help": "2 a 4 letras (ex.: cm). Inicia os nomes de utilizador das pessoas da clínica e não pode ser alterado depois.",
+  "clinic_code_invalid": "Use 2 a 4 letras minúsculas."
 }

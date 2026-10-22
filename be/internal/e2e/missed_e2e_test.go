@@ -11,9 +11,9 @@ import (
 // TestMissedSessionsFlag: three unjustified misses in the last 90 days flag
 // the patient to the coordinator; justifying one removes the flag.
 func TestMissedSessionsFlag(t *testing.T) {
-	coord, _ := login(t, "coordinator")
-	desk, _ := login(t, "receptionist")
-	tiago, _ := login(t, "physiotherapist2")
+	coord, _ := login(t, "de.marta.ribeiro")
+	desk, _ := login(t, "de.rita.lopes")
+	tiago, _ := login(t, "de.tiago.martins")
 	tiagoID := userIDOf(tiago)
 
 	var divisions []map[string]any
@@ -90,7 +90,7 @@ func TestMissedSessionsFlag(t *testing.T) {
 	if counts["unjustified"] != 2.0 || counts["justified"] != 1.0 {
 		t.Errorf("counts: %v", counts)
 	}
-	other, _ := login(t, "cm.coordenacao")
+	other, _ := login(t, "cm.ana.ferreira")
 	expect(t, "other clinic", other.call("GET", fmt.Sprintf("/schedule/missed/%s/", pid), nil, nil), 404)
 }
 

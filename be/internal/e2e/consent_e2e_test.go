@@ -10,7 +10,7 @@ import (
 // TestPatientConsents: the front desk records consents; a change adds a
 // record and the newest is the current state; bad kinds are refused.
 func TestPatientConsents(t *testing.T) {
-	desk, _ := login(t, "receptionist")
+	desk, _ := login(t, "de.rita.lopes")
 	var p map[string]any
 	expect(t, "patient", desk.call("POST", "/patient/", map[string]any{"name": "Consentimento " + time.Now().Format("150405.000")}, &p), 201)
 	path := "/patient/" + p["id"].(string) + "/consents/"

@@ -13,7 +13,7 @@ async function token(request: APIRequestContext, username: string) {
 const stamp = () => Date.now().toString().slice(-7);
 
 test("the version lives on the profile and the About page, not in the menu", async ({ page, request }) => {
-  await signIn(page, request, "cm.fisio3");
+  await signIn(page, request, "cm.catarina.lopes");
   await page.goto("/");
   await expect(page.getByText(/Klyniva v0\.\d+\.\d+/)).toHaveCount(0);
   await page.goto("/user/profile");
@@ -29,7 +29,7 @@ test("the version lives on the profile and the About page, not in the menu", asy
 });
 
 test("the user menu has profile, About and sign out; the board keeps rare actions in Organizar", async ({ page, request }) => {
-  await signIn(page, request, "cm.coordenacao");
+  await signIn(page, request, "cm.ana.ferreira");
   await page.goto("/");
   await page.locator("#user-profile-name").click();
   await expect(page.getByRole("menuitem", { name: "Perfil" })).toBeVisible();
@@ -49,7 +49,7 @@ test("the user menu has profile, About and sign out; the board keeps rare action
 });
 
 test("the app talks to the server on the address it was opened from (other laptops)", async ({ page, request }) => {
-  await signIn(page, request, "cm.fisio3");
+  await signIn(page, request, "cm.catarina.lopes");
   // 127.0.0.1 stands in for another laptop using this computer's address
   const apiHosts = new Set<string>();
   page.on("request", (r) => {
@@ -63,15 +63,15 @@ test("the app talks to the server on the address it was opened from (other lapto
 });
 
 test("stock permissions: the coordinator gives Pedro floor 2, Pedro can then restock only there", async ({ browser, page, request }) => {
-  const coordTok = await signIn(page, request, "cm.coordenacao");
-  const pedroTok = await token(request, "cm.fisio2");
+  const coordTok = await signIn(page, request, "cm.ana.ferreira");
+  const pedroTok = await token(request, "cm.pedro.almeida");
   const pedro = await (await api(request, pedroTok, "GET", "/users/getcurrentuser/")).json();
   await api(request, coordTok, "PUT", `/inventory/grants/${pedro.id}/`, { rules: [] });
 
   try {
     // Without permission Pedro can only look
     const pedroPage = await browser.newPage();
-    await signIn(pedroPage, request, "cm.fisio2");
+    await signIn(pedroPage, request, "cm.pedro.almeida");
     await pedroPage.goto("/inventory");
     await expect(pedroPage.getByText(/Pode consultar o stock mas não alterá-lo/)).toBeVisible();
     await expect(pedroPage.getByRole("button", { name: "Repor", exact: true })).toHaveCount(0);
@@ -100,7 +100,7 @@ test("stock permissions: the coordinator gives Pedro floor 2, Pedro can then res
 });
 
 test("inventory filters: single-use vs containers, and by floor", async ({ page, request }) => {
-  await signIn(page, request, "cm.coordenacao");
+  await signIn(page, request, "cm.ana.ferreira");
   await page.goto("/inventory");
   await page.getByRole("button", { name: "Embalagens (abrir e terminar)" }).click();
   await expect(page.locator("li", { hasText: "Gel de ultrassons" })).toBeVisible();
@@ -118,7 +118,7 @@ test("inventory filters: single-use vs containers, and by floor", async ({ page,
 });
 
 test("a missed session is justified or not, and the label says which", async ({ page, request }) => {
-  const physioTok = await signIn(page, request, "cm.fisio3");
+  const physioTok = await signIn(page, request, "cm.catarina.lopes");
   const reason = `Doente ${stamp()}`;
   await page.goto("/");
   const missButtons = page.getByRole("button", { name: "Marcar falta" });
@@ -141,7 +141,7 @@ test("a missed session is justified or not, and the label says which", async ({ 
 });
 
 test("a clinic's people open as the people list filtered by clinic", async ({ page, request }) => {
-  await signIn(page, request, "stateadmin");
+  await signIn(page, request, "paula.neves");
   await page.goto("/facility");
   await page.locator("a[href=\"/users?clinic=6b1f3c1e-5a8e-4c1d-9a0e-000000000002\"]").click();
   await expect(page).toHaveURL(/\/users\?clinic=6b1f3c1e-5a8e-4c1d-9a0e-000000000002$/);
@@ -154,7 +154,7 @@ test("a clinic's people open as the people list filtered by clinic", async ({ pa
 });
 
 test("clinics page: search and chips instead of advanced filters", async ({ page, request }) => {
-  await signIn(page, request, "stateadmin");
+  await signIn(page, request, "paula.neves");
   await page.goto("/facility");
   await expect(page.getByRole("button", { name: /Filtros avançados|Advanced filters/ })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Pesquisar clínicas" }).fill("cedofeita");
@@ -163,7 +163,7 @@ test("clinics page: search and chips instead of advanced filters", async ({ page
 });
 
 test("time board: today is marked, and the Today button pulses it in the week view", async ({ page, request }) => {
-  await signIn(page, request, "cm.coordenacao");
+  await signIn(page, request, "cm.ana.ferreira");
   await page.goto("/time-board");
   // Day view on today: bold label with a "Hoje" badge; gone on another day
   await expect(page.getByRole("button", { name: "Hoje" })).toHaveAttribute("aria-pressed", "true");
@@ -179,11 +179,11 @@ test("time board: today is marked, and the Today button pulses it in the week vi
 });
 
 test("holiday: each patient can go to a different physio", async ({ page, request }) => {
-  const coordTok = await signIn(page, request, "cm.coordenacao");
+  const coordTok = await signIn(page, request, "cm.ana.ferreira");
   const ids = {} as Record<string, { id: number; first_name: string; last_name: string }>;
-  for (const u of ["cm.fisio1", "cm.fisio2", "cm.fisio3"])
+  for (const u of ["cm.ines.moreira", "cm.pedro.almeida", "cm.catarina.lopes"])
     ids[u] = await (await api(request, await token(request, u), "GET", "/users/getcurrentuser/")).json();
-  const [away, y, z] = [ids["cm.fisio1"], ids["cm.fisio2"], ids["cm.fisio3"]];
+  const [away, y, z] = [ids["cm.ines.moreira"], ids["cm.pedro.almeida"], ids["cm.catarina.lopes"]];
   const name = (p: { first_name: string; last_name: string }) => `${p.first_name} ${p.last_name}`;
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + 84 + (Number(stamp()) % 5));
@@ -191,7 +191,7 @@ test("holiday: each patient can go to a different physio", async ({ page, reques
   const dmy = date.split("-").reverse().join("/");
   const divs = (await (await api(request, coordTok, "GET", "/schedule/divisions/")).json()) as { id: string; capacity: number; name: string }[];
   const gym = divs.find((x) => x.name === "Ginásio")!.id;
-  const deskTok = await token(request, "cm.rececao1");
+  const deskTok = await token(request, "cm.sofia.martins");
   const shifts: string[] = [];
   const patients: { id: string; name: string }[] = [];
 

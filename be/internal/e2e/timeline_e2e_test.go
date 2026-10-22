@@ -11,10 +11,10 @@ import (
 // normalised; the timeline gathers the referral, its messages and sessions,
 // and each role sees only what it may (no referrals for the front desk).
 func TestPatientExtrasAndTimeline(t *testing.T) {
-	doctor, _ := login(t, "doctor")
-	sarah, _ := login(t, "physiotherapist")
-	coord, _ := login(t, "coordinator")
-	desk, _ := login(t, "receptionist")
+	doctor, _ := login(t, "de.john.smith")
+	sarah, _ := login(t, "de.sarah.johnson")
+	coord, _ := login(t, "de.marta.ribeiro")
+	desk, _ := login(t, "de.rita.lopes")
 	sarahID := userIDOf(sarah)
 
 	expect(t, "bad postal code", desk.call("POST", "/patient/", map[string]any{"name": "Postal X", "postal_code": "12"}, nil), 400)

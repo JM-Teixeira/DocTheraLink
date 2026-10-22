@@ -50,6 +50,8 @@ export interface WardModel {
 export interface FacilityModel {
   id?: string;
   name?: string;
+  /** 2-4 letters; prefixes the usernames of its people (cm.joao.teixeira) */
+  code?: string;
   read_cover_image_url?: string;
   facility_type?: number;
   address?: string;

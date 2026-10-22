@@ -62,6 +62,7 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	users.POST("/", userHandler.CreateUser)
 	users.POST("/add_user/", userHandler.CreateUser) // path used by the frontend form
 	users.GET("/getcurrentuser/", userHandler.GetCurrentUser)
+	users.GET("/username_suggestion/", userHandler.UsernameSuggestion)
 	users.GET("/:username/", userHandler.GetUser)
 	users.PUT("/:username/", userHandler.UpdateUser)
 	users.PATCH("/:username/", userHandler.PartialUpdateUser)

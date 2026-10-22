@@ -129,6 +129,9 @@ func Migrate() error {
 		}
 	}
 
+	if err := DB.Exec(models.UniqueClinicCode).Error; err != nil {
+		return fmt.Errorf("failed to create clinic code index: %w", err)
+	}
 	for _, stmt := range patient.UniqueIndexes {
 		if err := DB.Exec(stmt).Error; err != nil {
 			return fmt.Errorf("failed to create patient indexes: %w", err)
@@ -265,7 +268,7 @@ const demoPasswordHash = "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTO
 // development and tests only (release mode refuses demo users).
 // Admin accounts are organisation-wide and get no clinic.
 func seedDemoClinic() error {
-	demo := models.Facility{ID: DemoClinicID, Name: "Klyniva Demo Clinic", Address: "Lisboa"}
+	demo := models.Facility{ID: DemoClinicID, Name: "Klyniva Demo Clinic", Code: demoClinicCode, Address: "Lisboa"}
 	if err := DB.FirstOrCreate(&demo, models.Facility{ID: DemoClinicID}).Error; err != nil {
 		return fmt.Errorf("failed to seed demo clinic: %w", err)
 	}
@@ -276,16 +279,19 @@ func seedDemoClinic() error {
 		inClinic              bool
 	}
 	users := []demoUser{
-		{"stateadmin", "State", "Administrator", models.RoleStateAdmin, false},
-		{"districtadmin", "District", "Administrator", models.RoleDistrictAdmin, false},
-		{"facilitycoordinator", "Clinic", "Coordinator", models.RoleLocalBodyAdmin, false},
-		{"doctor", "John", "Smith", models.RoleDoctor, true},
-		{"physiotherapist", "Sarah", "Johnson", models.RolePhysioTherapist, true},
-		{"physiotherapist2", "Tiago", "Martins", models.RolePhysioTherapist, true},
-		{"nurse", "Mary", "Williams", models.RoleNurse, true},
-		{"receptionist", "Rita", "Lopes", models.RoleReceptionist, true},
-		{"coordinator", "Marta", "Ribeiro", models.RoleCoordinator, true},
-		{"staff", "General", "Staff", models.RoleStaff, true},
+		{"paula.neves", "Paula", "Neves", models.RoleStateAdmin, false},
+		{"jorge.matos", "Jorge", "Matos", models.RoleDistrictAdmin, false},
+		{"luis.pereira", "Luís", "Pereira", models.RoleLocalBodyAdmin, false},
+		{"de.john.smith", "John", "Smith", models.RoleDoctor, true},
+		{"de.sarah.johnson", "Sarah", "Johnson", models.RolePhysioTherapist, true},
+		{"de.tiago.martins", "Tiago", "Martins", models.RolePhysioTherapist, true},
+		{"de.mary.williams", "Mary", "Williams", models.RoleNurse, true},
+		{"de.rita.lopes", "Rita", "Lopes", models.RoleReceptionist, true},
+		{"de.marta.ribeiro", "Marta", "Ribeiro", models.RoleCoordinator, true},
+		{"de.nuno.dias", "Nuno", "Dias", models.RoleStaff, true},
+	}
+	if err := applyNamingStandard(); err != nil {
+		return err
 	}
 	for _, d := range users {
 		u := models.User{
@@ -301,7 +307,7 @@ func seedDemoClinic() error {
 			return fmt.Errorf("failed to seed demo user %s: %w", d.username, err)
 		}
 		// Bring demo users created by older versions up to date
-		updates := map[string]any{"first_name": d.first}
+		updates := map[string]any{"first_name": d.first, "last_name": d.last}
 		if d.inClinic {
 			updates["home_facility_id"] = DemoClinicID
 		}

@@ -79,8 +79,10 @@ type Ward struct {
 }
 
 type Facility struct {
-	ID                string       `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Name              string       `json:"name" gorm:"not null"`
+	ID   string `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	Name string `json:"name" gorm:"not null"`
+	// Code prefixes the usernames of the clinic people (cm.joao.teixeira)
+	Code              string       `json:"code" gorm:"size:4;not null;default:''"`
 	FacilityType      FacilityType `json:"facility_type"`
 	Address           string       `json:"address"`
 	MiddlewareAddress *string      `json:"middleware_address"`
@@ -110,6 +112,7 @@ type Facility struct {
 // FacilityRequest represents facility creation/update request
 type FacilityRequest struct {
 	Name              string       `json:"name" binding:"required"`
+	Code              string       `json:"code" binding:"required"`
 	FacilityType      FacilityType `json:"facility_type" binding:"required"`
 	Address           string       `json:"address" binding:"required"`
 	MiddlewareAddress *string      `json:"middleware_address"`
@@ -129,3 +132,7 @@ func (f *Facility) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+// UniqueClinicCode is created after AutoMigrate: one clinic per code
+// (clinics without a code yet don't clash).
+const UniqueClinicCode = `CREATE UNIQUE INDEX IF NOT EXISTS uniq_facilities_code ON facilities (code) WHERE code <> '' AND deleted_at IS NULL`

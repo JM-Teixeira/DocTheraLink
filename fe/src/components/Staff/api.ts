@@ -18,6 +18,12 @@ const StaffRoutes = {
     method: "GET",
     TRes: Type<PaginatedResponse<StaffRow>>(),
   },
+  /** The username a new person would get (server-side naming standard) */
+  usernameSuggestion: {
+    path: "/api/v1/users/username_suggestion/",
+    method: "GET",
+    TRes: Type<{ username: string }>(),
+  },
   clinics: {
     path: "/api/v1/facility/",
     method: "GET",

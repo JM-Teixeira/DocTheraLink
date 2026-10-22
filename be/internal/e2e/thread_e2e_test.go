@@ -10,8 +10,8 @@ import (
 // TestQuestionThread: a question waits (badge + filter) for the other side
 // until they answer that question; progress notes keep the pain score.
 func TestQuestionThread(t *testing.T) {
-	doctor, _ := login(t, "doctor")
-	sarah, _ := login(t, "physiotherapist")
+	doctor, _ := login(t, "de.john.smith")
+	sarah, _ := login(t, "de.sarah.johnson")
 	var p, ref map[string]any
 	expect(t, "patient", doctor.call("POST", "/patient/", map[string]any{"name": "Pergunta " + time.Now().Format("150405.000")}, &p), 201)
 	expect(t, "referral", doctor.call("POST", "/referrals/", map[string]any{

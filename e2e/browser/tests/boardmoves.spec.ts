@@ -56,12 +56,12 @@ async function boardOn(page: Page, date: string) {
 }
 
 test("drag a patient to another hour in the physio's day", async ({ page, request }) => {
-  const coordTok = await signIn(page, request, "coordinator");
-  const tiago = await (await api(request, await token(request, "physiotherapist2"), "GET", "/users/getcurrentuser/")).json();
+  const coordTok = await signIn(page, request, "de.marta.ribeiro");
+  const tiago = await (await api(request, await token(request, "de.tiago.martins"), "GET", "/users/getcurrentuser/")).json();
   const divs = (await (await api(request, coordTok, "GET", "/schedule/divisions/")).json()) as { id: string; capacity: number }[];
   const gym = divs.find((x) => x.capacity >= 2)!.id;
   const { monday, shifts } = await freeWeek(request, coordTok, tiago.id, gym);
-  const patient = await (await api(request, await token(request, "receptionist"), "POST", "/patient/", { name: `Arrastar ${stamp()}` })).json();
+  const patient = await (await api(request, await token(request, "de.rita.lopes"), "POST", "/patient/", { name: `Arrastar ${stamp()}` })).json();
   try {
     expect((await api(request, coordTok, "POST", "/schedule/appointments/", { date: monday, hour: 9, therapist_id: tiago.id, patient_id: patient.id })).status()).toBe(201);
 
@@ -90,13 +90,13 @@ test("drag a patient to another hour in the physio's day", async ({ page, reques
 });
 
 test("waiting list: add a patient, book their plan, they leave the list", async ({ page, request }) => {
-  const coordTok = await signIn(page, request, "coordinator");
-  const tiago = await (await api(request, await token(request, "physiotherapist2"), "GET", "/users/getcurrentuser/")).json();
+  const coordTok = await signIn(page, request, "de.marta.ribeiro");
+  const tiago = await (await api(request, await token(request, "de.tiago.martins"), "GET", "/users/getcurrentuser/")).json();
   const divs = (await (await api(request, coordTok, "GET", "/schedule/divisions/")).json()) as { id: string; capacity: number }[];
   const gym = divs.find((x) => x.capacity >= 2)!.id;
   const { monday, shifts } = await freeWeek(request, coordTok, tiago.id, gym);
   const name = `Lista Espera ${stamp()}`;
-  await api(request, await token(request, "receptionist"), "POST", "/patient/", { name });
+  await api(request, await token(request, "de.rita.lopes"), "POST", "/patient/", { name });
   try {
     await boardOn(page, monday);
     await page.getByRole("button", { name: /Lista de espera/ }).click();

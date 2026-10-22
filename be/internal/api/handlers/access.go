@@ -132,7 +132,8 @@ func userUpdate(a *actor, target *models.User, body map[string]any) (map[string]
 
 // newUserRequest is what the "add person" form sends.
 type newUserRequest struct {
-	Username      string          `json:"username" binding:"required,min=3,max=150"`
+	// Username is ignored: the server applies the naming standard (user_naming.go)
+	Username      string          `json:"username"`
 	Password      string          `json:"password" binding:"required,min=8,max=128"`
 	Email         string          `json:"email" binding:"required,email"`
 	FirstName     string          `json:"first_name" binding:"required,max=150"`

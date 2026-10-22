@@ -6,7 +6,7 @@ import { PASSWORD, api, signIn, visibleText } from "./helpers";
 
 test("login form signs in and refuses a wrong password", async ({ page }) => {
   await page.goto("/");
-  await page.locator("#username").fill("cm.coordenacao");
+  await page.locator("#username").fill("cm.ana.ferreira");
   await page.locator("input[name=password]").first().fill("wrong-password");
   await page.locator("button[type=submit]").first().click();
   await expect(page).toHaveURL(/login|\/$/);
@@ -18,23 +18,23 @@ test("login form signs in and refuses a wrong password", async ({ page }) => {
 });
 
 test("a person who left cannot sign in", async ({ request }) => {
-  const res = await request.post("/api/v1/auth/login/", { data: { username: "cm.fisio7", password: PASSWORD } });
+  const res = await request.post("/api/v1/auth/login/", { data: { username: "cm.rui.nogueira", password: PASSWORD } });
   expect(res.ok()).toBeFalsy();
 });
 
 test("people: status chips find who left the clinic", async ({ page, request }) => {
-  await signIn(page, request, "cm.coordenacao");
+  await signIn(page, request, "cm.ana.ferreira");
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Pessoas" })).toBeVisible();
   await expect(page.getByText("Rui Nogueira")).toHaveCount(0); // active by default
   await page.getByRole("button", { name: "Saiu", exact: true }).click();
   await expect(page.getByText("Rui Nogueira")).toBeVisible();
   await page.getByText("Rui Nogueira").click();
-  await expect(page).toHaveURL(/\/users\/cm\.fisio7/);
+  await expect(page).toHaveURL(/\/users\/cm\.rui\.nogueira/);
 });
 
 test("patients: filters narrow the list and the metrics agree", async ({ page, request }) => {
-  await signIn(page, request, "cm.coordenacao");
+  await signIn(page, request, "cm.ana.ferreira");
   await page.goto("/patients");
   await page.getByRole("button", { name: "65-79 anos" }).click();
   await page.getByRole("button", { name: "Nível de cuidados 4" }).click();
@@ -50,9 +50,9 @@ test("patients: filters narrow the list and the metrics agree", async ({ page, r
 });
 
 test("dates follow the person's preference", async ({ page, request }) => {
-  const token = await signIn(page, request, "cm.coordenacao");
+  const token = await signIn(page, request, "cm.ana.ferreira");
   try {
-    expect((await api(request, token, "PATCH", "/users/cm.coordenacao/preferences/", { date_format: "ymd" })).ok()).toBeTruthy();
+    expect((await api(request, token, "PATCH", "/users/cm.ana.ferreira/preferences/", { date_format: "ymd" })).ok()).toBeTruthy();
     await page.goto("/time-board");
     const today = new Date().toISOString().slice(0, 10);
     await expect(page.getByLabel("Data", { exact: true })).toHaveValue(today);
@@ -65,12 +65,12 @@ test("dates follow the person's preference", async ({ page, request }) => {
     const [y, m, d] = today.split("-");
     await expect(page.getByLabel("Data", { exact: true })).toHaveValue(`${d}/${m}/${y}`);
   } finally {
-    await api(request, token, "PATCH", "/users/cm.coordenacao/preferences/", { date_format: "dmy" });
+    await api(request, token, "PATCH", "/users/cm.ana.ferreira/preferences/", { date_format: "dmy" });
   }
 });
 
 test("dropdown arrows never sit on top of the text", async ({ page, request }) => {
-  await signIn(page, request, "cm.coordenacao");
+  await signIn(page, request, "cm.ana.ferreira");
   for (const path of ["/referrals", "/users", "/patients"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
@@ -82,8 +82,8 @@ test("dropdown arrows never sit on top of the text", async ({ page, request }) =
 });
 
 test("no long dashes in the interface", async ({ page, request }) => {
-  await signIn(page, request, "cm.coordenacao");
-  for (const path of ["/", "/patients", "/users", "/referrals", "/time-board", "/inventory", "/users/cm.fisio7/facilities"]) {
+  await signIn(page, request, "cm.ana.ferreira");
+  for (const path of ["/", "/patients", "/users", "/referrals", "/time-board", "/inventory", "/users/cm.rui.nogueira/facilities"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     expect(await visibleText(page), path).not.toMatch(/[—–]/);
@@ -91,17 +91,17 @@ test("no long dashes in the interface", async ({ page, request }) => {
 });
 
 test("another clinic's people stay invisible in the app", async ({ page, request }) => {
-  const token = await signIn(page, request, "coordinator", "en");
+  const token = await signIn(page, request, "de.marta.ribeiro", "en");
   await page.goto("/users");
   await page.getByRole("searchbox").fill("cm.");
   await expect(page.getByText(/Nobody matches/)).toBeVisible();
-  expect((await api(request, token, "GET", "/users/cm.fisio3/")).status()).toBe(404);
-  await page.goto("/users/cm.fisio3");
+  expect((await api(request, token, "GET", "/users/cm.catarina.lopes/")).status()).toBe(404);
+  await page.goto("/users/cm.catarina.lopes");
   await expect(page.getByText("Catarina Lopes")).toHaveCount(0);
 });
 
 test("time board: filter by floor and open a physio's day", async ({ page, request }) => {
-  await signIn(page, request, "cm.coordenacao");
+  await signIn(page, request, "cm.ana.ferreira");
   await page.goto("/time-board");
   await page.getByRole("button", { name: "Piso 3", exact: true }).click();
   // Floor 3 is neuro rehab only; the gym and hydrotherapy (floor 1) go away

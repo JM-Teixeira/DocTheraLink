@@ -256,8 +256,13 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		forbid(c)
 		return
 	}
+	username, err := newUsername(db, clinic, req.FirstName, req.LastName)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "validation_error", Message: err.Error()})
+		return
+	}
 	user := models.User{
-		Username: strings.TrimSpace(req.Username), Email: strings.TrimSpace(req.Email),
+		Username: username, Email: strings.TrimSpace(req.Email),
 		FirstName: strings.TrimSpace(req.FirstName), LastName: strings.TrimSpace(req.LastName),
 		UserType: req.UserType, HomeFacilityID: clinic, PhoneNumber: req.PhoneNumber,
 		Qualification: req.Qualification, StateID: req.StateID, DistrictID: req.DistrictID,

@@ -8,7 +8,7 @@ import { PASSWORD, api, signIn } from "./helpers";
 const stamp = () => Date.now().toString().slice(-7);
 
 test("an unsaved registration survives a reload and can be discarded", async ({ page, request }) => {
-  await signIn(page, request, "cm.rececao1");
+  await signIn(page, request, "cm.sofia.martins");
   const name = `Rascunho ${stamp()}`;
   await page.goto("/patients/new");
   await page.locator("#name").fill(name);
@@ -54,8 +54,8 @@ test("an unsaved registration survives a reload and can be discarded", async ({ 
 });
 
 test("the patient history gathers the referral, its messages and sessions", async ({ page, request }) => {
-  const doctorTok = await signIn(page, request, "cm.medico2");
-  const physioTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.fisio4", password: PASSWORD } })).json()).access;
+  const doctorTok = await signIn(page, request, "cm.helena.carvalho");
+  const physioTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.joao.ribeiro", password: PASSWORD } })).json()).access;
   const joao = await (await api(request, physioTok, "GET", "/users/getcurrentuser/")).json();
   const patient = await (await api(request, doctorTok, "POST", "/patient/", { name: `Historico ${stamp()}` })).json();
   const ref = await (await api(request, doctorTok, "POST", "/referrals/", {
@@ -82,7 +82,7 @@ test("the patient history gathers the referral, its messages and sessions", asyn
 });
 
 test("allergies as a list, and saving survives a dropped connection", async ({ page, request }) => {
-  await signIn(page, request, "cm.rececao1");
+  await signIn(page, request, "cm.sofia.martins");
   const name = `Lista ${stamp()}`;
   await page.goto("/patients/new");
   await page.locator("#name").fill(name);
@@ -114,9 +114,9 @@ test("allergies as a list, and saving survives a dropped connection", async ({ p
 });
 
 test("the coordinator filters by physio and diagnosis and exports the list as CSV", async ({ page, request }) => {
-  const coordTok = await signIn(page, request, "cm.coordenacao");
-  const doctorTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.medico2", password: PASSWORD } })).json()).access;
-  const physioTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.fisio4", password: PASSWORD } })).json()).access;
+  const coordTok = await signIn(page, request, "cm.ana.ferreira");
+  const doctorTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.helena.carvalho", password: PASSWORD } })).json()).access;
+  const physioTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.joao.ribeiro", password: PASSWORD } })).json()).access;
   const joao = await (await api(request, physioTok, "GET", "/users/getcurrentuser/")).json();
   const diag = `Fasceite plantar ${stamp()}`;
   const patient = await (await api(request, coordTok, "POST", "/patient/", { name: `Exportar ${stamp()}`, city: "Porto" })).json();
@@ -144,7 +144,7 @@ test("the coordinator filters by physio and diagnosis and exports the list as CS
 });
 
 test("consents: the front desk records them and the history keeps every change", async ({ page, request }) => {
-  const tok = await signIn(page, request, "cm.rececao1");
+  const tok = await signIn(page, request, "cm.sofia.martins");
   const patient = await (await api(request, tok, "POST", "/patient/", { name: `Consentimento ${stamp()}` })).json();
   await page.goto(`/patients/${patient.id}`);
   const card = page.getByRole("region", { name: "Consentimentos (RGPD)" });

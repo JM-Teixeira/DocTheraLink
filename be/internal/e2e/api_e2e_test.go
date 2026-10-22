@@ -115,16 +115,16 @@ func TestAuthRequired(t *testing.T) {
 	c := &client{t: t, base: baseURL(t)}
 	expect(t, "unauthenticated list", c.call("GET", "/referrals/", nil, nil), 401)
 	expect(t, "bad password", c.call("POST", "/auth/login/",
-		map[string]string{"username": "doctor", "password": "wrong"}, nil), 401)
+		map[string]string{"username": "de.john.smith", "password": "wrong"}, nil), 401)
 }
 
 // TestReferralLifecycle walks the core product flow end to end:
 // doctor registers a patient and refers them; a physiotherapist accepts,
 // treats and closes the referral; both talk on the shared thread.
 func TestReferralLifecycle(t *testing.T) {
-	doctor, doctorTokens := login(t, "doctor")
-	physio, _ := login(t, "physiotherapist")
-	nurse, _ := login(t, "nurse")
+	doctor, doctorTokens := login(t, "de.john.smith")
+	physio, _ := login(t, "de.sarah.johnson")
+	nurse, _ := login(t, "de.mary.williams")
 	stamp := time.Now().Format("150405")
 
 	var patient map[string]any
@@ -218,9 +218,9 @@ func userIDOf(c *client) float64 {
 // TestHandOverAndReopen: a declined referral is re-opened to a colleague, who
 // later hands it back; the status counts follow along.
 func TestHandOverAndReopen(t *testing.T) {
-	doctor, _ := login(t, "doctor")
-	sarah, _ := login(t, "physiotherapist")
-	tiago, _ := login(t, "physiotherapist2")
+	doctor, _ := login(t, "de.john.smith")
+	sarah, _ := login(t, "de.sarah.johnson")
+	tiago, _ := login(t, "de.tiago.martins")
 	sarahID, tiagoID := userIDOf(sarah), userIDOf(tiago)
 
 	var p map[string]any
@@ -273,9 +273,9 @@ func notificationFor(c *client, referralID, event string) map[string]any {
 // TestNotifications: a new open referral notifies the clinic's physios (not
 // the doctor who created it); accepting notifies the doctor; read state works.
 func TestNotifications(t *testing.T) {
-	doctor, _ := login(t, "doctor")
-	sarah, _ := login(t, "physiotherapist")
-	tiago, _ := login(t, "physiotherapist2")
+	doctor, _ := login(t, "de.john.smith")
+	sarah, _ := login(t, "de.sarah.johnson")
+	tiago, _ := login(t, "de.tiago.martins")
 
 	var p, ref map[string]any
 	expect(t, "patient", doctor.call("POST", "/patient/", map[string]any{"name": "Notify " + time.Now().Format("150405")}, &p), 201)
@@ -317,7 +317,7 @@ func TestNotifications(t *testing.T) {
 // TestReceptionist covers the front-desk role: registers and edits patients,
 // but has no access to referrals (clinical content).
 func TestReceptionist(t *testing.T) {
-	rec, _ := login(t, "receptionist")
+	rec, _ := login(t, "de.rita.lopes")
 	var p map[string]any
 	expect(t, "receptionist registers patient", rec.call("POST", "/patient/", map[string]any{
 		"name": "Front Desk " + time.Now().Format("150405"), "phone_number": "+351 920 000 000",
@@ -332,7 +332,7 @@ func TestReceptionist(t *testing.T) {
 
 // TestClockInOut covers the staff time log (it used to always return 401).
 func TestClockInOut(t *testing.T) {
-	staff, _ := login(t, "staff")
+	staff, _ := login(t, "de.nuno.dias")
 	var status map[string]any
 	staff.call("GET", "/timelog/status", nil, &status)
 	if status["clocked_in"] == true {
@@ -382,9 +382,9 @@ func (c *client) download(path string) (int, []byte, http.Header) {
 // it byte for byte; outsiders, disguised executables and deletes by the
 // other participant are refused.
 func TestAttachments(t *testing.T) {
-	doctor, _ := login(t, "doctor")
-	physio, _ := login(t, "physiotherapist")
-	nurse, _ := login(t, "nurse")
+	doctor, _ := login(t, "de.john.smith")
+	physio, _ := login(t, "de.sarah.johnson")
+	nurse, _ := login(t, "de.mary.williams")
 
 	var p map[string]any
 	expect(t, "patient", doctor.call("POST", "/patient/", map[string]any{"name": "Files " + time.Now().Format("150405")}, &p), 201)
@@ -431,7 +431,7 @@ func TestAttachments(t *testing.T) {
 
 // TestCatalog: the referral form's ICD-10 search and templates, per language.
 func TestCatalog(t *testing.T) {
-	doctor, _ := login(t, "doctor")
+	doctor, _ := login(t, "de.john.smith")
 	var codes []map[string]string
 	expect(t, "icd search", doctor.call("GET", "/catalog/icd10/?search=lombalgia&lang=pt", nil, &codes), 200)
 	if len(codes) == 0 || codes[0]["code"] != "M54.5" || codes[0]["description"] != "Lombalgia" {
@@ -449,7 +449,7 @@ func TestCatalog(t *testing.T) {
 // TestPatientIdentifiersAndDuplicates: NIF is validated and unique per
 // clinic; a similar name with the same birth date needs confirmation.
 func TestPatientIdentifiersAndDuplicates(t *testing.T) {
-	rec, _ := login(t, "receptionist")
+	rec, _ := login(t, "de.rita.lopes")
 	// A fresh valid NIF per run: 8 digits from the clock + check digit
 	base := fmt.Sprintf("2%07d", time.Now().UnixNano()%10_000_000)
 	sum := 0

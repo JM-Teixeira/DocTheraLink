@@ -62,7 +62,7 @@ async function divisionWithRoom(request: APIRequestContext, tok: string, room = 
 }
 
 test("register a patient; duplicates are caught; found by NIF", async ({ page, request }) => {
-  await signIn(page, request, "cm.rececao1");
+  await signIn(page, request, "cm.sofia.martins");
   const name = `Registo Teste ${stamp()}`;
   const nif = freshNif();
   const fill = async (withNif?: string) => {
@@ -104,9 +104,9 @@ test("register a patient; duplicates are caught; found by NIF", async ({ page, r
 });
 
 test("weekly plan: 3 sessions a week booked from the board", async ({ page, request }) => {
-  const coordTok = await signIn(page, request, "coordinator");
-  const physio = await me(request, await token(request, "physiotherapist2"));
-  const deskTok = await token(request, "receptionist");
+  const coordTok = await signIn(page, request, "de.marta.ribeiro");
+  const physio = await me(request, await token(request, "de.tiago.martins"));
+  const deskTok = await token(request, "de.rita.lopes");
 
   // A Monday far ahead, unique to this run (no seeded shifts there)
   const base = new Date(Date.UTC(2060, 0, 5)); // a Monday
@@ -156,12 +156,12 @@ test("weekly plan: 3 sessions a week booked from the board", async ({ page, requ
 });
 
 test("holiday cover: patients move to the cover with a handover note", async ({ browser, page, request }) => {
-  const coordTok = await signIn(page, request, "coordinator");
-  const awayTok = await token(request, "physiotherapist");
-  const coverTok = await token(request, "physiotherapist2");
+  const coordTok = await signIn(page, request, "de.marta.ribeiro");
+  const awayTok = await token(request, "de.sarah.johnson");
+  const coverTok = await token(request, "de.tiago.martins");
   const away = await me(request, awayTok);
   const cover = await me(request, coverTok);
-  const deskTok = await token(request, "receptionist");
+  const deskTok = await token(request, "de.rita.lopes");
 
   // A day within the handover window (3 months), unique per run, late hour
   const date = addDays(iso(new Date()), 82 + (Number(stamp()) % 6));
@@ -221,7 +221,7 @@ test("holiday cover: patients move to the cover with a handover note", async ({ 
 
     // The cover physio finds the note on the patient
     const coverPage = await browser.newPage();
-    await signIn(coverPage, request, "physiotherapist2");
+    await signIn(coverPage, request, "de.tiago.martins");
     await boardOn(coverPage, date);
     await coverPage.locator("[data-physio-row]", { hasText: `${cover.first_name} ${cover.last_name}` }).locator("button").first().click();
     await coverPage.getByRole("dialog").getByRole("button", { name: new RegExp(patientName) }).click();
@@ -237,7 +237,7 @@ test("holiday cover: patients move to the cover with a handover note", async ({ 
 });
 
 test("inventory: use single items, open and finish containers", async ({ page, request }) => {
-  const coordTok = await signIn(page, request, "coordinator");
+  const coordTok = await signIn(page, request, "de.marta.ribeiro");
   const s = stamp();
   const make = async (name: string, tracking: string) => {
     const r = await api(request, coordTok, "POST", "/inventory/items/", {

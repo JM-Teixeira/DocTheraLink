@@ -1,6 +1,6 @@
 import AboutPage from "@/components/About/AboutPage";
+import AddPerson from "@/components/Staff/AddPerson";
 import StaffList from "@/components/Staff/StaffList";
-import UserAdd from "@/components/Users/UserAdd";
 import UserHome from "@/components/Users/UserHome";
 
 import { AppRoutes } from "@/Routers/AppRouter";
@@ -8,7 +8,7 @@ import { AppRoutes } from "@/Routers/AppRouter";
 const UserRoutes: AppRoutes = {
   "/about": () => <AboutPage />,
   "/users": () => <StaffList />,
-  "/users/add": () => <UserAdd />,
+  "/users/add": () => <AddPerson />,
   "/users/:username": ({ username }) => (
     <UserHome username={username} tab={"profile"} />
   ),

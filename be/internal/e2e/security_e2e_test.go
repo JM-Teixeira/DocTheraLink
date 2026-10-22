@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 	"time"
 )
@@ -12,9 +13,9 @@ import (
 // colleague's account, creates admins or deletes people; coordinators add
 // people only to their own clinic and only with clinic roles.
 func TestNoPrivilegeEscalation(t *testing.T) {
-	rec, _ := login(t, "receptionist")
-	coord, _ := login(t, "coordinator")
-	admin, _ := login(t, "stateadmin")
+	rec, _ := login(t, "de.rita.lopes")
+	coord, _ := login(t, "de.marta.ribeiro")
+	admin, _ := login(t, "paula.neves")
 
 	for name, body := range map[string]map[string]any{
 		"own role":      {"user_type": "StateAdmin"},
@@ -24,16 +25,16 @@ func TestNoPrivilegeEscalation(t *testing.T) {
 		"own password":  {"password": "hunter22hunter22"},
 		"own username":  {"username": "boss"},
 	} {
-		expect(t, name, rec.call("PATCH", "/users/receptionist/", body, nil), 403)
-		expect(t, name+" (PUT)", rec.call("PUT", "/users/receptionist/", body, nil), 403)
+		expect(t, name, rec.call("PATCH", "/users/de.rita.lopes/", body, nil), 403)
+		expect(t, name+" (PUT)", rec.call("PUT", "/users/de.rita.lopes/", body, nil), 403)
 	}
 	var me map[string]any
-	expect(t, "own profile field", rec.call("PATCH", "/users/receptionist/", map[string]any{"qualification": "Receção"}, &me), 200)
+	expect(t, "own profile field", rec.call("PATCH", "/users/de.rita.lopes/", map[string]any{"qualification": "Receção"}, &me), 200)
 	if me["user_type"] != "Receptionist" || me["is_superuser"] == true {
 		t.Fatalf("role changed: %v", me["user_type"])
 	}
-	expect(t, "colleague's account", rec.call("PATCH", "/users/coordinator/", map[string]any{"first_name": "X"}, nil), 403)
-	expect(t, "coordinator makes an admin", coord.call("PATCH", "/users/receptionist/", map[string]any{"user_type": "StateAdmin"}, nil), 403)
+	expect(t, "colleague's account", rec.call("PATCH", "/users/de.marta.ribeiro/", map[string]any{"first_name": "X"}, nil), 403)
+	expect(t, "coordinator makes an admin", coord.call("PATCH", "/users/de.rita.lopes/", map[string]any{"user_type": "StateAdmin"}, nil), 403)
 
 	stamp := time.Now().Format("150405.000")
 	newUser := func(role string) map[string]any {
@@ -56,26 +57,35 @@ func TestNoPrivilegeEscalation(t *testing.T) {
 		t.Fatalf("new user must join the coordinator's clinic: %v vs %v", created["home_facility"], coordMe["home_facility"])
 	}
 	username := created["username"].(string)
+	if !regexp.MustCompile(`^de\.e2e\.physiotherapist\d*$`).MatchString(username) {
+		t.Errorf("username must follow <clinic code>.<first>.<last>: %q", username)
+	}
+	var sug map[string]string
+	expect(t, "suggestion", coord.call("GET", "/users/username_suggestion/?first_name=Jo%C3%A3o&last_name=Silva+Teixeira", nil, &sug), 200)
+	if sug["username"] != "de.joao.teixeira" {
+		t.Errorf("suggestion: %v", sug)
+	}
+	expect(t, "front desk gets no suggestions", rec.call("GET", "/users/username_suggestion/?first_name=A&last_name=B", nil, nil), 403)
 	anon := &client{t: t, base: baseURL(t)}
 	expect(t, "new user signs in", anon.call("POST", "/auth/login/", map[string]string{"username": username, "password": "Seguro#2026"}, nil), 200)
 	expect(t, "coordinator deletes", coord.call("DELETE", "/users/"+username+"/", nil, nil), 403)
 	expect(t, "admin deletes", admin.call("DELETE", "/users/"+username+"/", nil, nil), 200)
-	expect(t, "admin cannot delete themself", admin.call("DELETE", "/users/stateadmin/", nil, nil), 404)
+	expect(t, "admin cannot delete themself", admin.call("DELETE", "/users/paula.neves/", nil, nil), 404)
 }
 
 // TestClinicIsolation: people, clinics, skills and time logs of another
 // clinic are invisible (404, so existence isn't revealed); lists are capped.
 func TestClinicIsolation(t *testing.T) {
-	physio, _ := login(t, "physiotherapist")
-	coord, _ := login(t, "coordinator")
-	cm, _ := login(t, "cm.coordenacao")
+	physio, _ := login(t, "de.sarah.johnson")
+	coord, _ := login(t, "de.marta.ribeiro")
+	cm, _ := login(t, "cm.ana.ferreira")
 	const climutua = "6b1f3c1e-5a8e-4c1d-9a0e-000000000002"
 
-	expect(t, "own profile", physio.call("GET", "/users/physiotherapist/", nil, nil), 200)
-	expect(t, "colleague", physio.call("GET", "/users/coordinator/", nil, nil), 200)
-	expect(t, "other clinic's person", physio.call("GET", "/users/cm.fisio3/", nil, nil), 404)
-	expect(t, "other clinic's skills", coord.call("GET", "/users/cm.fisio3/skill/", nil, nil), 404)
-	expect(t, "other clinic's clinic link", coord.call("GET", "/users/cm.fisio3/get_facilities/", nil, nil), 404)
+	expect(t, "own profile", physio.call("GET", "/users/de.sarah.johnson/", nil, nil), 200)
+	expect(t, "colleague", physio.call("GET", "/users/de.marta.ribeiro/", nil, nil), 200)
+	expect(t, "other clinic's person", physio.call("GET", "/users/cm.catarina.lopes/", nil, nil), 404)
+	expect(t, "other clinic's skills", coord.call("GET", "/users/cm.catarina.lopes/skill/", nil, nil), 404)
+	expect(t, "other clinic's clinic link", coord.call("GET", "/users/cm.catarina.lopes/get_facilities/", nil, nil), 404)
 	expect(t, "other clinic's staff", coord.call("GET", "/facility/"+climutua+"/get_users/", nil, nil), 404)
 	expect(t, "other clinic", coord.call("GET", "/facility/"+climutua+"/", nil, nil), 404)
 
@@ -102,10 +112,10 @@ func TestClinicIsolation(t *testing.T) {
 
 // TestDatePreference: people choose their own date format; nobody else can.
 func TestDatePreference(t *testing.T) {
-	physio, _ := login(t, "physiotherapist")
-	coord, _ := login(t, "coordinator")
+	physio, _ := login(t, "de.sarah.johnson")
+	coord, _ := login(t, "de.marta.ribeiro")
 	var me map[string]any
-	expect(t, "own preference", physio.call("PATCH", "/users/physiotherapist/preferences/", map[string]any{"date_format": "ymd"}, &me), 200)
+	expect(t, "own preference", physio.call("PATCH", "/users/de.sarah.johnson/preferences/", map[string]any{"date_format": "ymd"}, &me), 200)
 	if me["date_format"] != "ymd" {
 		t.Fatalf("saved: %v", me["date_format"])
 	}
@@ -113,7 +123,26 @@ func TestDatePreference(t *testing.T) {
 	if me["date_format"] != "ymd" {
 		t.Errorf("current user carries it: %v", me["date_format"])
 	}
-	expect(t, "someone else's", coord.call("PATCH", "/users/physiotherapist/preferences/", map[string]any{"date_format": "mdy"}, nil), 403)
-	expect(t, "unknown format", physio.call("PATCH", "/users/physiotherapist/preferences/", map[string]any{"date_format": "dd.mm"}, nil), 400)
-	expect(t, "back to default", physio.call("PATCH", "/users/physiotherapist/preferences/", map[string]any{"date_format": "dmy"}, nil), 200)
+	expect(t, "someone else's", coord.call("PATCH", "/users/de.sarah.johnson/preferences/", map[string]any{"date_format": "mdy"}, nil), 403)
+	expect(t, "unknown format", physio.call("PATCH", "/users/de.sarah.johnson/preferences/", map[string]any{"date_format": "dd.mm"}, nil), 400)
+	expect(t, "back to default", physio.call("PATCH", "/users/de.sarah.johnson/preferences/", map[string]any{"date_format": "dmy"}, nil), 200)
+}
+
+// TestClinicCodes: a new clinic needs a free 2-4 letter code; once set it
+// cannot change (usernames use it).
+func TestClinicCodes(t *testing.T) {
+	admin, _ := login(t, "paula.neves")
+	coord, _ := login(t, "cm.ana.ferreira")
+	clinic := func(code string) map[string]any {
+		return map[string]any{"name": "Clínica E2E " + code, "facility_type": 1, "address": "Rua X", "code": code}
+	}
+	expect(t, "no code", admin.call("POST", "/facility/", clinic(""), nil), 400)
+	expect(t, "bad code", admin.call("POST", "/facility/", clinic("C1"), nil), 400)
+	expect(t, "taken code", admin.call("POST", "/facility/", clinic("cm"), nil), 400)
+
+	var me map[string]any
+	coord.call("GET", "/users/getcurrentuser/", nil, &me)
+	path := "/facility/" + me["home_facility"].(string) + "/"
+	expect(t, "code cannot change", admin.call("PATCH", path, map[string]any{"code": "xy"}, nil), 400)
+	expect(t, "same code is fine", coord.call("PATCH", path, map[string]any{"code": "cm", "address": "Rua de Cedofeita 312, 4050-180 Porto"}, nil), 200)
 }

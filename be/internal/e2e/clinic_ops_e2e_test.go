@@ -11,9 +11,9 @@ import (
 // TestInventory: staff record use and restocks of the clinic's consumables;
 // stock never goes negative; only coordinators/admins remove items.
 func TestInventory(t *testing.T) {
-	nurse, _ := login(t, "nurse")
-	physio, _ := login(t, "physiotherapist")
-	coord, _ := login(t, "coordinator")
+	nurse, _ := login(t, "de.mary.williams")
+	physio, _ := login(t, "de.sarah.johnson")
+	coord, _ := login(t, "de.marta.ribeiro")
 
 	var seeded []map[string]any
 	expect(t, "list", nurse.call("GET", "/inventory/items/", nil, &seeded), 200)
@@ -51,10 +51,10 @@ func TestInventory(t *testing.T) {
 // coordinator assigns patients up to the division's capacity per hour; the
 // board shows the load; a shift with patients cannot be deleted.
 func TestTimeBoard(t *testing.T) {
-	coord, _ := login(t, "coordinator")
-	rec, _ := login(t, "receptionist")
-	doctor, _ := login(t, "doctor")
-	tiago, _ := login(t, "physiotherapist2")
+	coord, _ := login(t, "de.marta.ribeiro")
+	rec, _ := login(t, "de.rita.lopes")
+	doctor, _ := login(t, "de.john.smith")
+	tiago, _ := login(t, "de.tiago.martins")
 	tiagoID := userIDOf(tiago)
 
 	// A date of its own per run, far from the seeded weeks
@@ -128,8 +128,8 @@ func TestTimeBoard(t *testing.T) {
 // once; marking a session attended uses the per-session gloves; the
 // coordinator audits who used what; the year view counts the sessions.
 func TestCarePlanAndAutoUse(t *testing.T) {
-	coord, _ := login(t, "coordinator")
-	tiago, _ := login(t, "physiotherapist2")
+	coord, _ := login(t, "de.marta.ribeiro")
+	tiago, _ := login(t, "de.tiago.martins")
 	tiagoID := userIDOf(tiago)
 	start := time.Date(2045, 1, 2, 0, 0, 0, 0, time.UTC).AddDate(0, 0, 7*int(time.Now().Unix()%2000)) // a Monday
 	day := func(d int) string { return start.AddDate(0, 0, d).Format("2006-01-02") }
@@ -246,7 +246,7 @@ func TestCarePlanAndAutoUse(t *testing.T) {
 
 // TestClinicPeople: the clinic's "People" page lists the users who work there.
 func TestClinicPeople(t *testing.T) {
-	coord, _ := login(t, "coordinator")
+	coord, _ := login(t, "de.marta.ribeiro")
 	var me map[string]any
 	coord.call("GET", "/users/getcurrentuser/", nil, &me)
 	clinic, _ := me["home_facility"].(string)
@@ -266,7 +266,7 @@ func TestClinicPeople(t *testing.T) {
 	if page.Count < 5 || len(page.Results) == 0 {
 		t.Fatalf("people: %d", page.Count)
 	}
-	expect(t, "search", coord.call("GET", "/facility/"+clinic+"/get_users/?username=receptionist", nil, &page), 200)
+	expect(t, "search", coord.call("GET", "/facility/"+clinic+"/get_users/?username=rita.lopes", nil, &page), 200)
 	if page.Count != 1 {
 		t.Errorf("search by username: %d", page.Count)
 	}
@@ -276,8 +276,8 @@ func TestClinicPeople(t *testing.T) {
 // single-use items are used (not opened); the reorder list says how much
 // to order; per-division session rules can be set by the coordinator.
 func TestContainersAndReorder(t *testing.T) {
-	coord, _ := login(t, "coordinator")
-	physio, _ := login(t, "physiotherapist")
+	coord, _ := login(t, "de.marta.ribeiro")
+	physio, _ := login(t, "de.sarah.johnson")
 	stamp := time.Now().Format("150405.000")
 	var gel map[string]any
 	expect(t, "container", coord.call("POST", "/inventory/items/", map[string]any{
@@ -328,9 +328,9 @@ func TestContainersAndReorder(t *testing.T) {
 // TestClimutua: the PT-PT demo clinic is there with its own staff, patients
 // and Portuguese data, isolated from the other clinic.
 func TestClimutua(t *testing.T) {
-	coord, _ := login(t, "cm.coordenacao")
-	physio, _ := login(t, "cm.fisio3")
-	other, _ := login(t, "coordinator")
+	coord, _ := login(t, "cm.ana.ferreira")
+	physio, _ := login(t, "cm.catarina.lopes")
+	other, _ := login(t, "de.marta.ribeiro")
 
 	var patients struct {
 		Count   int              `json:"count"`

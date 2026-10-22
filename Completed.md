@@ -5,6 +5,22 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.12.0 (branch `feat/m4-patients`)
+
+### Adding people, clinic codes and the username standard (batch 3, part B)
+- "Adicionar pessoa" crashed ("Error loading plugins"): it was the old CARE
+  form (states, districts, wards). New Klyniva form: name, role, clinic
+  (admins), e-mail, phone, password; it shows the username while typing.
+- Clinics have a code (2-4 letters, unique, fixed once set): demo `de`,
+  Climutua `cm`. New clinics must have one.
+- Usernames are made by the server: `<clinic code>.<first name>.<last
+  surname>` in lower case without accents (`cm.joao.teixeira`); a number
+  on a clash (`cm.joao.teixeira2`), so two João Teixeira never collide;
+  organisation admins have no code (`paula.neves`). Deleted accounts keep
+  their name reserved. Package `internal/usernames` (tested).
+- All demo users renamed to the standard (old databases are renamed in
+  place on start-up); README, CONTEXT and tests updated.
+
 ## 2026-10-22 · Klyniva 0.11.1 (branch `feat/m4-patients`)
 
 ### Fixes from the review (batch 3, part A)

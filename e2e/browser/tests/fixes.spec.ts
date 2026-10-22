@@ -7,7 +7,7 @@ import { signIn } from "./helpers";
 const stamp = () => Date.now().toString().slice(-7);
 
 test("a state admin adds a stock item by choosing the clinic in the dialog", async ({ page, request }) => {
-  await signIn(page, request, "stateadmin");
+  await signIn(page, request, "paula.neves");
   await page.goto("/inventory");
   await page.getByRole("button", { name: "Novo artigo" }).click();
   const dialog = page.getByRole("dialog");
@@ -37,9 +37,26 @@ test("the login title stays at the same height in Portuguese and English", async
 });
 
 test("page headers keep a gap above the first card (clinics)", async ({ page, request }) => {
-  await signIn(page, request, "stateadmin");
+  await signIn(page, request, "paula.neves");
   await page.goto("/facility");
   const button = await page.getByRole("button", { name: "Nova clínica" }).boundingBox();
   const search = await page.getByPlaceholder("Nome ou morada").boundingBox();
   expect(button && search && search.y - (button.y + button.height)).toBeGreaterThanOrEqual(24);
+});
+
+test("the coordinator adds a person; the username follows the clinic standard", async ({ page, request }) => {
+  await signIn(page, request, "cm.ana.ferreira");
+  page.on("pageerror", (e) => {
+    throw e;
+  });
+  await page.goto("/users/add");
+  const last = `Teste${stamp().replace(/\d/g, (d) => "abcdefghij"[Number(d)])}`;
+  await page.getByLabel(/^Nome próprio/).fill("João");
+  await page.getByLabel(/^Apelido/).fill(`Silva ${last}`);
+  await expect(page.getByText(`cm.joao.${last.toLowerCase()}`)).toBeVisible();
+  await page.getByLabel(/^Email/).fill(`joao.${last.toLowerCase()}@example.test`);
+  await page.getByLabel(/^Palavra-passe/).fill("Seguro#2026");
+  await page.getByLabel(/^Confirmar palavra-passe/i).fill("Seguro#2026");
+  await page.getByRole("button", { name: "Adicionar pessoa" }).click();
+  await expect(page).toHaveURL(new RegExp(`/users/cm\.joao\.${last.toLowerCase()}$`));
 });

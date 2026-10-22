@@ -10,9 +10,9 @@ import (
 // TestMoveAndReschedule: a session moves to another hour only where it fits;
 // a plan's remaining sessions move to a new weekly pattern.
 func TestMoveAndReschedule(t *testing.T) {
-	coord, _ := login(t, "coordinator")
-	desk, _ := login(t, "receptionist")
-	tiago, _ := login(t, "physiotherapist2")
+	coord, _ := login(t, "de.marta.ribeiro")
+	desk, _ := login(t, "de.rita.lopes")
+	tiago, _ := login(t, "de.tiago.martins")
 	tiagoID := userIDOf(tiago)
 
 	var divisions []map[string]any
@@ -98,9 +98,9 @@ func TestMoveAndReschedule(t *testing.T) {
 // TestWaitingList: the front desk queues a patient once; urgent ones come
 // first; booking marks the entry scheduled and it leaves the list.
 func TestWaitingList(t *testing.T) {
-	coord, _ := login(t, "coordinator")
-	desk, _ := login(t, "receptionist")
-	physio, _ := login(t, "physiotherapist")
+	coord, _ := login(t, "de.marta.ribeiro")
+	desk, _ := login(t, "de.rita.lopes")
+	physio, _ := login(t, "de.sarah.johnson")
 	stamp := time.Now().Format("150405.000")
 	var p1, p2 map[string]any
 	expect(t, "patient 1", desk.call("POST", "/patient/", map[string]any{"name": "Espera " + stamp}, &p1), 201)

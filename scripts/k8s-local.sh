@@ -115,13 +115,12 @@ print_access() {
   Klyniva is running: $URL   (open it in a browser on this computer)
 
   Demo logins (local demo data only) — password for all: 1234@1
-    doctor            Dr. John Smith (refers patients)
-    physiotherapist   Sarah Johnson
-    physiotherapist2  Tiago Martins
-    receptionist      Rita Lopes (patients, assigns patients on the time board)
-    coordinator       Marta Ribeiro (time board: divisions, shifts, physio load)
-    nurse, staff      other clinic staff
-    stateadmin        administrator (all clinics)
+    de.john.smith     Dr. John Smith (refers patients)
+    de.sarah.johnson  Sarah Johnson (physio)
+    de.rita.lopes     Rita Lopes (front desk)
+    de.marta.ribeiro  Marta Ribeiro (coordinator)
+    paula.neves       administrator (all clinics)
+    cm.ana.ferreira   Climutua coordinator (more in README.md)
 
 INFO
 }

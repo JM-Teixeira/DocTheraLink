@@ -184,9 +184,11 @@ make k8s-deploy | k8s-status | k8s-down
 The local cluster's kubeconfig is `~/.kube/klyniva.yaml` (context
 `k3d-klyniva`); the script never touches `~/.kube/config`, which holds real
 cloud clusters — never run kubectl against those from this project.
-Demo users (only when `SEED_DEMO_USERS=true`, never in release): `doctor`,
-`physiotherapist`, `nurse`, `receptionist`, `staff` (all in the demo clinic),
-`stateadmin`, `districtadmin`, `facilitycoordinator` — password `1234@1`.
+Demo users (only when `SEED_DEMO_USERS=true`, never in release) follow the
+username standard `<clinic code>.<first>.<last>` (internal/usernames): demo
+clinic `de.*`, Climutua `cm.*`, admins `paula.neves`, `jorge.matos`,
+`luis.pereira`; password `1234@1`. Old names are renamed in place on seed
+(database/usernames_seed.go).
 
 Go toolchain: go.mod pins `toolchain go1.27.3`; with an older local Go use
 `GOTOOLCHAIN=auto`. In this dev environment the repo lives in WSL

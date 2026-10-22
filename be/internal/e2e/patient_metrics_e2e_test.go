@@ -13,10 +13,10 @@ import (
 // the front desk), monthly registrations, and the CSV export for
 // coordinators only.
 func TestPatientMetrics(t *testing.T) {
-	doctor, _ := login(t, "doctor")
-	sarah, _ := login(t, "physiotherapist")
-	coord, _ := login(t, "coordinator")
-	desk, _ := login(t, "receptionist")
+	doctor, _ := login(t, "de.john.smith")
+	sarah, _ := login(t, "de.sarah.johnson")
+	coord, _ := login(t, "de.marta.ribeiro")
+	desk, _ := login(t, "de.rita.lopes")
 	sarahID := userIDOf(sarah)
 
 	diag := "Metatarsalgia " + time.Now().Format("150405.000")

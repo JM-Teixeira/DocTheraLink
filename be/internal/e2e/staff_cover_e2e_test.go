@@ -18,46 +18,46 @@ type page struct {
 // left stay on record but cannot sign in); skills are linked and unlinked;
 // only a manager of the person's clinic changes their status.
 func TestPeopleAndEmployment(t *testing.T) {
-	coord, _ := login(t, "cm.coordenacao")
-	physio, _ := login(t, "cm.fisio3")
-	otherCoord, _ := login(t, "coordinator")
+	coord, _ := login(t, "cm.ana.ferreira")
+	physio, _ := login(t, "cm.catarina.lopes")
+	otherCoord, _ := login(t, "de.marta.ribeiro")
 
 	var p page
 	expect(t, "people who left", coord.call("GET", "/users/?employment_status=left", nil, &p), 200)
 	found := false
 	for _, u := range p.Results {
-		found = found || u["username"] == "cm.fisio7"
+		found = found || u["username"] == "cm.rui.nogueira"
 		if u["employment_status"] != "left" {
 			t.Errorf("filter leaked %v", u)
 		}
 	}
 	if !found {
-		t.Fatalf("cm.fisio7 should be listed as left: %v", p.Results)
+		t.Fatalf("cm.rui.nogueira should be listed as left: %v", p.Results)
 	}
 	expect(t, "search by full name", coord.call("GET", "/users/?search="+url.QueryEscape("Rui Nogueira"), nil, &p), 200)
 	if p.Count != 1 {
 		t.Errorf("full-name search: %d", p.Count)
 	}
-	expect(t, "other clinic's people are hidden", otherCoord.call("GET", "/users/?search=cm.fisio", nil, &p), 200)
+	expect(t, "other clinic's people are hidden", otherCoord.call("GET", "/users/?search=cm.", nil, &p), 200)
 	if p.Count != 0 {
 		t.Errorf("coordinator of another clinic sees %d Climutua people", p.Count)
 	}
 
 	anon := &client{t: t, base: baseURL(t)}
-	if code := anon.call("POST", "/auth/login/", map[string]string{"username": "cm.fisio7", "password": demoPassword}, nil); code == 200 {
+	if code := anon.call("POST", "/auth/login/", map[string]string{"username": "cm.rui.nogueira", "password": demoPassword}, nil); code == 200 {
 		t.Error("someone who left must not sign in")
 	}
 
 	status := map[string]any{"status": "on_leave", "note": "e2e"}
-	expect(t, "physio cannot change a colleague", physio.call("PATCH", "/users/cm.fisio2/employment/", status, nil), 403)
-	expect(t, "other clinic cannot change", otherCoord.call("PATCH", "/users/cm.fisio2/employment/", status, nil), 403)
-	expect(t, "nobody changes their own", coord.call("PATCH", "/users/cm.coordenacao/employment/", status, nil), 400)
+	expect(t, "physio cannot change a colleague", physio.call("PATCH", "/users/cm.pedro.almeida/employment/", status, nil), 403)
+	expect(t, "other clinic cannot change", otherCoord.call("PATCH", "/users/cm.pedro.almeida/employment/", status, nil), 403)
+	expect(t, "nobody changes their own", coord.call("PATCH", "/users/cm.ana.ferreira/employment/", status, nil), 400)
 	var u map[string]any
-	expect(t, "coordinator sets on leave", coord.call("PATCH", "/users/cm.fisio2/employment/", status, &u), 200)
+	expect(t, "coordinator sets on leave", coord.call("PATCH", "/users/cm.pedro.almeida/employment/", status, &u), 200)
 	if u["employment_status"] != "on_leave" {
 		t.Fatalf("status: %v", u["employment_status"])
 	}
-	expect(t, "back to active", coord.call("PATCH", "/users/cm.fisio2/employment/", map[string]any{"status": "active"}, nil), 200)
+	expect(t, "back to active", coord.call("PATCH", "/users/cm.pedro.almeida/employment/", map[string]any{"status": "active"}, nil), 200)
 
 	// Skills: catalogue, link (idempotent), unlink
 	var catalogue page
@@ -66,7 +66,7 @@ func TestPeopleAndEmployment(t *testing.T) {
 		t.Fatalf("skills catalogue: %d", catalogue.Count)
 	}
 	var mine page
-	expect(t, "own skills", physio.call("GET", "/users/cm.fisio3/skill/", nil, &mine), 200)
+	expect(t, "own skills", physio.call("GET", "/users/cm.catarina.lopes/skill/", nil, &mine), 200)
 	have := map[string]bool{}
 	for _, s := range mine.Results {
 		have[s["skill_object"].(map[string]any)["id"].(string)] = true
@@ -82,10 +82,10 @@ func TestPeopleAndEmployment(t *testing.T) {
 		t.Fatal("no skill left to add")
 	}
 	var link map[string]any
-	expect(t, "add own skill", physio.call("POST", "/users/cm.fisio3/skill/", map[string]any{"skill": pick}, &link), 201)
-	expect(t, "cannot edit a colleague's skills", physio.call("POST", "/users/cm.fisio2/skill/", map[string]any{"skill": pick}, nil), 403)
-	expect(t, "remove", coord.call("DELETE", "/users/cm.fisio3/skill/"+link["id"].(string)+"/", nil, nil), 204)
-	expect(t, "own skills again", physio.call("GET", "/users/cm.fisio3/skill/", nil, &mine), 200)
+	expect(t, "add own skill", physio.call("POST", "/users/cm.catarina.lopes/skill/", map[string]any{"skill": pick}, &link), 201)
+	expect(t, "cannot edit a colleague's skills", physio.call("POST", "/users/cm.pedro.almeida/skill/", map[string]any{"skill": pick}, nil), 403)
+	expect(t, "remove", coord.call("DELETE", "/users/cm.catarina.lopes/skill/"+link["id"].(string)+"/", nil, nil), 204)
+	expect(t, "own skills again", physio.call("GET", "/users/cm.catarina.lopes/skill/", nil, &mine), 200)
 	if mine.Count != len(have) {
 		t.Errorf("skills after remove: %d, want %d", mine.Count, len(have))
 	}
@@ -94,7 +94,7 @@ func TestPeopleAndEmployment(t *testing.T) {
 // TestPatientFiltersAndStats: patients are found by NIF digits; the stats
 // count what the list filters return.
 func TestPatientFiltersAndStats(t *testing.T) {
-	coord, _ := login(t, "cm.coordenacao")
+	coord, _ := login(t, "cm.ana.ferreira")
 
 	var all page
 	expect(t, "list", coord.call("GET", "/patient/?limit=1", nil, &all), 200)
@@ -148,7 +148,7 @@ func TestPatientFiltersAndStats(t *testing.T) {
 
 // TestReferralDoctorFilter: the referral list narrows to one referring doctor.
 func TestReferralDoctorFilter(t *testing.T) {
-	coord, _ := login(t, "cm.coordenacao")
+	coord, _ := login(t, "cm.ana.ferreira")
 	var refs page
 	expect(t, "all", coord.call("GET", "/referrals/?limit=100", nil, &refs), 200)
 	if refs.Count == 0 {
@@ -171,10 +171,10 @@ func TestReferralDoctorFilter(t *testing.T) {
 // physio at the same hour, with a handover note the cover can read; the
 // absent physio cannot be booked meanwhile.
 func TestHolidayCover(t *testing.T) {
-	coord, _ := login(t, "coordinator")
-	rec, _ := login(t, "receptionist")
-	away, _ := login(t, "physiotherapist")
-	cover, _ := login(t, "physiotherapist2")
+	coord, _ := login(t, "de.marta.ribeiro")
+	rec, _ := login(t, "de.rita.lopes")
+	away, _ := login(t, "de.sarah.johnson")
+	cover, _ := login(t, "de.tiago.martins")
 	awayID, coverID := userIDOf(away), userIDOf(cover)
 
 	// A day of its own per run, within the handover window (3 months)
@@ -277,14 +277,14 @@ func TestHolidayCover(t *testing.T) {
 // TestLeftUserLosesSession: a token issued before someone is marked as having
 // left stops working right away, and works again when they come back.
 func TestLeftUserLosesSession(t *testing.T) {
-	coord, _ := login(t, "cm.coordenacao")
-	tiago, _ := login(t, "cm.fisio6")
+	coord, _ := login(t, "cm.ana.ferreira")
+	tiago, _ := login(t, "cm.tiago.fonseca")
 	expect(t, "signed in", tiago.call("GET", "/users/getcurrentuser/", nil, nil), 200)
 
-	expect(t, "mark as left", coord.call("PATCH", "/users/cm.fisio6/employment/", map[string]any{"status": "left", "note": "e2e"}, nil), 200)
-	defer coord.call("PATCH", "/users/cm.fisio6/employment/", map[string]any{"status": "active"}, nil)
+	expect(t, "mark as left", coord.call("PATCH", "/users/cm.tiago.fonseca/employment/", map[string]any{"status": "left", "note": "e2e"}, nil), 200)
+	defer coord.call("PATCH", "/users/cm.tiago.fonseca/employment/", map[string]any{"status": "active"}, nil)
 	expect(t, "old token refused", tiago.call("GET", "/users/getcurrentuser/", nil, nil), 401)
 
-	expect(t, "back", coord.call("PATCH", "/users/cm.fisio6/employment/", map[string]any{"status": "active"}, nil), 200)
+	expect(t, "back", coord.call("PATCH", "/users/cm.tiago.fonseca/employment/", map[string]any{"status": "active"}, nil), 200)
 	expect(t, "token works again", tiago.call("GET", "/users/getcurrentuser/", nil, nil), 200)
 }

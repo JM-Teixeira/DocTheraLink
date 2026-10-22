@@ -12,11 +12,11 @@ import (
 // floor-1 stock, Mariana the hygiene items of floors 2 and 3, Pedro nothing;
 // the coordinator gives and takes these permissions.
 func TestStockAccessByFloorAndCategory(t *testing.T) {
-	coord, _ := login(t, "cm.coordenacao")
-	ines, _ := login(t, "cm.fisio1")
-	mariana, _ := login(t, "cm.fisio5")
-	pedro, _ := login(t, "cm.fisio2")
-	other, _ := login(t, "coordinator")
+	coord, _ := login(t, "cm.ana.ferreira")
+	ines, _ := login(t, "cm.ines.moreira")
+	mariana, _ := login(t, "cm.mariana.costa")
+	pedro, _ := login(t, "cm.pedro.almeida")
+	other, _ := login(t, "de.marta.ribeiro")
 
 	item := func(name string) map[string]any {
 		var items []map[string]any
@@ -72,8 +72,8 @@ func TestStockAccessByFloorAndCategory(t *testing.T) {
 
 // TestInventoryClinicFilter: admins look at one clinic at a time if they want.
 func TestInventoryClinicFilter(t *testing.T) {
-	admin, _ := login(t, "stateadmin")
-	physio, _ := login(t, "physiotherapist")
+	admin, _ := login(t, "paula.neves")
+	physio, _ := login(t, "de.sarah.johnson")
 	const climutua = "6b1f3c1e-5a8e-4c1d-9a0e-000000000002"
 	var all, one []map[string]any
 	expect(t, "all clinics", admin.call("GET", "/inventory/items/", nil, &all), 200)

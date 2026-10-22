@@ -29,15 +29,22 @@ engine **inside WSL (Ubuntu-22.04)**. It is only reachable from this computer.
 
 Demo logins (local demo data only), password **`1234@1`** for all:
 
+Usernames follow one standard: `<clinic code>.<first name>.<last surname>`
+(lower case, no accents), a number on a clash (`cm.joao.teixeira2`);
+organisation admins have no clinic code. The server picks the username when
+a person is added.
+
+Demo clinic (code `de`):
+
 | Username | Who | Can do |
 |---|---|---|
-| `doctor` | Dr. John Smith | patients, create/follow referrals |
-| `physiotherapist` | Sarah Johnson | referral inbox, accept/treat/complete |
-| `physiotherapist2` | Tiago Martins | second therapist (hand-over) |
-| `receptionist` | Rita Lopes | register/edit patients, assign patients on the time board |
-| `coordinator` | Marta Ribeiro | plans divisions and physio shifts, sees physio load, inventory |
-| `nurse`, `staff` | clinic staff | patients |
-| `stateadmin` | administrator | everything, all clinics |
+| `de.john.smith` | Dr. John Smith | patients, create/follow referrals |
+| `de.sarah.johnson` | Sarah Johnson | referral inbox, accept/treat/complete |
+| `de.tiago.martins` | Tiago Martins | second therapist (hand-over) |
+| `de.rita.lopes` | Rita Lopes | register/edit patients, assign patients on the time board |
+| `de.marta.ribeiro` | Marta Ribeiro | plans divisions and physio shifts, sees physio load, inventory |
+| `de.mary.williams`, `de.nuno.dias` | clinic staff | patients |
+| `paula.neves` | administrator | everything, all clinics |
 
 **Second demo clinic — Climutua** (Porto, everything in PT-PT: 120 patients,
 diagnoses, referrals with messages, weekly schedules, sessions and stock),
@@ -45,12 +52,12 @@ same password `1234@1`:
 
 | Username | Who |
 |---|---|
-| `cm.coordenacao` | Ana Ferreira — coordenadora |
-| `cm.medico1` / `cm.medico2` / `cm.medico3` | Miguel Sousa (fisiatra) / Helena Carvalho (ortopedista) / Rui Teixeira (neurologista) |
-| `cm.fisio1` … `cm.fisio6` | Inês Moreira, Pedro Almeida, Catarina Lopes (neurológica), João Ribeiro, Mariana Costa, Tiago Fonseca |
-| `cm.rececao1` / `cm.rececao2` | Sofia Martins / Carla Pinto — receção |
-| `cm.enfermagem` | Teresa Gomes — enfermagem |
-| `cm.fisio7` | Rui Nogueira — **left the clinic** (kept on record; cannot sign in) |
+| `cm.ana.ferreira` | Ana Ferreira, coordenadora |
+| `cm.miguel.sousa` / `cm.helena.carvalho` / `cm.rui.teixeira` | médicos: fisiatra / ortopedista / neurologista |
+| `cm.ines.moreira`, `cm.pedro.almeida`, `cm.catarina.lopes`, `cm.joao.ribeiro`, `cm.mariana.costa`, `cm.tiago.fonseca` | fisioterapeutas |
+| `cm.sofia.martins` / `cm.carla.pinto` | receção |
+| `cm.teresa.gomes` | enfermagem |
+| `cm.rui.nogueira` | **left the clinic** (kept on record; cannot sign in) |
 
 Stock permissions in Climutua: Teresa (nursing) changes everything, Inês the
 floor-1 stock, Mariana the hygiene items of floors 2 and 3; the other physios

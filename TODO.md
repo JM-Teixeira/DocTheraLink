@@ -11,7 +11,7 @@ Status tags: **[proposed]** = waiting for product-owner review before work start
 ## Requests 2026-10-22 (batch 3, in progress)
 
 Bugs / quick fixes
-- [ ] Adding a clinic user gets stuck on "loading plugin".
+- [x] Adding a clinic user gets stuck on "loading plugin".
 - [x] State admin cannot create inventory items.
 - [x] Home: the Klyniva logo moves when switching EN/PT (fixed height).
 - [x] Patients: the diagnosis filter text is cut ("CID").
@@ -26,7 +26,7 @@ Features
 - [ ] Admins can view the app as any role ("ver como") to check what each role sees.
 - [ ] Users: filters (dropdowns) for who can change which stock (category x floor), counting "all floors / all categories" grants.
 - [ ] User page: professional situation at a glance (joined on, leave from/to, left on), from a dated history.
-- [ ] Clinic code (demo "de", Climutua "cm") and a username standard `<code>.<first>.<last>` (+ number on clash), applied to everyone.
+- [x] Clinic code (demo "de", Climutua "cm") and a username standard `<code>.<first>.<last>` (+ number on clash), applied to everyone.
 - [ ] Waiting list: confirm several patients; highlight entries when a matching slot is free (any or a chosen physio) and alert the coordinator.
 - [ ] User: field for what the person does with patients (to clarify with the product owner).
 
