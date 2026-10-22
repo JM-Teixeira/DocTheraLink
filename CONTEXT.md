@@ -92,7 +92,7 @@ Makefile           make up / test / check / k8s-up / k8s-e2e …
 | Backend | Go 1.27.3, Gin 1.12, GORM 1.31 + pgx, golang-jwt v5, swaggo |
 | DB | PostgreSQL 18 (compose, k8s, tests) |
 | Frontend | React 18.3, TypeScript 5, Vite 7, Tailwind 3.4, TanStack Query 5, raviger router, i18next, shadcn/ui (Radix), lucide-react |
-| Tests | Go `testing` + testcontainers-go; Vitest 5 + Testing Library + fast-check; Cypress (legacy E2E) |
+| Tests | Go `testing` + testcontainers-go; Vitest + Testing Library + fast-check; Playwright (browser E2E) |
 | Runtime | Docker (distroless backend, nginx frontend — both non-root); Kubernetes manifests |
 | Not used | Redis (config keys exist, no client; removed from compose default and k8s) |
 

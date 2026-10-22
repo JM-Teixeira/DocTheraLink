@@ -117,7 +117,7 @@ func TestClinicRules(t *testing.T) {
 }
 
 func TestPageLimit(t *testing.T) {
-	for in, want := range map[int]int{0: 20, -5: 20, 50: 50, 100: 100, 100000: 20} {
+	for in, want := range map[int]int{0: 20, -5: 20, 50: 50, 100: 100, 500: 500, 100000: 500} {
 		if got := pageLimit(in); got != want {
 			t.Errorf("pageLimit(%d) = %d", in, got)
 		}

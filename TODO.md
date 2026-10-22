@@ -8,7 +8,7 @@ Status tags: **[proposed]** = waiting for product-owner review before work start
 
 ---
 
-## Requests 2026-10-22 (batch 3, in progress)
+## Requests 2026-10-22 (batch 3)
 
 Bugs / quick fixes
 - [x] Adding a clinic user gets stuck on "loading plugin".
@@ -32,11 +32,14 @@ Features
 - [ ] Plan next: plan templates per condition (e.g. shoulder), print the plan for the patient, link steps to the home exercise library (M2).
 
 Repo / docs
-- [ ] Clean up unused files, clear layout, rewrite README.md.
+- [x] Clean up unused files (75 CARE leftovers, Cypress), clear layout, rewrite README.md and fe/README.md.
 
-Hosting
-- [ ] TLS certificates (local CA now, Let's Encrypt when public).
-- [ ] Move hosting to the Ubuntu laptop as a server: same k8s manifests (k3s), notes to keep it modular and ready to scale (stateless backend, S3 uploads, managed Postgres, versioned migrations).
+Hosting (plan and reasons: docs/HOSTING.md)
+- [x] Notes: how to keep it modular and ready to scale (docs/HOSTING.md).
+- [ ] P1 Ubuntu laptop as the server: k3s, overlay `k8s/overlays/homeserver`, fixed IP, nightly pg_dump + restore test, VPN for outside access, UPS.
+- [ ] P1 TLS certificates: local CA (mkcert / step-ca) + cert-manager on the network; Let's Encrypt (DNS-01) once there is a public domain; then HSTS and httpOnly refresh cookie.
+- [ ] P2 Images from CI to GHCR tagged by commit; the server pulls fixed tags.
+- [ ] P2 Before more than one backend replica: versioned migrations (k8s Job) and uploads on S3 / MinIO.
 
 ---
 

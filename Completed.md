@@ -5,6 +5,22 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.17.1 (branch `feat/m4-patients`)
+
+### Clean-up, documentation, hosting plan (batch 3, part H)
+- Removed 75 frontend files nothing used (CARE leftovers: old form
+  fields, location pickers, user tabs, unused UI kit pieces and hooks) and
+  the old CARE Cypress tests and packages (Playwright is the browser test
+  tool).
+- New README.md (what it does, how to run, accounts, network access,
+  tests, layout) and fe/README.md; CONTEXT updated.
+- docs/HOSTING.md: moving to the Ubuntu laptop (k3s), certificates (local
+  CA, Let's Encrypt with DNS-01), and the order of steps that lets it grow
+  (registry images, migrations, S3 uploads, managed Postgres, replicas).
+  TODO has the concrete hosting items.
+- Fix: list pages asked for more than 100 items got only 20 (now capped at
+  500), which made the People stock filter miss people.
+
 ## 2026-10-22 · Klyniva 0.17.0 (branch `feat/m4-patients`)
 
 ### Waiting list: free slots (batch 3, part G)

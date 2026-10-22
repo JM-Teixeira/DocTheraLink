@@ -198,10 +198,13 @@ func clinicUpdate(body map[string]any) map[string]any {
 	return out
 }
 
-// pageLimit caps list sizes (default 20, at most 100).
+// pageLimit caps list sizes (default 20, at most 500).
 func pageLimit(n int) int {
-	if n <= 0 || n > 100 {
+	switch {
+	case n <= 0:
 		return 20
+	case n > 500: // a big ask gets the most we give, not a small page
+		return 500
 	}
 	return n
 }
