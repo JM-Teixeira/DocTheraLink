@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"klyniva/internal/auth"
 	"klyniva/internal/models"
@@ -99,6 +100,36 @@ func (h *Handler) Stats(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, st)
+}
+
+// Export godoc
+// @Summary Patients matching the list filters as a CSV file (coordinators and admins)
+// @Tags patients
+// @Security BearerAuth
+// @Produce text/csv
+// @Router /patient/export/ [get]
+func (h *Handler) Export(c *gin.Context) {
+	actor, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var q ListQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: err.Error()})
+		return
+	}
+	items, err := h.svc.Export(c.Request.Context(), actor, q)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	name := "utentes-" + time.Now().Format("2006-01-02") + ".csv"
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", "attachment; filename=\""+name+"\"")
+	c.Header("Cache-Control", "no-store")
+	if err := WriteCSV(c.Writer, items, c.Query("lang"), time.Now()); err != nil {
+		log.Printf("patient: export: %v", err)
+	}
 }
 
 // Create godoc

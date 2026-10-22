@@ -109,6 +109,56 @@ export default function PatientMetrics({ stats }: { stats?: PatientStats }) {
           ))}
         </ul>
       </div>
+
+      {!!stats.monthly?.length && <MonthlyTrend months={stats.monthly} />}
     </section>
+  );
+}
+
+/** Registrations per month (last 12), as small columns. */
+function MonthlyTrend({
+  months,
+}: {
+  months: { month: string; count: number }[];
+}) {
+  const { t, i18n } = useTranslation();
+  const max = Math.max(1, ...months.map((m) => m.count));
+  const label = (m: string) =>
+    new Intl.DateTimeFormat(i18n.language, { month: "short" }).format(
+      new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, 1),
+    );
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:col-span-4">
+      <p className="mb-2 text-xs text-gray-500">
+        {t("registrations_per_month")}
+      </p>
+      <ol
+        className="flex h-24 items-end gap-1.5"
+        aria-label={t("registrations_per_month")}
+      >
+        {months.map((m) => (
+          <li
+            key={m.month}
+            className="flex h-full flex-1 flex-col items-center justify-end gap-1"
+            title={`${m.month}: ${m.count}`}
+          >
+            <span className="text-[10px] tabular-nums text-gray-600">
+              {m.count || ""}
+            </span>
+            <span
+              className="w-full rounded-t bg-primary-500"
+              style={{ height: `${(m.count / max) * 100}%`, minHeight: 2 }}
+            />
+            <span className="text-[10px] capitalize text-gray-500">
+              {label(m.month)}
+              <span className="sr-only">
+                {" "}
+                {m.month.slice(0, 4)}: {m.count}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

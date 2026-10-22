@@ -17,6 +17,8 @@ export interface PatientFilter {
   careLevels: number[];
   gender: number | null;
   clinic: string;
+  physio: number | null;
+  diagnosis: string;
 }
 
 export const NO_PATIENT_FILTER: PatientFilter = {
@@ -25,6 +27,8 @@ export const NO_PATIENT_FILTER: PatientFilter = {
   careLevels: [],
   gender: null,
   clinic: "",
+  physio: null,
+  diagnosis: "",
 };
 
 /** Query params shared by the list and the stats (empty filters left out). */
@@ -39,6 +43,8 @@ export function patientQuery(f: PatientFilter) {
       : undefined,
     gender: f.gender ?? undefined,
     facility: f.clinic || undefined,
+    physio: f.physio ?? undefined,
+    diagnosis: f.diagnosis.trim() || undefined,
   };
 }
 
@@ -49,7 +55,9 @@ export const isFiltered = (f: PatientFilter) =>
     f.ageBand ||
     f.careLevels.length ||
     f.gender !== null ||
-    f.clinic
+    f.clinic ||
+    f.physio !== null ||
+    f.diagnosis.trim()
   );
 
 /** Share of n in total, 0–100. */

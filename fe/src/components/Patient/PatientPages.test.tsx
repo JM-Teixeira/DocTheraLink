@@ -14,6 +14,7 @@ import { PatientModel } from "@/components/Patient/models";
 // Data hooks, routing and page chrome are replaced; texts are translation keys.
 const m = vi.hoisted(() => ({
   navigate: vi.fn(),
+  download: vi.fn(async () => undefined),
   user: { id: 1, user_type: "Doctor" },
   patient: undefined as PatientModel | undefined,
   list: { data: undefined as unknown, isLoading: false, isError: false },
@@ -41,8 +42,15 @@ vi.mock("@/components/Patient/api", () => ({
       genders: { "2": 2 },
       age_bands: { "65+": 1 },
       average_age: 61.5,
+      monthly: [
+        { month: "2026-09", count: 1 },
+        { month: "2026-10", count: 3 },
+      ],
     },
   }),
+}));
+vi.mock("@/components/Patient/exportPatients", () => ({
+  downloadPatientsCsv: m.download,
 }));
 vi.mock("raviger", async (orig) => ({
   ...(await orig<object>()),
@@ -172,6 +180,39 @@ describe("PatientList", () => {
     m.list = { data: undefined, isLoading: false, isError: true };
     wrap(<PatientList />);
     expect(screen.getByText("patients_load_error")).toBeInTheDocument();
+  });
+});
+
+describe("PatientList for a coordinator", () => {
+  it("exports the filtered list and shows the monthly trend", async () => {
+    m.user = { id: 2, user_type: "Coordinator" };
+    m.list = {
+      data: { count: 1, results: [{ id: "p1", name: "Ana" }] },
+      isLoading: false,
+      isError: false,
+    };
+    wrap(<PatientList />);
+    expect(
+      screen.getByRole("list", { name: "registrations_per_month" }),
+    ).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("diagnosis"), "lombalgia");
+    await userEvent.click(screen.getByRole("button", { name: "export_csv" }));
+    expect(m.download).toHaveBeenCalled();
+  });
+
+  it("hides the diagnosis filter and export from the front desk", () => {
+    m.user = { id: 3, user_type: "Receptionist" };
+    m.list = {
+      data: { count: 0, results: [] },
+      isLoading: false,
+      isError: false,
+    };
+    wrap(<PatientList />);
+    expect(screen.queryByLabelText("diagnosis")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "export_csv" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("physiotherapist")).toBeInTheDocument();
   });
 });
 

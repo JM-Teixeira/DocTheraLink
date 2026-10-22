@@ -54,3 +54,11 @@ export const managesStaff = (
   (isCoordinator(u) &&
     !!u.home_facility &&
     u.home_facility === target.home_facility);
+
+/** Filtering patients by diagnosis tells who has what: clinical roles and coordinators. */
+export const canFilterByDiagnosis = (u: RoleUser) =>
+  isAdmin(u) || isDoctor(u) || isTherapist(u) || isCoordinator(u);
+
+/** Exporting the patient list (personal data): coordinators and admins. */
+export const canExportPatients = (u: RoleUser) =>
+  isAdmin(u) || isCoordinator(u);

@@ -45,8 +45,12 @@ type ListQuery struct {
 	AgeMax     *int   `form:"age_max"`
 	CareLevels []int  `form:"care_level"` // any of these
 	Gender     *int   `form:"gender"`
-	Limit      int    `form:"limit"`
-	Offset     int    `form:"offset"`
+	// Patients a physio has (a referral or a session with them)
+	Physio uint `form:"physio"`
+	// Referral diagnosis or ICD code contains this (clinical: see Service.checkFilters)
+	Diagnosis string `form:"diagnosis"`
+	Limit     int    `form:"limit"`
+	Offset    int    `form:"offset"`
 }
 
 // Stats summarises a set of patients.
@@ -56,6 +60,14 @@ type Stats struct {
 	Genders    map[int]int64    `json:"genders"`     // 0 = unknown, 1–3
 	AgeBands   map[string]int64 `json:"age_bands"`   // 0-17, 18-39, 40-64, 65-79, 80+, unknown
 	AverageAge float64          `json:"average_age"`
+	// Registrations per month, oldest first, the last 12 months (empty months included)
+	Monthly []MonthCount `json:"monthly"`
+}
+
+// MonthCount is how many of the patients were registered in a month.
+type MonthCount struct {
+	Month string `json:"month"` // YYYY-MM
+	Count int64  `json:"count"`
 }
 
 // Repository is the persistence boundary of the module.
@@ -157,7 +169,36 @@ func (g *GormRepository) Stats(ctx context.Context, s Scope, q ListQuery, now ti
 	if avg != nil {
 		st.AverageAge = *avg
 	}
+	// Registrations per month over the last 12 months
+	first := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).AddDate(0, -11, 0)
+	var months []struct {
+		Month string
+		N     int64
+	}
+	if err := base().Where("patients.created_at >= ?", first).
+		Select("to_char(patients.created_at, 'YYYY-MM') AS month, COUNT(*) AS n").
+		Group("month").Scan(&months).Error; err != nil {
+		return nil, err
+	}
+	st.Monthly = monthSeries(first, months)
 	return st, nil
+}
+
+// monthSeries lists the 12 months from first, with the counts found (0 if none).
+func monthSeries(first time.Time, found []struct {
+	Month string
+	N     int64
+}) []MonthCount {
+	byMonth := map[string]int64{}
+	for _, m := range found {
+		byMonth[m.Month] = m.N
+	}
+	out := make([]MonthCount, 12)
+	for i := range out {
+		m := first.AddDate(0, i, 0).Format("2006-01")
+		out[i] = MonthCount{Month: m, Count: byMonth[m]}
+	}
+	return out
 }
 
 // filtered applies the list filters (search, phone, clinic, age, care level, gender).
@@ -191,6 +232,14 @@ func filtered(db *gorm.DB, q ListQuery, now time.Time) *gorm.DB {
 	}
 	if q.Gender != nil {
 		db = db.Where("gender = ?", *q.Gender)
+	}
+	if q.Physio != 0 {
+		db = db.Where(`EXISTS (SELECT 1 FROM referrals r WHERE r.patient_id = patients.id AND r.therapist_id = ? AND r.deleted_at IS NULL)
+			OR EXISTS (SELECT 1 FROM appointments a WHERE a.patient_id = patients.id AND a.therapist_id = ?)`, q.Physio, q.Physio)
+	}
+	if d := strings.TrimSpace(q.Diagnosis); d != "" {
+		db = db.Where(`EXISTS (SELECT 1 FROM referrals r WHERE r.patient_id = patients.id AND r.deleted_at IS NULL
+			AND (r.diagnosis ILIKE ? OR r.icd_code ILIKE ?))`, "%"+escapeLike(d)+"%", escapeLike(d)+"%")
 	}
 	return db
 }

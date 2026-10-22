@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Search, Users, X } from "lucide-react";
+import { Download, Plus, Search, Users, X } from "lucide-react";
 import { navigate } from "raviger";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,7 @@ import { FilterChips, FilterPanel } from "@/components/Common/FilterChips";
 import Page from "@/components/Common/Page";
 import PatientMetrics from "@/components/Patient/PatientMetrics";
 import { usePatientList, usePatientStats } from "@/components/Patient/api";
+import { downloadPatientsCsv } from "@/components/Patient/exportPatients";
 import {
   AGE_BANDS,
   AgeBand,
@@ -31,9 +32,15 @@ import useAuthUser from "@/hooks/useAuthUser";
 import useDateFormat from "@/hooks/useDateFormat";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
 
+import * as Notification from "@/Utils/Notifications";
 import { ageFromDob, initials } from "@/Utils/person";
 import query from "@/Utils/request/query";
-import { canWritePatients, isAdmin } from "@/Utils/roles";
+import {
+  canExportPatients,
+  canFilterByDiagnosis,
+  canWritePatients,
+  isAdmin,
+} from "@/Utils/roles";
 
 const PAGE_SIZE = 20;
 
@@ -43,7 +50,7 @@ const PAGE_SIZE = 20;
  * whatever the filters match.
  */
 export default function PatientList() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { fmt } = useDateFormat();
   const user = useAuthUser();
   const admin = isAdmin(user);
@@ -69,6 +76,23 @@ export default function PatientList() {
     queryFn: query(StaffRoutes.clinics, { queryParams: { limit: 100 } }),
     enabled: admin,
   });
+  const { data: physios } = useQuery({
+    queryKey: ["staff", "by-role", "PhysioTherapist"],
+    queryFn: query(StaffRoutes.list, {
+      queryParams: { user_type: "PhysioTherapist", limit: 100 },
+    }),
+  });
+  const [exporting, setExporting] = useState(false);
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await downloadPatientsCsv(params, i18n.language);
+    } catch {
+      Notification.Error({ msg: t("patients_export_failed") });
+    } finally {
+      setExporting(false);
+    }
+  };
   const total = data?.count ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -77,12 +101,24 @@ export default function PatientList() {
       title={t("patients")}
       hideBack
       options={
-        canWritePatients(user) && (
-          <Button variant="primary" onClick={() => navigate("/patients/new")}>
-            <Plus className="mr-1.5 size-4" aria-hidden />
-            {t("new_patient")}
-          </Button>
-        )
+        <div className="flex flex-wrap justify-end gap-2">
+          {canExportPatients(user) && (
+            <Button
+              variant="outline"
+              disabled={exporting || !total}
+              onClick={exportCsv}
+            >
+              <Download className="mr-1.5 size-4" aria-hidden />
+              {t("export_csv")}
+            </Button>
+          )}
+          {canWritePatients(user) && (
+            <Button variant="primary" onClick={() => navigate("/patients/new")}>
+              <Plus className="mr-1.5 size-4" aria-hidden />
+              {t("new_patient")}
+            </Button>
+          )}
+        </div>
       }
     >
       <FilterPanel>
@@ -115,6 +151,31 @@ export default function PatientList() {
                 </option>
               ))}
             </select>
+          )}
+          <select
+            aria-label={t("physiotherapist")}
+            value={filter.physio ?? ""}
+            onChange={(e) =>
+              set({ physio: e.target.value ? Number(e.target.value) : null })
+            }
+            className="h-10 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+          >
+            <option value="">{t("all_physios")}</option>
+            {physios?.results.map((p) => (
+              <option key={p.id} value={p.id}>
+                {`${p.first_name} ${p.last_name}`.trim() || p.username}
+              </option>
+            ))}
+          </select>
+          {canFilterByDiagnosis(user) && (
+            <input
+              type="search"
+              aria-label={t("diagnosis")}
+              placeholder={t("diagnosis_or_icd")}
+              value={filter.diagnosis}
+              onChange={(e) => set({ diagnosis: e.target.value })}
+              className="h-10 w-48 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            />
           )}
           {isFiltered(filter) && (
             <button

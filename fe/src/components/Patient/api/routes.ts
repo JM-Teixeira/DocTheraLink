@@ -9,6 +9,8 @@ export interface PatientStats {
   genders: Record<string, number>;
   age_bands: Record<string, number>;
   average_age: number;
+  /** Registrations per month, oldest first (last 12 months). */
+  monthly?: { month: string; count: number }[];
 }
 
 /** One thing that happened to a patient (be/internal/modules/timeline). */

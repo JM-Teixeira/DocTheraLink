@@ -108,7 +108,7 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] Rest of the old "centralized patient creation" spec: retry on network errors (only when the server cannot have done the work), structured allergies / conditions / medications, ≥80 % coverage of the patient flow enforced in CI; unused old spec code removed.
 - [x] Portuguese identifiers: NIF (mod-11 check digit) and SNS number (9 digits), stored normalised.
 - [x] Patient filters (care level, age band, gender, clinic) with metrics of the match; search by name, NIF or SNS number.
-- [ ] Patient metrics next: export CSV; trends over time; filter by physio / diagnosis.
+- [x] Patient metrics: CSV export (coordinators/admins; contact and demographic columns only, safe against spreadsheet formulas), new patients per month (12 months), filter by physio and by diagnosis / ICD (clinical roles and coordinators only).
 - [x] Patient timeline: next sessions on top, then referral steps, messages (with pain), files and sessions by month; filters by kind; each role sees only its own sources (no referrals for the front desk).
 - [ ] Consent records (GDPR) per patient.
 

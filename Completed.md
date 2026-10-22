@@ -5,6 +5,21 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.10.0 (branch `feat/m4-patients`)
+
+### Patient metrics (TODO)
+- Filter the patients by physio (a referral or a session with them) and by
+  diagnosis or ICD code. The diagnosis filter is clinical, so only doctors,
+  physios, coordinators and admins have it (the server refuses it to others).
+- New patients per month for the last 12 months, under the metrics.
+- "Exportar CSV" (coordinators and admins): the filtered list with name,
+  birth date, age, gender, care level, phone, e-mail, postal code, city and
+  registration date; no NIF/SNS or clinical data. UTF-8 with ";" so Excel
+  in Portugal opens it directly; cells that look like formulas are
+  neutralised.
+- Tests: unit (filters, roles, CSV, months), API e2e `TestPatientMetrics`,
+  component and browser tests.
+
 ## 2026-10-22 · Klyniva 0.9.1 (branch `feat/m4-patients`)
 
 ### Small fixes from use

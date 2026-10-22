@@ -114,8 +114,27 @@ func (s *Service) scope(ctx context.Context, a Actor) (Scope, error) {
 	return Scope{UserID: a.ID, ClinicID: home}, nil
 }
 
+// checkFilters refuses the diagnosis filter to roles that may not read
+// referrals (it would tell them who has which diagnosis).
+func checkFilters(a Actor, q ListQuery) error {
+	if strings.TrimSpace(q.Diagnosis) == "" {
+		return nil
+	}
+	switch a.Role {
+	case models.RoleDoctor, models.RolePhysioTherapist, models.RoleCoordinator:
+		return nil
+	}
+	if auth.IsAdmin(a.Role) {
+		return nil
+	}
+	return ErrForbidden
+}
+
 // List returns visible patients, newest first, with bounded pagination.
 func (s *Service) List(ctx context.Context, a Actor, q ListQuery) ([]models.Patient, int64, error) {
+	if err := checkFilters(a, q); err != nil {
+		return nil, 0, err
+	}
 	sc, err := s.scope(ctx, a)
 	if err != nil {
 		return nil, 0, err
@@ -130,6 +149,9 @@ func (s *Service) List(ctx context.Context, a Actor, q ListQuery) ([]models.Pati
 
 // Stats summarises the visible patients matching q (for metrics).
 func (s *Service) Stats(ctx context.Context, a Actor, q ListQuery) (*Stats, error) {
+	if err := checkFilters(a, q); err != nil {
+		return nil, err
+	}
 	sc, err := s.scope(ctx, a)
 	if err != nil {
 		return nil, err

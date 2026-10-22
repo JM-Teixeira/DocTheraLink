@@ -112,3 +112,33 @@ test("allergies as a list, and saving survives a dropped connection", async ({ p
   await expect(page.getByText("Penicilina · Grave")).toBeVisible();
   await expect(page.getByText("Ibuprofeno · 400 mg")).toBeVisible();
 });
+
+test("the coordinator filters by physio and diagnosis and exports the list as CSV", async ({ page, request }) => {
+  const coordTok = await signIn(page, request, "cm.coordenacao");
+  const doctorTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.medico2", password: PASSWORD } })).json()).access;
+  const physioTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.fisio4", password: PASSWORD } })).json()).access;
+  const joao = await (await api(request, physioTok, "GET", "/users/getcurrentuser/")).json();
+  const diag = `Fasceite plantar ${stamp()}`;
+  const patient = await (await api(request, coordTok, "POST", "/patient/", { name: `Exportar ${stamp()}`, city: "Porto" })).json();
+  await api(request, doctorTok, "POST", "/referrals/", { patient_id: patient.id, diagnosis: diag, reason: "Dor", therapist_id: joao.id });
+
+  await page.goto("/patients");
+  await expect(page.getByRole("list", { name: "Novos utentes por mês (últimos 12 meses)" })).toBeVisible();
+  await page.getByLabel("Diagnóstico", { exact: true }).fill(diag);
+  await expect(page.getByText(patient.name)).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await page.getByLabel("Fisioterapeuta", { exact: true }).selectOption(String(joao.id));
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Exportar CSV" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^utentes-\d{4}-\d{2}-\d{2}\.csv$/);
+  const csv = await (await download.createReadStream()).toArray();
+  const text = Buffer.concat(csv as Buffer[]).toString("utf8");
+  expect(text).toContain("Nome;Data de nascimento");
+  expect(text).toContain(`${patient.name};`);
+  expect(text).toContain(";Porto;");
+  expect(text.split("\n").filter(Boolean)).toHaveLength(2); // header + the one patient
+});

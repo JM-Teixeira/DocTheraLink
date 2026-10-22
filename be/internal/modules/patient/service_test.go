@@ -357,3 +357,69 @@ func TestClinicalLists(t *testing.T) {
 		}
 	}
 }
+
+func TestMetricsFiltersAndExport(t *testing.T) {
+	ctx := context.Background()
+	s, repo := newSvc()
+	coord := Actor{ID: 9, Role: models.RoleCoordinator}
+	physio := Actor{ID: 10, Role: models.RolePhysioTherapist}
+
+	// Diagnosis is clinical: not for the front desk
+	if _, _, err := s.List(ctx, receptionist, ListQuery{Diagnosis: "lombalgia"}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("receptionist diagnosis filter: %v", err)
+	}
+	if _, err := s.Stats(ctx, nurse, ListQuery{Diagnosis: "x"}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("nurse diagnosis stats: %v", err)
+	}
+	if _, _, err := s.List(ctx, receptionist, ListQuery{Physio: 3}); err != nil {
+		t.Errorf("physio filter is fine for everyone: %v", err)
+	}
+	s2 := NewService(repo, clinic.Static{physio.ID: home, coord.ID: home}, func() time.Time { return now })
+	if _, _, err := s2.List(ctx, physio, ListQuery{Diagnosis: "lombalgia"}); err != nil {
+		t.Errorf("physio diagnosis filter: %v", err)
+	}
+
+	// Export: coordinators and admins only, up to maxExport rows
+	if _, err := s2.Export(ctx, physio, ListQuery{}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("physio export: %v", err)
+	}
+	if _, err := s2.Export(ctx, coord, ListQuery{Limit: 3}); err != nil || repo.lastQuery.Limit != maxExport {
+		t.Errorf("coordinator export: %v limit %d", err, repo.lastQuery.Limit)
+	}
+}
+
+func TestWriteCSV(t *testing.T) {
+	dob := time.Date(1960, 12, 31, 0, 0, 0, 0, time.UTC)
+	g := 2
+	var b strings.Builder
+	err := WriteCSV(&b, []models.Patient{{
+		Name: "=HYPERLINK(\"x\")", DateOfBirth: &dob, Gender: &g, CareLevel: 3,
+		City: strp("Porto"), CreatedAt: now,
+	}}, "pt", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	if !strings.HasPrefix(out, "\uFEFFNome;Data de nascimento;") {
+		t.Errorf("header: %q", out[:40])
+	}
+	if !strings.Contains(out, `"'=HYPERLINK(""x"")";1960-12-31;65;Feminino;3;;;;Porto;2026-10-20`) {
+		t.Errorf("row: %q", out)
+	}
+	b.Reset()
+	_ = WriteCSV(&b, nil, "en", now)
+	if !strings.Contains(b.String(), "Name;Date of birth") {
+		t.Errorf("english header: %q", b.String())
+	}
+}
+
+func TestMonthSeries(t *testing.T) {
+	first := time.Date(2025, 11, 1, 0, 0, 0, 0, time.UTC)
+	got := monthSeries(first, []struct {
+		Month string
+		N     int64
+	}{{"2025-11", 2}, {"2026-10", 5}})
+	if len(got) != 12 || got[0] != (MonthCount{"2025-11", 2}) || got[1].Count != 0 || got[11] != (MonthCount{"2026-10", 5}) {
+		t.Errorf("series: %+v", got)
+	}
+}
