@@ -142,3 +142,31 @@ test("the coordinator filters by physio and diagnosis and exports the list as CS
   expect(text).toContain(";Porto;");
   expect(text.split("\n").filter(Boolean)).toHaveLength(2); // header + the one patient
 });
+
+test("consents: the front desk records them and the history keeps every change", async ({ page, request }) => {
+  const tok = await signIn(page, request, "cm.rececao1");
+  const patient = await (await api(request, tok, "POST", "/patient/", { name: `Consentimento ${stamp()}` })).json();
+  await page.goto(`/patients/${patient.id}`);
+  const card = page.getByRole("region", { name: "Consentimentos (RGPD)" });
+  await expect(card.getByRole("alert")).toContainText("Ainda não há consentimento registado");
+
+  await card.getByRole("button", { name: "Registar: Tratamento de dados de saúde para os cuidados" }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+  await expect(card.getByRole("alert")).toHaveCount(0);
+
+  await card.getByRole("button", { name: "Registar: Contacto por SMS" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByText("Dá consentimento").click();
+  await dialog.getByLabel("Como").selectOption("verbal");
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+  await card.getByRole("button", { name: "Registar: Contacto por SMS" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByText("Retira / recusa").click();
+  await dialog.getByLabel("Nota").fill("Prefere chamadas");
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+
+  await expect(card.getByText("Retirado")).toBeVisible();
+  await card.getByRole("button", { name: "Ver histórico (3 registos)" }).click();
+  await expect(card.getByText(/Prefere chamadas/)).toBeVisible();
+});

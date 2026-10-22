@@ -114,6 +114,7 @@ func Migrate() error {
 		{"clinics", []any{&models.Facility{}}},
 		{"users", []any{&models.User{}, &models.Skill{}, &models.UserSkill{}}},
 		{"patients", []any{&models.Patient{}}},
+		{"patient consents", patient.Models()},
 		{"staff time log", []any{&models.TimeLog{}}},
 		{"inventory", inventory.Models()},
 		{"time board", schedule.Models()},

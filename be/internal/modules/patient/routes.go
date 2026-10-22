@@ -23,5 +23,7 @@ func RegisterRoutes(patients *gin.RouterGroup, db *gorm.DB) *Service {
 	patients.GET("/:id/", h.Get)
 	patients.PUT("/:id/", h.Update)
 	patients.PATCH("/:id/", h.Update)
+	patients.GET("/:id/consents/", h.ListConsents)
+	patients.POST("/:id/consents/", h.RecordConsent)
 	return svc
 }

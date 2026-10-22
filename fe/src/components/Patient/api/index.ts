@@ -6,7 +6,7 @@ import { retryDelay, retryTransient } from "@/Utils/request/retry";
 import { QueryParams } from "@/Utils/request/types";
 
 import { PatientModel } from "../models";
-import PatientRoutes from "./routes";
+import PatientRoutes, { ConsentRequest } from "./routes";
 
 // Query Keys
 export const patientKeys = {
@@ -80,6 +80,32 @@ export function usePatientStats(filters: QueryParams = {}) {
     queryKey: patientKeys.stats(filters),
     queryFn: query(PatientRoutes.patientStats, { queryParams: filters }),
     staleTime: 60000,
+  });
+}
+
+export function usePatientConsents(patientId: string) {
+  return useQuery({
+    queryKey: [...patientKeys.detail(patientId), "consents"],
+    queryFn: query(PatientRoutes.patientConsents, {
+      pathParams: { id: patientId },
+    }),
+    enabled: !!patientId,
+  });
+}
+
+export function useRecordConsent(patientId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ConsentRequest) =>
+      callApi(PatientRoutes.recordConsent, {
+        pathParams: { id: patientId },
+        body,
+      }),
+    onSuccess: (view) =>
+      queryClient.setQueryData(
+        [...patientKeys.detail(patientId), "consents"],
+        view,
+      ),
   });
 }
 

@@ -70,7 +70,7 @@ const SidebarUserCard: React.FC<SidebarUserCardProps> = ({ shrinked }) => {
           </Link>
           <Link href="/about" className="block text-sm text-gray-900">
             <DropdownMenuItem className="cursor-pointer">
-              <div id="about-button">{t("about_klyniva")}</div>
+              <div id="about-button">{t("about")}</div>
             </DropdownMenuItem>
           </Link>
           <DropdownMenuItem onClick={signOut} className="cursor-pointer">

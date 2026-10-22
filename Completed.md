@@ -5,6 +5,25 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.11.0 (branch `feat/m4-patients`)
+
+### Network access from other laptops really works
+- The page asked the API at `localhost:8088`, which on another laptop is
+  that laptop. The local cluster now uses `same-origin`: the app calls the
+  API on the address it was opened from (localhost, the PC name or its IP).
+  The `fe/public/config.js` edit is not needed for this.
+- User menu says "Sobre"; the page keeps the title "Sobre o Klyniva".
+
+### Patient consents, GDPR (TODO)
+- Card on the patient page: health-data processing, sharing progress with
+  the referring doctor, contact by e-mail, contact by SMS, photos/video.
+  Each shows given / withdrawn / not recorded, when, how (signed form,
+  verbal, digital) and by whom.
+- Recording a change adds a record (`patient_consents`, never edited); the
+  newest per kind is the current state; the history is one click away.
+- A warning shows while health-data consent is missing.
+- Tests: unit, API e2e `TestPatientConsents`, component and browser tests.
+
 ## 2026-10-22 · Klyniva 0.10.0 (branch `feat/m4-patients`)
 
 ### Patient metrics (TODO)

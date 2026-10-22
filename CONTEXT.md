@@ -35,7 +35,8 @@ be/                Go backend (Go module name: klyniva)
     api/handlers/  legacy handlers (users, facilities, time log)
     modules/       NEW layered modules — use this pattern for new features
       referral/    model → repository → service → handler → routes (+ tests)
-      patient/     same layout
+      patient/     same layout; clinical lists (clinical.go), CSV export (export.go),
+                   GDPR consents, append-only (consent.go, patient_consents)
       notification/ in-app + e-mail notifications fed by referral events
       attachment/  files on referrals; access follows the referral
       catalog/     embedded ICD-10 subset + referral templates (EN/PT, read-only)

@@ -110,7 +110,8 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] Patient filters (care level, age band, gender, clinic) with metrics of the match; search by name, NIF or SNS number.
 - [x] Patient metrics: CSV export (coordinators/admins; contact and demographic columns only, safe against spreadsheet formulas), new patients per month (12 months), filter by physio and by diagnosis / ICD (clinical roles and coordinators only).
 - [x] Patient timeline: next sessions on top, then referral steps, messages (with pain), files and sessions by month; filters by kind; each role sees only its own sources (no referrals for the front desk).
-- [ ] Consent records (GDPR) per patient.
+- [x] Consent records (GDPR) per patient: health data, sharing with the doctor, e-mail, SMS, photos; given/withdrawn, how, by whom, append-only history; warning while health-data consent is missing.
+- [ ] Consents next: printable consent form to sign; block clinical notes / SMS when the matching consent is missing or withdrawn.
 
 ### M3 — Scheduling (P1) — started early on request (time board)
 - [x] **Time board** (`/time-board`): divisions of the clinic (gym, rooms, pool…) with a capacity of patients per physio per hour; physio shifts per day per division; patients assigned per physio-hour (capacity, on-shift and double-booking checks, safe under concurrency); views by physio and by division; copy a day's shifts; attended / missed.

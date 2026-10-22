@@ -18,8 +18,19 @@ const logo = (value?: string, fallback?: ILogo) => {
     return fallback;
   }
 };
+/**
+ * Where the API is. "same-origin" means the address the page was opened from
+ * (nginx forwards /api/ to the backend), so the same deployment works from
+ * localhost and from other computers on the network.
+ */
+export const resolveApiUrl = (raw: string | undefined, origin: string) =>
+  !raw || raw === "same-origin" ? origin : raw;
+
 const careConfig = {
-  apiUrl: windowEnv.REACT_CARE_API_URL || env.REACT_CARE_API_URL,
+  apiUrl: resolveApiUrl(
+    windowEnv.REACT_CARE_API_URL || env.REACT_CARE_API_URL,
+    window.location.origin,
+  ),
 
   urls: {
     dashboard: env.REACT_DASHBOARD_URL,

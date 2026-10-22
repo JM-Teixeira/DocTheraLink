@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
+import PatientConsents from "@/components/Patient/PatientConsents";
 import PatientTimeline from "@/components/Patient/PatientTimeline";
 import { usePatient } from "@/components/Patient/api";
 import { formatId, genderKey } from "@/components/Patient/patientFormUtils";
@@ -225,6 +226,8 @@ export default function PatientDetail({ id }: { id: string }) {
             )}
           </section>
         )}
+
+        <PatientConsents patientId={id} canRecord={canWritePatients(user)} />
 
         <PatientTimeline patientId={id} />
       </div>

@@ -35,6 +35,11 @@ vi.mock("@/components/Patient/api", () => ({
     m.lastListParams = p;
     return m.list;
   },
+  usePatientConsents: () => ({
+    data: { current: {}, history: [] },
+    isLoading: false,
+  }),
+  useRecordConsent: () => ({ mutate: vi.fn(), isPending: false }),
   usePatientStats: () => ({
     data: {
       total: 2,

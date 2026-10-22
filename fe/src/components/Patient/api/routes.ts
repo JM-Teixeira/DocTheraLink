@@ -34,6 +34,40 @@ export interface PatientTimeline {
   history: TimelineEntry[];
 }
 
+/** One consent record (be/internal/modules/patient/consent.go). */
+export interface Consent {
+  id: string;
+  patient_id: string;
+  kind: ConsentKind;
+  granted: boolean;
+  method: ConsentMethod;
+  note: string;
+  recorded_by?: { id: number; first_name: string; last_name: string };
+  created_date: string;
+}
+export const CONSENT_KINDS = [
+  "data_processing",
+  "share_with_doctor",
+  "contact_email",
+  "contact_sms",
+  "photos",
+] as const;
+export type ConsentKind = (typeof CONSENT_KINDS)[number];
+export const CONSENT_METHODS = ["signed_paper", "verbal", "digital"] as const;
+export type ConsentMethod = (typeof CONSENT_METHODS)[number];
+
+export interface ConsentView {
+  current: Partial<Record<ConsentKind, Consent>>;
+  history: Consent[];
+}
+
+export interface ConsentRequest {
+  kind: ConsentKind;
+  granted: boolean;
+  method: ConsentMethod;
+  note: string;
+}
+
 /**
  * Patient API Routes
  * Defines API endpoints for patient-related operations
@@ -92,6 +126,19 @@ const PatientRoutes = {
     path: "/api/v1/patient/{id}/timeline/",
     method: "GET" as const,
     TRes: Type<PatientTimeline>(),
+  },
+
+  /** GET/POST /api/v1/patient/{id}/consents/ */
+  patientConsents: {
+    path: "/api/v1/patient/{id}/consents/",
+    method: "GET" as const,
+    TRes: Type<ConsentView>(),
+  },
+  recordConsent: {
+    path: "/api/v1/patient/{id}/consents/",
+    method: "POST" as const,
+    TBody: Type<ConsentRequest>(),
+    TRes: Type<ConsentView>(),
   },
 
   getPatient: {

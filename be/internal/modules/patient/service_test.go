@@ -16,6 +16,7 @@ import (
 // fakeRepo is an in-memory Repository. It records the scope it was called
 // with; visibility itself is enforced in SQL and covered by integration tests.
 type fakeRepo struct {
+	consents  []Consent
 	patients  map[string]models.Patient
 	lastScope Scope
 	lastQuery ListQuery
@@ -42,6 +43,23 @@ func (f *fakeRepo) Get(_ context.Context, s Scope, id string) (*models.Patient, 
 		return nil, ErrNotFound
 	}
 	return &p, nil
+}
+
+// Consents returns the patient's records newest first (they are appended in time order).
+func (f *fakeRepo) Consents(_ context.Context, patientID string) ([]Consent, error) {
+	var out []Consent
+	for i := len(f.consents) - 1; i >= 0; i-- {
+		if f.consents[i].PatientID == patientID {
+			out = append(out, f.consents[i])
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) AddConsent(_ context.Context, c *Consent) error {
+	_ = c.BeforeCreate(nil)
+	f.consents = append(f.consents, *c)
+	return nil
 }
 
 func (f *fakeRepo) Create(_ context.Context, p *models.Patient) error {
@@ -421,5 +439,47 @@ func TestMonthSeries(t *testing.T) {
 	}{{"2025-11", 2}, {"2026-10", 5}})
 	if len(got) != 12 || got[0] != (MonthCount{"2025-11", 2}) || got[1].Count != 0 || got[11] != (MonthCount{"2026-10", 5}) {
 		t.Errorf("series: %+v", got)
+	}
+}
+
+func TestConsents(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newSvc()
+	p, _ := s.Create(ctx, receptionist, CreateRequest{Name: "Ana"})
+	yes, no := true, false
+
+	v, err := s.Consents(ctx, receptionist, p.ID)
+	if err != nil || len(v.Current) != 0 || v.History == nil {
+		t.Fatalf("empty: %v %+v", err, v)
+	}
+	if _, err := s.RecordConsent(ctx, receptionist, p.ID, ConsentRequest{Kind: "data_processing", Granted: &yes, Method: "signed_paper"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RecordConsent(ctx, receptionist, p.ID, ConsentRequest{Kind: "contact_sms", Granted: &yes, Method: "verbal"}); err != nil {
+		t.Fatal(err)
+	}
+	v, err = s.RecordConsent(ctx, receptionist, p.ID, ConsentRequest{Kind: "contact_sms", Granted: &no, Method: "verbal", Note: " pediu "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v.History) != 3 || v.Current["contact_sms"].Granted || !v.Current["data_processing"].Granted ||
+		v.Current["contact_sms"].Note != "pediu" || v.Current["contact_sms"].RecordedByID != receptionist.ID {
+		t.Errorf("view: %+v", v)
+	}
+
+	for field, req := range map[string]ConsentRequest{
+		"kind":   {Kind: "marketing", Granted: &yes, Method: "verbal"},
+		"method": {Kind: "photos", Granted: &yes, Method: "telepathy"},
+	} {
+		var ve *ValidationError
+		if _, err := s.RecordConsent(ctx, receptionist, p.ID, req); !errors.As(err, &ve) || ve.Field != field {
+			t.Errorf("%s: %v", field, err)
+		}
+	}
+	if _, err := s.RecordConsent(ctx, readOnly, p.ID, ConsentRequest{Kind: "photos", Granted: &yes, Method: "verbal"}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("read-only: %v", err)
+	}
+	if _, err := s.Consents(ctx, receptionist, uuid.NewString()); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown patient: %v", err)
 	}
 }

@@ -34,8 +34,9 @@ test("the user menu has profile, About and sign out; the board keeps rare action
   await page.locator("#user-profile-name").click();
   await expect(page.getByRole("menuitem", { name: "Perfil" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Terminar sessão" })).toBeVisible();
-  await page.getByRole("menuitem", { name: "Sobre o Klyniva" }).click();
+  await page.getByRole("menuitem", { name: "Sobre", exact: true }).click();
   await expect(page).toHaveURL(/\/about$/);
+  await expect(page.getByText("Sobre o Klyniva").first()).toBeVisible();
 
   await page.goto("/time-board");
   for (const name of ["Ausências", "Divisões", "Copiar dia", "Repetir semana"])
@@ -45,6 +46,18 @@ test("the user menu has profile, About and sign out; the board keeps rare action
     await expect(page.getByRole("menuitem", { name })).toBeVisible();
   await page.getByRole("menuitem", { name: "Copiar dia" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
+});
+
+test("the app talks to the server on the address it was opened from (other laptops)", async ({ page, request }) => {
+  await signIn(page, request, "cm.fisio3");
+  // 127.0.0.1 stands in for another laptop using this computer's address
+  const apiHosts = new Set<string>();
+  page.on("request", (r) => {
+    if (r.url().includes("/api/v1/")) apiHosts.add(new URL(r.url()).host);
+  });
+  await page.goto("http://127.0.0.1:8088/");
+  await expect(page.locator("#user-profile-name")).toBeVisible();
+  expect([...apiHosts]).toEqual(["127.0.0.1:8088"]);
 });
 
 test("stock permissions: the coordinator gives Pedro floor 2, Pedro can then restock only there", async ({ browser, page, request }) => {

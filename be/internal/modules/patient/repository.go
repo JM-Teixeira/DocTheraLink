@@ -75,6 +75,9 @@ type Repository interface {
 	List(ctx context.Context, s Scope, q ListQuery) ([]models.Patient, int64, error)
 	Stats(ctx context.Context, s Scope, q ListQuery, now time.Time) (*Stats, error)
 	Get(ctx context.Context, s Scope, id string) (*models.Patient, error)
+	// Consents of a patient, newest first, with who recorded them.
+	Consents(ctx context.Context, patientID string) ([]Consent, error)
+	AddConsent(ctx context.Context, c *Consent) error
 	Create(ctx context.Context, p *models.Patient) error
 	Update(ctx context.Context, id string, fields map[string]any) error
 	// Candidates returns visible patients sharing an identifier, the birth
@@ -242,6 +245,17 @@ func filtered(db *gorm.DB, q ListQuery, now time.Time) *gorm.DB {
 			AND (r.diagnosis ILIKE ? OR r.icd_code ILIKE ?))`, "%"+escapeLike(d)+"%", escapeLike(d)+"%")
 	}
 	return db
+}
+
+func (g *GormRepository) Consents(ctx context.Context, patientID string) ([]Consent, error) {
+	var out []Consent
+	err := g.db.WithContext(ctx).Preload("RecordedBy").Where("patient_id = ?", patientID).
+		Order("created_at DESC").Find(&out).Error
+	return out, err
+}
+
+func (g *GormRepository) AddConsent(ctx context.Context, c *Consent) error {
+	return g.db.WithContext(ctx).Create(c).Error
 }
 
 func (g *GormRepository) Get(ctx context.Context, s Scope, id string) (*models.Patient, error) {
