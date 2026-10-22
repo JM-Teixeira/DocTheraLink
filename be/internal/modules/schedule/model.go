@@ -93,10 +93,12 @@ type Appointment struct {
 	TherapistID uint            `json:"therapist_id" gorm:"not null;index"`
 	PatientID   string          `json:"patient_id" gorm:"type:uuid;not null;index"`
 	Patient     *PatientSummary `json:"patient,omitempty" gorm:"foreignKey:PatientID;->;-:migration"`
-	Credits     int             `json:"credits" gorm:"not null;default:1"` // patient's care level when booked
-	ReferralID  *string         `json:"referral_id" gorm:"type:uuid"`
-	SeriesID    *string         `json:"series_id" gorm:"type:uuid;index"`
-	Status      string          `json:"status" gorm:"size:12;not null;default:booked"`
+	// Loaded only for the patient timeline
+	Therapist  *UserSummary `json:"therapist,omitempty" gorm:"foreignKey:TherapistID;->;-:migration"`
+	Credits    int          `json:"credits" gorm:"not null;default:1"` // patient's care level when booked
+	ReferralID *string      `json:"referral_id" gorm:"type:uuid"`
+	SeriesID   *string      `json:"series_id" gorm:"type:uuid;index"`
+	Status     string       `json:"status" gorm:"size:12;not null;default:booked"`
 	// Missed sessions only: was the miss justified (ill, warned), and why
 	MissJustified *bool     `json:"miss_justified"`
 	MissReason    string    `json:"miss_reason" gorm:"size:200"`

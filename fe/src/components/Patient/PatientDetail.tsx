@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
+import PatientTimeline from "@/components/Patient/PatientTimeline";
 import { usePatient } from "@/components/Patient/api";
 import { formatId, genderKey } from "@/components/Patient/patientFormUtils";
 import ReferralCard from "@/components/Referral/ReferralCard";
@@ -112,16 +113,40 @@ export default function PatientDetail({ id }: { id: string }) {
         <div className="grid gap-6 lg:grid-cols-2">
           <Card title={t("contact")}>
             <Item label={t("phone")} value={patient.phone_number} />
+            <Item label={t("email")} value={patient.email} />
             <Item
-              label={t("emergency_phone")}
-              value={patient.emergency_phone_number}
+              label={t("address")}
+              value={[
+                patient.address,
+                [patient.postal_code, patient.city].filter(Boolean).join(" "),
+              ]
+                .filter(Boolean)
+                .join("\n")}
+              wide
             />
-            <Item label={t("address")} value={patient.address} wide />
+            <Item
+              label={t("emergency_contact")}
+              value={[
+                patient.emergency_contact_name,
+                patient.emergency_contact_relation &&
+                  `(${t(`relation__${patient.emergency_contact_relation}`)})`,
+                patient.emergency_phone_number,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              wide
+            />
             <Item label={t("nationality")} value={patient.nationality} />
             <Item label={t("nif")} value={formatId(patient.nif)} />
             <Item
               label={t("sns_number")}
               value={formatId(patient.sns_number)}
+            />
+            <Item
+              label={t("health_insurance")}
+              value={[patient.insurer, patient.insurance_number]
+                .filter(Boolean)
+                .join(" · ")}
             />
           </Card>
           <Card title={t("clinical_background")}>
@@ -164,6 +189,8 @@ export default function PatientDetail({ id }: { id: string }) {
             )}
           </section>
         )}
+
+        <PatientTimeline patientId={id} />
       </div>
     </Page>
   );

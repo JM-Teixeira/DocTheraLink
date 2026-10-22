@@ -11,6 +11,27 @@ export interface PatientStats {
   average_age: number;
 }
 
+/** One thing that happened to a patient (be/internal/modules/timeline). */
+export interface TimelineEntry {
+  at: string;
+  kind: "registered" | "referral" | "note" | "file" | "session";
+  /** referral step, note kind or session status */
+  status?: string;
+  referral_id?: string;
+  item_id?: string;
+  text?: string;
+  who?: string;
+  pain?: number;
+  date?: string;
+  hour?: number;
+  justified?: boolean;
+}
+
+export interface PatientTimeline {
+  upcoming: TimelineEntry[];
+  history: TimelineEntry[];
+}
+
 /**
  * Patient API Routes
  * Defines API endpoints for patient-related operations
@@ -61,6 +82,16 @@ const PatientRoutes = {
    * Get patient details
    * GET /api/v1/patient/{id}/
    */
+  /**
+   * Referrals, messages, files and sessions of a patient
+   * GET /api/v1/patient/{id}/timeline/
+   */
+  patientTimeline: {
+    path: "/api/v1/patient/{id}/timeline/",
+    method: "GET" as const,
+    TRes: Type<PatientTimeline>(),
+  },
+
   getPatient: {
     path: "/api/v1/patient/{id}/",
     method: "GET" as const,

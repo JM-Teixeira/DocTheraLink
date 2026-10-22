@@ -104,11 +104,12 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 ### M4 — Patients (P1) ← next
 - [x] New Klyniva patient pages: list/search, detail, create/edit (replace CARE's 3k-line pages).
 - [x] Duplicate detection with confirmation: same NIF/SNS in the clinic is blocked (also by a partial unique index); similar name + same birth date or phone asks "different person?".
-- [ ] Rest of the old "centralized patient creation" spec (from `.kiro`): draft auto-save, retry on network errors, accessibility checks, browser E2E of the flow, ≥80 % coverage. Backend model grows to match: emergency contact (name/relationship), address parts, insurance, structured allergies/medications/conditions.
+- [x] Patient form: draft auto-save (per user, 24 h, cleared on sign-out; restore or discard), e-mail, street / postal code / city, emergency contact name + relationship, insurer + member number; browser E2E of the flow.
+- [ ] Rest of the old "centralized patient creation" spec: retry on network errors, ≥80 % coverage, structured allergies/medications/conditions (lists instead of free text).
 - [x] Portuguese identifiers: NIF (mod-11 check digit) and SNS number (9 digits), stored normalised.
 - [x] Patient filters (care level, age band, gender, clinic) with metrics of the match; search by name, NIF or SNS number.
 - [ ] Patient metrics next: export CSV; trends over time; filter by physio / diagnosis.
-- [ ] Patient timeline: referrals, sessions, notes and documents in one view.
+- [x] Patient timeline: next sessions on top, then referral steps, messages (with pain), files and sessions by month; filters by kind; each role sees only its own sources (no referrals for the front desk).
 - [ ] Consent records (GDPR) per patient.
 
 ### M3 — Scheduling (P1) — started early on request (time board)

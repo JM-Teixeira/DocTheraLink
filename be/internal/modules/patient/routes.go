@@ -8,9 +8,11 @@ import (
 )
 
 // RegisterRoutes wires the module's endpoints onto an existing /patient group.
-// The group must already run auth.AuthMiddleware.
-func RegisterRoutes(patients *gin.RouterGroup, db *gorm.DB) {
-	h := NewHandler(NewService(NewGormRepository(db), clinic.NewGormResolver(db), nil))
+// The group must already run auth.AuthMiddleware. It returns the service
+// (the patient timeline checks access through it).
+func RegisterRoutes(patients *gin.RouterGroup, db *gorm.DB) *Service {
+	svc := NewService(NewGormRepository(db), clinic.NewGormResolver(db), nil)
+	h := NewHandler(svc)
 
 	patients.GET("/", h.List)
 	patients.POST("/", h.Create)
@@ -20,4 +22,5 @@ func RegisterRoutes(patients *gin.RouterGroup, db *gorm.DB) {
 	patients.GET("/:id/", h.Get)
 	patients.PUT("/:id/", h.Update)
 	patients.PATCH("/:id/", h.Update)
+	return svc
 }

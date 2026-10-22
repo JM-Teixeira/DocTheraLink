@@ -71,7 +71,8 @@ test("register a patient; duplicates are caught; found by NIF", async ({ page, r
     await page.locator("#date_of_birth").fill("15/03/1961");
     await page.locator("#date_of_birth").press("Tab");
     await page.locator("label", { hasText: /^Feminino$/ }).click();
-    if (withNif) await page.locator("#nif").fill(withNif);
+    // always set: the form keeps an unsaved draft between visits
+    await page.locator("#nif").fill(withNif ?? "");
     await page.getByRole("button", { name: "Registar utente" }).click();
   };
 

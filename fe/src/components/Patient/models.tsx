@@ -69,6 +69,13 @@ export interface PatientModel {
   facility?: string;
   phone_number?: string;
   emergency_phone_number?: string;
+  emergency_contact_name?: string | null;
+  emergency_contact_relation?: string | null;
+  email?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  insurer?: string | null;
+  insurance_number?: string | null;
   allergies?: string;
   medical_history?: Array<{ disease: string | number; details: string }>;
   facility_object?: {

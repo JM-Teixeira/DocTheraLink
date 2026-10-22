@@ -30,11 +30,18 @@ export interface PatientFormState {
   date_of_birth: string; // YYYY-MM-DD
   phone_number: string;
   emergency_phone_number: string;
+  emergency_contact_name: string;
+  emergency_contact_relation: string; // one of RELATIONS or ""
+  email: string;
   nationality: string;
   nif: string;
   sns_number: string;
   care_level: string; // "1" … "5"
-  address: string;
+  address: string; // street line
+  postal_code: string; // 0000-000
+  city: string;
+  insurer: string;
+  insurance_number: string;
   blood_group: string;
   allergies: string;
   medical_history_details: string;
@@ -47,11 +54,18 @@ export const EMPTY_PATIENT_FORM: PatientFormState = {
   date_of_birth: "",
   phone_number: "",
   emergency_phone_number: "",
+  emergency_contact_name: "",
+  emergency_contact_relation: "",
+  email: "",
   nationality: "",
   nif: "",
   sns_number: "",
   care_level: "1",
   address: "",
+  postal_code: "",
+  city: "",
+  insurer: "",
+  insurance_number: "",
   blood_group: "",
   allergies: "",
   medical_history_details: "",
@@ -66,11 +80,18 @@ export function patientToForm(p: PatientModel): PatientFormState {
     date_of_birth: p.date_of_birth ? p.date_of_birth.slice(0, 10) : "",
     phone_number: p.phone_number ?? "",
     emergency_phone_number: p.emergency_phone_number ?? "",
+    emergency_contact_name: p.emergency_contact_name ?? "",
+    emergency_contact_relation: p.emergency_contact_relation ?? "",
+    email: p.email ?? "",
     nationality: p.nationality ?? "",
     nif: p.nif ?? "",
     sns_number: p.sns_number ?? "",
     care_level: String(p.care_level ?? 1),
     address: p.address ?? "",
+    postal_code: p.postal_code ?? "",
+    city: p.city ?? "",
+    insurer: p.insurer ?? "",
+    insurance_number: p.insurance_number ?? "",
     blood_group: p.blood_group ?? "",
     allergies: p.allergies ?? "",
     medical_history_details: p.medical_history_details ?? "",
@@ -90,11 +111,18 @@ export function formToPayload(f: PatientFormState): Record<string, unknown> {
     date_of_birth: opt(f.date_of_birth),
     phone_number: opt(f.phone_number),
     emergency_phone_number: opt(f.emergency_phone_number),
+    emergency_contact_name: opt(f.emergency_contact_name),
+    emergency_contact_relation: opt(f.emergency_contact_relation),
+    email: opt(f.email),
     nationality: opt(f.nationality),
     nif: opt(normalizeId(f.nif)),
     sns_number: opt(normalizeId(f.sns_number)),
     care_level: Number(f.care_level) || 1,
     address: opt(f.address),
+    postal_code: opt(f.postal_code),
+    city: opt(f.city),
+    insurer: opt(f.insurer),
+    insurance_number: opt(f.insurance_number),
     blood_group: opt(f.blood_group),
     allergies: opt(f.allergies),
     medical_history_details: opt(f.medical_history_details),
@@ -125,8 +153,28 @@ export const formatId = (id?: string | null) =>
 /** SNS number (nº de utente): 9 digits; its check rule is not public. */
 export const validSns = (raw: string) => /^\d{9}$/.test(normalizeId(raw));
 
-/** Same pattern as the backend's phone validation. */
+/** Same patterns as the backend (patient/service.go). */
 const PHONE_RE = /^\+?[0-9 ()\-.]{6,20}$/;
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const POSTAL_RE = /^\d{4}-?\d{3}$/;
+
+/** Who the emergency contact is; labels are relation__<id>. */
+export const RELATIONS = [
+  "spouse",
+  "parent",
+  "child",
+  "sibling",
+  "relative",
+  "friend",
+  "caregiver",
+  "other",
+] as const;
+
+/** "4000123" or "4000 123" → "4000-123"; anything else is left as typed. */
+export function formatPostalCode(raw: string) {
+  const s = raw.replace(/\s/g, "");
+  return /^\d{7}$/.test(s) ? `${s.slice(0, 4)}-${s.slice(4)}` : raw;
+}
 
 /** Field → translation key of the error message. Empty object = valid. */
 export type PatientFormErrors = Partial<Record<keyof PatientFormState, string>>;
@@ -149,7 +197,94 @@ export function validatePatientForm(
     if (f[k].trim() && !PHONE_RE.test(f[k].trim()))
       errors[k] = "error__invalid_phone";
   }
+  if (f.email.trim() && !EMAIL_RE.test(f.email.trim()))
+    errors.email = "error__invalid_email";
+  if (f.postal_code.trim() && !POSTAL_RE.test(f.postal_code.replace(/\s/g, "")))
+    errors.postal_code = "error__invalid_postal_code";
   return errors;
+}
+
+/**
+ * Drafts of the patient form, so a half-filled registration survives a
+ * closed tab or a lost connection. They hold patient data, so they belong to
+ * one user, expire after a day and are removed on sign-out.
+ */
+export const DRAFT_PREFIX = "klyniva:patient-draft:";
+export const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+export interface PatientDraft {
+  saved_at: string; // ISO time
+  form: PatientFormState;
+}
+
+/** One draft per user and per patient ("new" for a registration). */
+export const draftKey = (userId: string | number, patientId?: string) =>
+  `${DRAFT_PREFIX}${userId}:${patientId ?? "new"}`;
+
+/** True when two forms hold the same values. */
+export const sameForm = (a: PatientFormState, b: PatientFormState) =>
+  (Object.keys(EMPTY_PATIENT_FORM) as (keyof PatientFormState)[]).every(
+    (k) => a[k] === b[k],
+  );
+
+/** Reads a draft; old, broken or foreign data gives null. */
+export function readDraft(
+  storage: Pick<Storage, "getItem"> | undefined,
+  key: string,
+  now = new Date(),
+): PatientDraft | null {
+  try {
+    const raw = storage?.getItem(key);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Partial<PatientDraft>;
+    const at = new Date(d.saved_at ?? "");
+    if (!d.form || Number.isNaN(at.getTime())) return null;
+    if (now.getTime() - at.getTime() > DRAFT_MAX_AGE_MS) return null;
+    // Only known fields, as strings (new fields keep their empty value)
+    const form = { ...EMPTY_PATIENT_FORM };
+    for (const k of Object.keys(form) as (keyof PatientFormState)[]) {
+      const v = (d.form as unknown as Record<string, unknown>)[k];
+      if (typeof v === "string") form[k] = v;
+    }
+    return { saved_at: at.toISOString(), form };
+  } catch {
+    return null;
+  }
+}
+
+/** Saves the form; an untouched form removes the draft instead. */
+export function writeDraft(
+  storage: Pick<Storage, "setItem" | "removeItem"> | undefined,
+  key: string,
+  form: PatientFormState,
+  base: PatientFormState,
+  now = new Date(),
+) {
+  try {
+    if (sameForm(form, base)) storage?.removeItem(key);
+    else
+      storage?.setItem(
+        key,
+        JSON.stringify({ saved_at: now.toISOString(), form }),
+      );
+  } catch {
+    // storage full or blocked: the form still works, just without a draft
+  }
+}
+
+/** Removes every patient draft (on sign-out). */
+export function clearAllDrafts(storage: Storage | undefined) {
+  try {
+    if (!storage) return;
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (k?.startsWith(DRAFT_PREFIX)) keys.push(k);
+    }
+    keys.forEach((k) => storage.removeItem(k));
+  } catch {
+    // nothing to clear
+  }
 }
 
 /**

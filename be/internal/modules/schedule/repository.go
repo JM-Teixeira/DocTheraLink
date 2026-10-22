@@ -71,6 +71,8 @@ type Repository interface {
 
 	// SeriesAppointments are a plan's still-booked sessions from a date on.
 	SeriesAppointments(ctx context.Context, clinicID, seriesID string, from time.Time) ([]Appointment, error)
+	// PatientAppointments are a patient's sessions in the clinic, newest first, with the physio.
+	PatientAppointments(ctx context.Context, clinicID, patientID string, limit int) ([]Appointment, error)
 
 	Waiting(ctx context.Context, clinicID, status string) ([]WaitingEntry, error)
 	GetWaiting(ctx context.Context, clinicID, id string) (*WaitingEntry, error)
@@ -121,6 +123,13 @@ func (g *GormRepository) SeriesAppointments(ctx context.Context, clinicID, serie
 	err := g.db.WithContext(ctx).Preload("Patient").
 		Where("clinic_id = ? AND series_id = ? AND status = ? AND date >= ?", clinicID, seriesID, StatusBooked, day(from)).
 		Order("date, hour").Find(&out).Error
+	return out, err
+}
+
+func (g *GormRepository) PatientAppointments(ctx context.Context, clinicID, patientID string, limit int) ([]Appointment, error) {
+	var out []Appointment
+	err := g.db.WithContext(ctx).Preload("Therapist").Where("clinic_id = ? AND patient_id = ?", clinicID, patientID).
+		Order("date DESC, hour DESC").Limit(limit).Find(&out).Error
 	return out, err
 }
 

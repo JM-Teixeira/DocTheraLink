@@ -18,6 +18,7 @@ import (
 	"klyniva/internal/modules/referral"
 	"klyniva/internal/modules/schedule"
 	"klyniva/internal/modules/staff"
+	"klyniva/internal/modules/timeline"
 	"klyniva/internal/storage"
 	"klyniva/internal/version"
 
@@ -103,7 +104,7 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	db := database.GetDB()
 
 	// Patients (module)
-	patient.RegisterRoutes(protected.Group("/patient"), db)
+	patients := patient.RegisterRoutes(protected.Group("/patient"), db)
 
 	// In-app + e-mail notifications (module); referrals publish events to it
 	notifications := notification.NewService(notification.NewGormRepository(db),
@@ -121,8 +122,8 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	if err != nil {
 		log.Fatalf("attachments: %v", err)
 	}
-	attachment.RegisterRoutes(protected, attachment.NewService(
-		attachment.NewGormRepository(db), uploads, referrals, cfg.Upload.MaxSize))
+	files := attachment.NewService(attachment.NewGormRepository(db), uploads, referrals, cfg.Upload.MaxSize)
+	attachment.RegisterRoutes(protected, files)
 
 	// Staff time log (clock in/out)
 	timelog := protected.Group("/timelog")
@@ -138,6 +139,11 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	// Time board: divisions, physio shifts, patients per physio per hour
 	board := schedule.RegisterRoutes(protected, db, stock) // attended sessions use consumables
 	referrals.WithCovers(board)                            // cover physios see the referrals they cover
+
+	// Patient timeline: referrals, messages, files and sessions in one list
+	timeline.RegisterRoutes(protected, timeline.Services{
+		Patients: patients, Referrals: referrals, Files: files, Board: board,
+	})
 
 	// Skills, clinic and employment status of staff
 	staff.RegisterRoutes(protected, staff.NewService(staff.NewGormRepository(db)))

@@ -38,29 +38,46 @@ const (
 	dateLayout   = "2006-01-02"
 )
 
-var phoneRe = regexp.MustCompile(`^\+?[0-9 ()\-.]{6,20}$`)
+var (
+	phoneRe      = regexp.MustCompile(`^\+?[0-9 ()\-.]{6,20}$`)
+	emailRe      = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+	postalCodeRe = regexp.MustCompile(`^(\d{4})-?(\d{3})$`)
+)
+
+// Relations accepted for the emergency contact (labels live in the frontend).
+var relations = map[string]bool{
+	"spouse": true, "parent": true, "child": true, "sibling": true,
+	"relative": true, "friend": true, "caregiver": true, "other": true,
+}
 
 // CreateRequest is the body of POST /patient/. Field names follow the
 // existing frontend PatientModel (snake_case, CARE-compatible).
 type CreateRequest struct {
-	Name                  string  `json:"name" binding:"required,max=255"`
-	Gender                *int    `json:"gender" binding:"omitempty,min=1,max=3"`
-	DateOfBirth           *string `json:"date_of_birth"`
-	YearOfBirth           *int    `json:"year_of_birth" binding:"omitempty,min=1900"`
-	PhoneNumber           *string `json:"phone_number"`
-	EmergencyPhoneNumber  *string `json:"emergency_phone_number"`
-	BloodGroup            *string `json:"blood_group" binding:"omitempty,oneof=A+ A- B+ B- AB+ AB- O+ O-"`
-	Address               *string `json:"address"`
-	PermanentAddress      *string `json:"permanent_address"`
-	Pincode               *int    `json:"pincode"`
-	Nationality           *string `json:"nationality"`
-	NIF                   *string `json:"nif"`
-	SNSNumber             *string `json:"sns_number"`
-	Allergies             *string `json:"allergies"`
-	MedicalHistoryDetails *string `json:"medical_history_details"`
-	OngoingMedication     *string `json:"ongoing_medication"`
-	PresentHealth         *string `json:"present_health"`
-	FacilityID            *string `json:"facility" binding:"omitempty,uuid"`
+	Name                     string  `json:"name" binding:"required,max=255"`
+	Gender                   *int    `json:"gender" binding:"omitempty,min=1,max=3"`
+	DateOfBirth              *string `json:"date_of_birth"`
+	YearOfBirth              *int    `json:"year_of_birth" binding:"omitempty,min=1900"`
+	PhoneNumber              *string `json:"phone_number"`
+	EmergencyPhoneNumber     *string `json:"emergency_phone_number"`
+	EmergencyContactName     *string `json:"emergency_contact_name" binding:"omitempty,max=120"`
+	EmergencyContactRelation *string `json:"emergency_contact_relation"`
+	Email                    *string `json:"email" binding:"omitempty,max=254"`
+	PostalCode               *string `json:"postal_code"`
+	City                     *string `json:"city" binding:"omitempty,max=100"`
+	Insurer                  *string `json:"insurer" binding:"omitempty,max=100"`
+	InsuranceNumber          *string `json:"insurance_number" binding:"omitempty,max=40"`
+	BloodGroup               *string `json:"blood_group" binding:"omitempty,oneof=A+ A- B+ B- AB+ AB- O+ O-"`
+	Address                  *string `json:"address"`
+	PermanentAddress         *string `json:"permanent_address"`
+	Pincode                  *int    `json:"pincode"`
+	Nationality              *string `json:"nationality"`
+	NIF                      *string `json:"nif"`
+	SNSNumber                *string `json:"sns_number"`
+	Allergies                *string `json:"allergies"`
+	MedicalHistoryDetails    *string `json:"medical_history_details"`
+	OngoingMedication        *string `json:"ongoing_medication"`
+	PresentHealth            *string `json:"present_health"`
+	FacilityID               *string `json:"facility" binding:"omitempty,uuid"`
 	// AllowDuplicate confirms the user checked the name-based possible
 	// duplicates and this is a different person. Same NIF/SNS is never allowed.
 	AllowDuplicate bool `json:"allow_duplicate"`
@@ -145,6 +162,10 @@ func (s *Service) Create(ctx context.Context, a Actor, req CreateRequest) (*mode
 	if err := validatePhone("emergency_phone_number", req.EmergencyPhoneNumber); err != nil {
 		return nil, err
 	}
+	postal, err := validateExtras(req.Email, req.PostalCode, req.EmergencyContactRelation)
+	if err != nil {
+		return nil, err
+	}
 	dob, err := s.parseBirthDate(req.DateOfBirth)
 	if err != nil {
 		return nil, err
@@ -182,28 +203,35 @@ func (s *Service) Create(ctx context.Context, a Actor, req CreateRequest) (*mode
 	}
 
 	p := &models.Patient{
-		Name:                  name,
-		Gender:                req.Gender,
-		DateOfBirth:           dob,
-		YearOfBirth:           req.YearOfBirth,
-		PhoneNumber:           req.PhoneNumber,
-		EmergencyPhoneNumber:  req.EmergencyPhoneNumber,
-		BloodGroup:            (*models.BloodGroup)(req.BloodGroup),
-		Address:               req.Address,
-		PermanentAddress:      req.PermanentAddress,
-		Pincode:               req.Pincode,
-		Nationality:           req.Nationality,
-		NIF:                   nif,
-		CareLevel:             careLevelOr(req.CareLevel),
-		SNSNumber:             sns,
-		Allergies:             req.Allergies,
-		MedicalHistoryDetails: req.MedicalHistoryDetails,
-		OngoingMedication:     req.OngoingMedication,
-		PresentHealth:         req.PresentHealth,
-		FacilityID:            facility,
-		IsActive:              true,
-		CreatedByID:           &a.ID,
-		LastEditedID:          &a.ID,
+		Name:                     name,
+		Gender:                   req.Gender,
+		DateOfBirth:              dob,
+		YearOfBirth:              req.YearOfBirth,
+		PhoneNumber:              req.PhoneNumber,
+		EmergencyPhoneNumber:     req.EmergencyPhoneNumber,
+		EmergencyContactName:     blankNil(req.EmergencyContactName),
+		EmergencyContactRelation: blankNil(req.EmergencyContactRelation),
+		Email:                    blankNil(req.Email),
+		PostalCode:               postal,
+		City:                     blankNil(req.City),
+		Insurer:                  blankNil(req.Insurer),
+		InsuranceNumber:          blankNil(req.InsuranceNumber),
+		BloodGroup:               (*models.BloodGroup)(req.BloodGroup),
+		Address:                  req.Address,
+		PermanentAddress:         req.PermanentAddress,
+		Pincode:                  req.Pincode,
+		Nationality:              req.Nationality,
+		NIF:                      nif,
+		CareLevel:                careLevelOr(req.CareLevel),
+		SNSNumber:                sns,
+		Allergies:                req.Allergies,
+		MedicalHistoryDetails:    req.MedicalHistoryDetails,
+		OngoingMedication:        req.OngoingMedication,
+		PresentHealth:            req.PresentHealth,
+		FacilityID:               facility,
+		IsActive:                 true,
+		CreatedByID:              &a.ID,
+		LastEditedID:             &a.ID,
 	}
 	if dob != nil && p.YearOfBirth == nil {
 		y := dob.Year()
@@ -229,6 +257,9 @@ const (
 	kindUUID
 	kindPhone
 	kindIdentifier
+	kindEmail
+	kindPostalCode
+	kindRelation
 )
 
 // editable maps JSON keys accepted by PUT/PATCH to their column and type.
@@ -237,27 +268,34 @@ var editable = map[string]struct {
 	column string
 	kind   fieldKind
 }{
-	"name":                    {"name", kindString},
-	"gender":                  {"gender", kindInt},
-	"date_of_birth":           {"date_of_birth", kindDate},
-	"year_of_birth":           {"year_of_birth", kindInt},
-	"phone_number":            {"phone_number", kindPhone},
-	"emergency_phone_number":  {"emergency_phone_number", kindPhone},
-	"blood_group":             {"blood_group", kindString},
-	"address":                 {"address", kindString},
-	"permanent_address":       {"permanent_address", kindString},
-	"pincode":                 {"pincode", kindInt},
-	"nationality":             {"nationality", kindString},
-	"nif":                     {"nif", kindIdentifier},
-	"sns_number":              {"sns_number", kindIdentifier},
-	"care_level":              {"care_level", kindInt},
-	"allergies":               {"allergies", kindString},
-	"medical_history_details": {"medical_history_details", kindString},
-	"ongoing_medication":      {"ongoing_medication", kindString},
-	"present_health":          {"present_health", kindString},
-	"facility":                {"facility_id", kindUUID},
-	"assigned_to":             {"assigned_to_id", kindInt},
-	"is_active":               {"is_active", kindBool},
+	"name":                       {"name", kindString},
+	"gender":                     {"gender", kindInt},
+	"date_of_birth":              {"date_of_birth", kindDate},
+	"year_of_birth":              {"year_of_birth", kindInt},
+	"phone_number":               {"phone_number", kindPhone},
+	"emergency_phone_number":     {"emergency_phone_number", kindPhone},
+	"emergency_contact_name":     {"emergency_contact_name", kindString},
+	"emergency_contact_relation": {"emergency_contact_relation", kindRelation},
+	"email":                      {"email", kindEmail},
+	"postal_code":                {"postal_code", kindPostalCode},
+	"city":                       {"city", kindString},
+	"insurer":                    {"insurer", kindString},
+	"insurance_number":           {"insurance_number", kindString},
+	"blood_group":                {"blood_group", kindString},
+	"address":                    {"address", kindString},
+	"permanent_address":          {"permanent_address", kindString},
+	"pincode":                    {"pincode", kindInt},
+	"nationality":                {"nationality", kindString},
+	"nif":                        {"nif", kindIdentifier},
+	"sns_number":                 {"sns_number", kindIdentifier},
+	"care_level":                 {"care_level", kindInt},
+	"allergies":                  {"allergies", kindString},
+	"medical_history_details":    {"medical_history_details", kindString},
+	"ongoing_medication":         {"ongoing_medication", kindString},
+	"present_health":             {"present_health", kindString},
+	"facility":                   {"facility_id", kindUUID},
+	"assigned_to":                {"assigned_to_id", kindInt},
+	"is_active":                  {"is_active", kindBool},
 }
 
 // Update applies a partial update from decoded JSON. Unknown keys are ignored
@@ -366,6 +404,31 @@ func (s *Service) coerce(key string, kind fieldKind, raw any) (any, error) {
 			return nil, err // empty string clears the field
 		}
 		return *v, nil
+	case kindEmail, kindPostalCode, kindRelation:
+		str, ok := raw.(string)
+		if !ok {
+			return nil, bad
+		}
+		if str = strings.TrimSpace(str); str == "" {
+			return nil, nil
+		}
+		var postal *string
+		var err error
+		switch kind {
+		case kindEmail:
+			_, err = validateExtras(&str, nil, nil)
+		case kindPostalCode:
+			postal, err = validateExtras(nil, &str, nil)
+		default:
+			_, err = validateExtras(nil, nil, &str)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if postal != nil {
+			return *postal, nil
+		}
+		return str, nil
 	case kindPhone:
 		str, ok := raw.(string)
 		if !ok {
@@ -408,6 +471,36 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// validateExtras checks the e-mail, postal code and emergency contact
+// relation (each optional) and returns the postal code as 0000-000.
+func validateExtras(email, postal, relation *string) (*string, error) {
+	if e := strings.TrimSpace(deref(email)); e != "" && !emailRe.MatchString(e) {
+		return nil, &ValidationError{"email", "is not a valid e-mail address"}
+	}
+	if r := strings.TrimSpace(deref(relation)); r != "" && !relations[r] {
+		return nil, &ValidationError{"emergency_contact_relation", "is not a known relation"}
+	}
+	p := strings.ReplaceAll(strings.TrimSpace(deref(postal)), " ", "")
+	if p == "" {
+		return nil, nil
+	}
+	m := postalCodeRe.FindStringSubmatch(p)
+	if m == nil {
+		return nil, &ValidationError{"postal_code", "must look like 1234-567"}
+	}
+	out := m[1] + "-" + m[2]
+	return &out, nil
+}
+
+// blankNil trims a value and drops it when empty.
+func blankNil(v *string) *string {
+	if v == nil || strings.TrimSpace(*v) == "" {
+		return nil
+	}
+	t := strings.TrimSpace(*v)
+	return &t
 }
 
 func validatePhone(field string, v *string) error {

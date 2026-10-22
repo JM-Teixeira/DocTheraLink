@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DRAFT_MAX_AGE_MS,
   EMPTY_PATIENT_FORM,
+  clearAllDrafts,
+  draftKey,
   duplicatesFromError,
   formToPayload,
   formatId,
+  formatPostalCode,
   genderKey,
   patientToForm,
+  readDraft,
   serverErrorsToForm,
   validNif,
   validSns,
   validatePatientForm,
+  writeDraft,
 } from "@/components/Patient/patientFormUtils";
 
 const today = new Date("2026-10-21T12:00:00Z");
@@ -159,5 +165,98 @@ describe("duplicatesFromError", () => {
     expect(duplicatesFromError(400, cause)).toBeNull();
     expect(duplicatesFromError(409, { error: "conflict" })).toBeNull();
     expect(duplicatesFromError(409, undefined)).toBeNull();
+  });
+});
+
+describe("registration extras", () => {
+  it("checks e-mail and postal code, and formats the postal code", () => {
+    const f = { ...EMPTY_PATIENT_FORM, name: "Ana" };
+    expect(
+      validatePatientForm({ ...f, email: "ana@", postal_code: "40001" }, today),
+    ).toEqual({
+      email: "error__invalid_email",
+      postal_code: "error__invalid_postal_code",
+    });
+    expect(
+      validatePatientForm(
+        { ...f, email: "ana@ex.pt", postal_code: "4000 123" },
+        today,
+      ),
+    ).toEqual({});
+    expect(formatPostalCode("4000 123")).toBe("4000-123");
+    expect(formatPostalCode("40")).toBe("40");
+  });
+
+  it("sends the new fields, empty ones as null", () => {
+    const body = formToPayload({
+      ...EMPTY_PATIENT_FORM,
+      name: "Ana",
+      city: " Porto ",
+      emergency_contact_relation: "spouse",
+    });
+    expect(body.city).toBe("Porto");
+    expect(body.emergency_contact_relation).toBe("spouse");
+    expect(body.insurer).toBeNull();
+  });
+});
+
+describe("form drafts", () => {
+  const memory = () => {
+    const m = new Map<string, string>();
+    return {
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => void m.set(k, v),
+      removeItem: (k: string) => void m.delete(k),
+      key: (i: number) => [...m.keys()][i] ?? null,
+      get length() {
+        return m.size;
+      },
+      clear: () => m.clear(),
+    } as Storage;
+  };
+  const key = draftKey(7);
+  const filled = { ...EMPTY_PATIENT_FORM, name: "Ana", city: "Porto" };
+
+  it("saves, restores and expires a draft", () => {
+    const s = memory();
+    writeDraft(s, key, filled, EMPTY_PATIENT_FORM, today);
+    expect(readDraft(s, key, today)?.form.city).toBe("Porto");
+    const later = new Date(today.getTime() + DRAFT_MAX_AGE_MS + 1);
+    expect(readDraft(s, key, later)).toBeNull();
+  });
+
+  it("removes the draft when the form is back to its start", () => {
+    const s = memory();
+    writeDraft(s, key, filled, EMPTY_PATIENT_FORM, today);
+    writeDraft(s, key, EMPTY_PATIENT_FORM, EMPTY_PATIENT_FORM, today);
+    expect(s.length).toBe(0);
+  });
+
+  it("ignores broken data and keeps only known string fields", () => {
+    const s = memory();
+    s.setItem(key, "{not json");
+    expect(readDraft(s, key, today)).toBeNull();
+    s.setItem(
+      key,
+      JSON.stringify({
+        saved_at: today.toISOString(),
+        form: { name: "Ana", evil: "x", care_level: 3 },
+      }),
+    );
+    const d = readDraft(s, key, today);
+    expect(d?.form.name).toBe("Ana");
+    expect(d?.form.care_level).toBe("1");
+    expect("evil" in (d?.form ?? {})).toBe(false);
+  });
+
+  it("keeps drafts per user and patient, and clears them all on sign-out", () => {
+    expect(draftKey(7, "p1")).not.toBe(draftKey(8, "p1"));
+    const s = memory();
+    s.setItem("other", "keep");
+    writeDraft(s, draftKey(7), filled, EMPTY_PATIENT_FORM, today);
+    writeDraft(s, draftKey(7, "p1"), filled, EMPTY_PATIENT_FORM, today);
+    clearAllDrafts(s);
+    expect(s.length).toBe(1);
+    expect(s.getItem("other")).toBe("keep");
   });
 });

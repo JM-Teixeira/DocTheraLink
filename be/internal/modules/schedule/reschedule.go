@@ -131,6 +131,19 @@ func (s *Service) ReschedulePlan(ctx context.Context, a Actor, seriesID string, 
 	return &PlanRescheduleResult{SeriesResult: *res, Replaced: len(rest)}, nil
 }
 
+// PatientSessions are a patient's sessions in the user's clinic (newest
+// first, at most 500), for the patient timeline.
+func (s *Service) PatientSessions(ctx context.Context, a Actor, patientID string) ([]Appointment, error) {
+	cid, err := s.clinicOf(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	if uuid.Validate(patientID) != nil {
+		return nil, ErrNotFound
+	}
+	return s.repo.PatientAppointments(ctx, cid, patientID, 500)
+}
+
 // SeriesSessions lists a plan's still-booked sessions from today (for the
 // "reschedule plan" dialog).
 func (s *Service) SeriesSessions(ctx context.Context, a Actor, seriesID string) ([]Appointment, error) {

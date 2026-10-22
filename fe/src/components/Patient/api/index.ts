@@ -90,6 +90,16 @@ export function usePatientStats(filters: QueryParams = {}) {
   });
 }
 
+export function usePatientTimeline(patientId: string) {
+  return useQuery({
+    queryKey: [...patientKeys.detail(patientId), "timeline"],
+    queryFn: query(PatientRoutes.patientTimeline, {
+      pathParams: { id: patientId },
+    }),
+    enabled: !!patientId,
+  });
+}
+
 export function usePatient(patientId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: patientKeys.detail(patientId),

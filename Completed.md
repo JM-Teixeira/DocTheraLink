@@ -5,6 +5,26 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.8.0 (branch `feat/m4-patients`)
+
+### Patient registration extras and patient history (TODO)
+- **Draft auto-save** on the patient form (new and edit): kept on this
+  computer for 24 h, per user, removed on save, cancel, "Descartar
+  rascunho" and sign-out (it holds patient data); a banner says when a
+  draft was restored.
+- **New fields**: e-mail, street / postal code (typed `4000123` becomes
+  `4000-123`) / city, emergency contact name and relationship (fixed list),
+  insurer or subsystem (suggestions: ADSE, Médis, ...) and member number.
+  Validated in the browser and on the server.
+- **Patient history** on the patient page (`timeline` module): the next
+  sessions, then by month the registration, referral steps, thread
+  messages with pain, files and sessions (held, missed with justification,
+  not recorded). Filters by kind; entries open their referral. Each source
+  keeps its access rules, so the front desk sees sessions but no clinical
+  content.
+- Tests: unit (extras, timeline merge/order/endings, drafts), API e2e
+  `TestPatientExtrasAndTimeline`, browser `patients.spec.ts`.
+
 ## 2026-10-22 · Klyniva 0.7.0 (branch `feat/m4-patients`)
 
 ### Time board: move sessions, reschedule plans, waiting list (TODO)

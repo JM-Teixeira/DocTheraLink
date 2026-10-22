@@ -250,3 +250,49 @@ func TestEscapeLike(t *testing.T) {
 		t.Errorf("escapeLike: %q", got)
 	}
 }
+
+func TestRegistrationExtras(t *testing.T) {
+	ctx := context.Background()
+	s, repo := newSvc()
+
+	p, err := s.Create(ctx, receptionist, CreateRequest{
+		Name: "Ana", Email: strp(" ana@example.pt "), PostalCode: strp("4000123"), City: strp(" Porto "),
+		EmergencyContactName: strp("Rui"), EmergencyContactRelation: strp("spouse"),
+		Insurer: strp("ADSE"), InsuranceNumber: strp(""),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *p.PostalCode != "4000-123" || *p.City != "Porto" || *p.Email != "ana@example.pt" ||
+		*p.EmergencyContactRelation != "spouse" || p.InsuranceNumber != nil {
+		t.Errorf("extras not stored as expected: %+v", p)
+	}
+
+	for field, req := range map[string]CreateRequest{
+		"email":                      {Name: "Ana", Email: strp("ana@")},
+		"postal_code":                {Name: "Ana", PostalCode: strp("40001")},
+		"emergency_contact_relation": {Name: "Ana", EmergencyContactRelation: strp("boss")},
+	} {
+		var v *ValidationError
+		if _, err := s.Create(ctx, receptionist, req); !errors.As(err, &v) || v.Field != field {
+			t.Errorf("%s: want validation error, got %v", field, err)
+		}
+	}
+
+	// Edits: the postal code is normalised, empty clears, bad values fail
+	if _, err := s.Update(ctx, receptionist, p.ID, map[string]any{
+		"postal_code": "1000 001", "email": "", "emergency_contact_relation": "parent", "city": "Lisboa",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if repo.updates["postal_code"] != "1000-001" || repo.updates["email"] != nil ||
+		repo.updates["emergency_contact_relation"] != "parent" || repo.updates["city"] != "Lisboa" {
+		t.Errorf("updates: %+v", repo.updates)
+	}
+	for _, body := range []map[string]any{{"postal_code": "abc"}, {"email": "x"}, {"emergency_contact_relation": "boss"}} {
+		var v *ValidationError
+		if _, err := s.Update(ctx, receptionist, p.ID, body); !errors.As(err, &v) {
+			t.Errorf("%v: want validation error, got %v", body, err)
+		}
+	}
+}

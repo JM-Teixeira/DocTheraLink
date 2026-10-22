@@ -679,6 +679,22 @@ func (f *fakeRepo) UpdateWaiting(_ context.Context, id string, fields map[string
 	return nil
 }
 
+func (f *fakeRepo) PatientAppointments(_ context.Context, cid, patientID string, limit int) ([]Appointment, error) {
+	var out []Appointment
+	for _, a := range f.appts {
+		if a.ClinicID == cid && a.PatientID == patientID {
+			out = append(out, a)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if !out[i].Date.Equal(out[j].Date) {
+			return out[i].Date.After(out[j].Date)
+		}
+		return out[i].Hour > out[j].Hour
+	})
+	return out[:min(len(out), limit)], nil
+}
+
 func (f *fakeRepo) SeriesAppointments(_ context.Context, cid, seriesID string, from time.Time) ([]Appointment, error) {
 	var out []Appointment
 	for _, a := range f.appts {
