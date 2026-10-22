@@ -20,6 +20,9 @@ type Repository interface {
 	AddUserSkill(ctx context.Context, userID uint, skillID string) (*models.UserSkill, error)
 	RemoveUserSkill(ctx context.Context, userID uint, id string) error
 	Clinic(ctx context.Context, id string) (*models.Facility, error)
+	AddEmploymentEvent(ctx context.Context, e *EmploymentEvent) error
+	// EmploymentEvents of a person, oldest first.
+	EmploymentEvents(ctx context.Context, userID uint) ([]EmploymentEvent, error)
 }
 
 // GormRepository implements Repository on PostgreSQL via GORM.
@@ -92,4 +95,14 @@ func (g *GormRepository) Clinic(ctx context.Context, id string) (*models.Facilit
 	var f models.Facility
 	err := g.db.WithContext(ctx).First(&f, "id = ?", id).Error
 	return &f, notFound(err)
+}
+
+func (g *GormRepository) AddEmploymentEvent(ctx context.Context, e *EmploymentEvent) error {
+	return g.db.WithContext(ctx).Create(e).Error
+}
+
+func (g *GormRepository) EmploymentEvents(ctx context.Context, userID uint) ([]EmploymentEvent, error) {
+	var out []EmploymentEvent
+	err := g.db.WithContext(ctx).Where("user_id = ?", userID).Order("since, created_at").Find(&out).Error
+	return out, err
 }

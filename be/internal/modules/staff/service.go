@@ -52,6 +52,8 @@ type EmploymentRequest struct {
 	Status string `json:"status" binding:"required,oneof=active on_leave left"`
 	Since  string `json:"since"` // YYYY-MM-DD, today by default
 	Note   string `json:"note" binding:"max=300"`
+	// JoinedOn (YYYY-MM-DD) corrects when the person started, optional
+	JoinedOn string `json:"joined_on"`
 }
 
 // PreferencesRequest changes how the app is shown to the person.
@@ -252,7 +254,19 @@ func (s *Service) SetEmployment(ctx context.Context, a Actor, username string, r
 		"employment_status": req.Status, "employment_since": since,
 		"employment_note": strings.TrimSpace(req.Note), "is_active": req.Status != StatusLeft,
 	}
+	if req.JoinedOn != "" {
+		joined, err := time.Parse("2006-01-02", req.JoinedOn)
+		if err != nil {
+			return nil, &ValidationError{"joined_on", "must be a date in YYYY-MM-DD format"}
+		}
+		fields["joined_on"] = joined
+	}
 	if err := s.repo.UpdateUser(ctx, u.ID, fields); err != nil {
+		return nil, err
+	}
+	// The history keeps every change (the user row only has the latest)
+	if err := s.repo.AddEmploymentEvent(ctx, &EmploymentEvent{UserID: u.ID, Status: req.Status, Since: since,
+		Note: strings.TrimSpace(req.Note), RecordedByID: a.ID}); err != nil {
 		return nil, err
 	}
 	auth.ForgetActive(u.ID) // a person who left loses access now, not in 30 s

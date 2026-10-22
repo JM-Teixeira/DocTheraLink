@@ -282,6 +282,16 @@ func climutuaStaffIDs() ([]uint, error) {
 			"employment_note": "Mudou-se para Lisboa."}).Error; err != nil {
 		return nil, err
 	}
+	// Start dates (a few months apart) and the history of who left
+	for i, id := range staff {
+		joined := time.Date(2022, 1, 10, 0, 0, 0, 0, time.UTC).AddDate(0, 2*i, 0)
+		if err := DB.Model(&models.User{}).Where("id = ? AND joined_on IS NULL", id).Update("joined_on", joined).Error; err != nil {
+			return nil, err
+		}
+	}
+	if err := seedLeftEvent(staff[len(staff)-1], left, "Mudou-se para Lisboa."); err != nil {
+		return nil, err
+	}
 	return staff, nil
 }
 
@@ -772,4 +782,13 @@ func seedStockAccess() error {
 		id["cm.ines.moreira"]:  {{Floors: []int{1}}},
 		id["cm.mariana.costa"]: {{Floors: []int{2, 3}, Categories: []string{"Higiene"}}},
 	})
+}
+
+// seedLeftEvent records in the employment history that someone left (once).
+func seedLeftEvent(userID uint, since time.Time, note string) error {
+	var n int64
+	if err := DB.Model(&staff.EmploymentEvent{}).Where("user_id = ?", userID).Count(&n).Error; err != nil || n > 0 {
+		return err
+	}
+	return DB.Create(&staff.EmploymentEvent{UserID: userID, Status: "left", Since: since, Note: note}).Error
 }

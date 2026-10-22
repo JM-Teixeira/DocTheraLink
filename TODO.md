@@ -24,8 +24,8 @@ Features
 - [x] Suggestions: anyone sends ideas from Settings; admins read them in one place.
 - [x] "?" help on each page: what it does and its features, in a pop-up (keeps pages short).
 - [x] Admins can view the app as any role ("ver como") to check what each role sees.
-- [ ] Users: filters (dropdowns) for who can change which stock (category x floor), counting "all floors / all categories" grants.
-- [ ] User page: professional situation at a glance (joined on, leave from/to, left on), from a dated history.
+- [x] Users: filters (dropdowns) for who can change which stock (category x floor), counting "all floors / all categories" grants.
+- [x] User page: professional situation at a glance (joined on, leave from/to, left on), from a dated history.
 - [x] Clinic code (demo "de", Climutua "cm") and a username standard `<code>.<first>.<last>` (+ number on clash), applied to everyone.
 - [ ] Waiting list: confirm several patients; highlight entries when a matching slot is free (any or a chosen physio) and alert the coordinator.
 - [x] Treatment plan per referral (steps of a session: activity, minutes, sets, machine, notes), versioned, shown on the patient page for whoever covers the physio.

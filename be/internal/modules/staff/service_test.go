@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"klyniva/internal/models"
 
@@ -12,10 +13,26 @@ import (
 
 // fakeRepo is an in-memory Repository.
 type fakeRepo struct {
+	events []EmploymentEvent
 	users  map[uint]*models.User
 	skills map[string]models.Skill
 	links  []models.UserSkill
 	clinic map[string]bool
+}
+
+func (f *fakeRepo) AddEmploymentEvent(_ context.Context, e *EmploymentEvent) error {
+	f.events = append(f.events, *e)
+	return nil
+}
+
+func (f *fakeRepo) EmploymentEvents(_ context.Context, userID uint) ([]EmploymentEvent, error) {
+	var out []EmploymentEvent
+	for _, e := range f.events {
+		if e.UserID == userID {
+			out = append(out, e)
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeRepo) UserByUsername(_ context.Context, username string) (*models.User, error) {
@@ -43,6 +60,9 @@ func (f *fakeRepo) UpdateUser(_ context.Context, id uint, fields map[string]any)
 			u.EmploymentStatus = v.(string)
 		case "is_active":
 			u.IsActive = v.(bool)
+		case "joined_on":
+			j := v.(time.Time)
+			u.JoinedOn = &j
 		case "date_format":
 			u.DateFormat = v.(string)
 		case "theme":
@@ -264,4 +284,32 @@ func TestPreferences(t *testing.T) {
 			t.Errorf("%+v: %v", bad, err)
 		}
 	}
+}
+
+func TestEmploymentHistory(t *testing.T) {
+	ctx := context.Background()
+	s, repo := newSvc()
+	if _, err := s.SetEmployment(ctx, marta, "sarah", EmploymentRequest{Status: StatusOnLeave, Since: "2026-10-10", JoinedOn: "2026-10-01"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetEmployment(ctx, marta, "sarah", EmploymentRequest{Status: StatusLeft, Since: "2026-12-31", Note: "Fim de contrato"}); err != nil {
+		t.Fatal(err)
+	}
+	h, err := s.EmploymentHistory(ctx, tiago, "sarah") // a colleague of the same clinic
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.JoinedOn.Format("2006-01-02") != "2026-10-01" || len(h.Events) != 2 ||
+		h.Events[0].Status != StatusOnLeave || h.Events[1].Since.Format("2006-01-02") != "2026-12-31" ||
+		h.Events[1].RecordedByID != marta.ID {
+		t.Errorf("history: %+v", h)
+	}
+	if _, err := s.EmploymentHistory(ctx, farCoord, "sarah"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("another clinic sees it: %v", err)
+	}
+	var verr *ValidationError
+	if _, err := s.SetEmployment(ctx, marta, "sarah", EmploymentRequest{Status: StatusActive, JoinedOn: "ontem"}); !errors.As(err, &verr) {
+		t.Errorf("bad joined_on: %v", err)
+	}
+	_ = repo
 }

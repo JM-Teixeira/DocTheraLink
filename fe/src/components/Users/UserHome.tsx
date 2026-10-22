@@ -8,6 +8,7 @@ import { userChildProps } from "@/components/Common/UserColumns";
 import Error404 from "@/components/ErrorPages/404";
 import EmploymentTab from "@/components/Staff/EmploymentTab";
 import SkillsTab from "@/components/Staff/SkillsTab";
+import WorkTimeline from "@/components/Staff/WorkTimeline";
 import UserBanner from "@/components/Users/UserBanner";
 import UserSummaryTab from "@/components/Users/UserSummary";
 import { UserModel } from "@/components/Users/models";
@@ -110,6 +111,7 @@ export default function UserHome(props: UserHomeProps) {
         {
           <>
             <UserBanner userData={userData} />
+            <WorkTimeline username={username} />
             <div className="mt-4 w-full border-b-2 border-secondary-200">
               <div className="overflow-x-auto sm:flex sm:items-baseline">
                 <div className="mt-4 sm:mt-0">

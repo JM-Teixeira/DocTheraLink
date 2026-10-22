@@ -17,6 +17,7 @@ import StaffRoutes from "@/components/Staff/api";
 import {
   CLINIC_ROLES,
   STATUS_STYLES,
+  canChangeStock,
   roleKey,
   staffQuery,
   statusOf,
@@ -61,18 +62,23 @@ export default function StaffList() {
   );
   const [status, setStatus] = useState<EmploymentStatus | "all">("active");
   const [page, setPage] = useState(0);
+  // Who may change which stock: floor and/or category (managers only)
+  const [stockFloor, setStockFloor] = useState<number | null>(null);
+  const [stockCategory, setStockCategory] = useState("");
+  const stockFilter = stockFloor !== null || !!stockCategory;
   const term = useDebouncedValue(search);
 
   // Any filter change → first page
-  useEffect(() => setPage(0), [term, role, clinic, status]);
+  useEffect(() => setPage(0), [term, role, clinic, status, stockFilter]);
 
   const params = staffQuery({
     search: term,
     role,
     clinic,
     status,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    // The stock filter needs everyone at once (it is applied here)
+    limit: stockFilter ? 500 : PAGE_SIZE,
+    offset: stockFilter ? 0 : page * PAGE_SIZE,
   });
   const { data, isLoading, isError } = useQuery({
     queryKey: ["staff", params],
@@ -114,9 +120,20 @@ export default function StaffList() {
     floors: (ns: string) => t("floors_n", { ns }),
     everything: t("all_categories").toLowerCase(),
   };
-  const total = data?.count ?? 0;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const filtered = !!(term.trim() || role || clinic || status !== "active");
+  const people = stockFilter
+    ? (data?.results ?? []).filter((p) =>
+        canChangeStock(p.user_type, grantsOf(p.id), stockFloor, stockCategory),
+      )
+    : (data?.results ?? []);
+  const total = stockFilter ? people.length : (data?.count ?? 0);
+  const pages = stockFilter ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const filtered = !!(
+    term.trim() ||
+    role ||
+    clinic ||
+    status !== "active" ||
+    stockFilter
+  );
 
   return (
     <Page
@@ -163,6 +180,38 @@ export default function StaffList() {
               ))}
             </select>
           )}
+          {manager && (
+            <>
+              <select
+                aria-label={t("stock_filter_floor")}
+                value={stockFloor ?? ""}
+                onChange={(e) =>
+                  setStockFloor(e.target.value ? Number(e.target.value) : null)
+                }
+                className="h-10 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              >
+                <option value="">{t("stock_filter_any_floor")}</option>
+                {floorsOf(divisions ?? []).map((n) => (
+                  <option key={n} value={n}>
+                    {t("floor_n", { n })}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label={t("stock_filter_category")}
+                value={stockCategory}
+                onChange={(e) => setStockCategory(e.target.value)}
+                className="h-10 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              >
+                <option value="">{t("stock_filter_any_category")}</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           {filtered && (
             <button
               type="button"
@@ -171,6 +220,8 @@ export default function StaffList() {
                 setRole("");
                 setClinic("");
                 setStatus("active");
+                setStockFloor(null);
+                setStockCategory("");
               }}
               className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"
             >
@@ -218,7 +269,7 @@ export default function StaffList() {
             />
           ))}
         </div>
-      ) : data?.results?.length ? (
+      ) : people.length ? (
         <>
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="min-w-full divide-y divide-gray-100 text-sm">
@@ -239,7 +290,7 @@ export default function StaffList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {data.results.map((p) => {
+                {people.map((p) => {
                   const st = statusOf(p.employment_status);
                   const name =
                     `${p.first_name} ${p.last_name}`.trim() || p.username;

@@ -213,5 +213,20 @@ func mount(g *gin.RouterGroup, h *Handler) {
 	users.DELETE("/delete_facility/", h.ClearClinic)
 	users.DELETE("/clear_home_facility/", h.ClearClinic)
 	users.PATCH("/employment/", h.SetEmployment)
+	users.GET("/employment/history/", h.EmploymentHistory)
 	users.PATCH("/preferences/", h.SetPreferences)
+}
+
+// EmploymentHistory handles GET /users/:username/employment/history/.
+func (h *Handler) EmploymentHistory(c *gin.Context) {
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	v, err := h.svc.EmploymentHistory(c.Request.Context(), a, c.Param("username"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, v)
 }

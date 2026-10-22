@@ -24,6 +24,14 @@ const StaffRoutes = {
     method: "GET",
     TRes: Type<{ username: string }>(),
   },
+  employmentHistory: {
+    path: "/api/v1/users/{username}/employment/history/",
+    method: "GET",
+    TRes: Type<{
+      joined_on: string;
+      events: { status: string; since: string; note: string }[];
+    }>(),
+  },
   clinics: {
     path: "/api/v1/facility/",
     method: "GET",

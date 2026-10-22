@@ -288,3 +288,24 @@ func TestLeftUserLosesSession(t *testing.T) {
 	expect(t, "back", coord.call("PATCH", "/users/cm.tiago.fonseca/employment/", map[string]any{"status": "active"}, nil), 200)
 	expect(t, "token works again", tiago.call("GET", "/users/getcurrentuser/", nil, nil), 200)
 }
+
+// TestEmploymentHistory: every status change is kept with its date.
+func TestEmploymentHistory(t *testing.T) {
+	coord, _ := login(t, "cm.ana.ferreira")
+	expect(t, "leave", coord.call("PATCH", "/users/cm.carla.pinto/employment/", map[string]any{"status": "on_leave", "since": "2026-10-10", "note": "e2e"}, nil), 200)
+	expect(t, "back", coord.call("PATCH", "/users/cm.carla.pinto/employment/", map[string]any{"status": "active", "since": "2026-10-20"}, nil), 200)
+	var h struct {
+		JoinedOn string `json:"joined_on"`
+		Events   []struct {
+			Status string `json:"status"`
+			Since  string `json:"since"`
+		} `json:"events"`
+	}
+	expect(t, "history", coord.call("GET", "/users/cm.carla.pinto/employment/history/", nil, &h), 200)
+	n := len(h.Events)
+	if n < 2 || h.Events[n-1].Status != "active" || h.JoinedOn == "" {
+		t.Errorf("history: %+v", h)
+	}
+	other, _ := login(t, "de.marta.ribeiro")
+	expect(t, "other clinic", other.call("GET", "/users/cm.carla.pinto/employment/history/", nil, nil), 404)
+}

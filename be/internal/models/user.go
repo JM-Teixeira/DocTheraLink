@@ -70,7 +70,9 @@ type User struct {
 	// cannot sign in).
 	EmploymentStatus string     `json:"employment_status" gorm:"size:12;not null;default:active"`
 	EmploymentSince  *time.Time `json:"employment_since" gorm:"type:date"`
-	EmploymentNote   string     `json:"employment_note" gorm:"size:300"`
+	// When the person started at the clinic (nil = when the account was made)
+	JoinedOn       *time.Time `json:"joined_on" gorm:"type:date"`
+	EmploymentNote string     `json:"employment_note" gorm:"size:300"`
 
 	// How the person wants dates shown: dmy, mdy, ymd or long ("" = dmy).
 	DateFormat string `json:"date_format" gorm:"size:8"`

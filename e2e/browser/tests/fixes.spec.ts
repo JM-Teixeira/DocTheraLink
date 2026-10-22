@@ -94,3 +94,21 @@ test("an admin views the app as a physio of Climutua, read-only, and comes back"
   await expect(page.getByRole("status").filter({ hasText: "A ver como" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Sugestões" })).toBeVisible();
 });
+
+test("people: who can change gloves on floor 1, and the work history at a glance", async ({ page, request }) => {
+  await signIn(page, request, "cm.ana.ferreira");
+  await page.goto("/users");
+  await page.getByLabel("Pode alterar stock do piso").selectOption("1");
+  const rows = page.locator("tbody");
+  // Teresa (all stock), Inês (floor 1) and the coordinator; not Mariana (floors 2-3 hygiene) or Pedro
+  await expect(rows.getByText("Teresa Gomes")).toBeVisible();
+  await expect(rows.getByText("Inês Moreira")).toBeVisible();
+  await expect(rows.getByText("Ana Ferreira")).toBeVisible();
+  await expect(rows.getByText("Mariana Costa")).toHaveCount(0);
+  await expect(rows.getByText("Pedro Almeida")).toHaveCount(0);
+
+  await page.goto("/users/cm.rui.nogueira");
+  const history = page.getByRole("list", { name: "Situação profissional" });
+  await expect(history.getByText(/^Entrou a /)).toBeVisible();
+  await expect(history.getByText("Saiu a 31/07/2026")).toBeVisible();
+});

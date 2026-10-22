@@ -5,6 +5,19 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.16.0 (branch `feat/m4-patients`)
+
+### People: stock permission filter and work history (batch 3, part F)
+- People page (coordinators, admins): "Pode alterar stock do piso" and
+  "... da categoria" dropdowns list who may change that stock: their own
+  floor/category rules, "all floors" / "all categories" rules, and the
+  coordinators and admins (who change everything).
+- Each person's page shows their work story in one line: joined on,
+  leaves (from / to), left on. Every status change is now kept
+  (`employment_events`); managers can set the start date (`joined_on`).
+- Tests: unit (`canChangeStock`, `workSteps`, history), API e2e
+  `TestEmploymentHistory`, browser.
+
 ## 2026-10-22 · Klyniva 0.15.0 (branch `feat/m4-patients`)
 
 ### Page help and "view as" (batch 3, parts D and E)

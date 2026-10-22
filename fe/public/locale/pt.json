@@ -1186,5 +1186,15 @@
   "view_as_start": "Ver",
   "view_as_stop": "Voltar a administrador",
   "viewing_as": "A ver como {{role}} · {{clinic}} (só leitura)",
-  "view_as_read_only": "Está a ver como outra função: não é possível alterar nada."
+  "view_as_read_only": "Está a ver como outra função: não é possível alterar nada.",
+  "stock_filter_floor": "Pode alterar stock do piso",
+  "stock_filter_any_floor": "Stock: qualquer piso",
+  "stock_filter_category": "Pode alterar stock da categoria",
+  "stock_filter_any_category": "Stock: qualquer categoria",
+  "work_history": "Situação profissional",
+  "work_step__joined": "Entrou a {{date}}",
+  "work_step__leave": "De licença desde {{date}}",
+  "work_step__leave_until": "Licença de {{from}} a {{to}}",
+  "work_step__back": "Regressou a {{date}}",
+  "work_step__left": "Saiu a {{date}}"
 }
