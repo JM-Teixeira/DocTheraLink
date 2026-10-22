@@ -115,6 +115,48 @@ func (h *Handler) Series(c *gin.Context) {
 }
 
 // CancelSeries handles DELETE /schedule/series/:id/?from= (today by default).
+// MoveAppointment handles POST /schedule/appointments/:id/move/ (drag and drop).
+func (h *Handler) MoveAppointment(c *gin.Context) {
+	handle(c, http.StatusOK, true, func(a Actor, req MoveRequest) (any, error) {
+		return h.svc.Move(c.Request.Context(), a, c.Param("id"), req)
+	})
+}
+
+// SeriesSessions handles GET /schedule/series/:id/ (the plan's sessions still to come).
+func (h *Handler) SeriesSessions(c *gin.Context) {
+	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
+		return h.svc.SeriesSessions(c.Request.Context(), a, c.Param("id"))
+	})
+}
+
+// ReschedulePlan handles POST /schedule/series/:id/reschedule/ (dry_run previews).
+func (h *Handler) ReschedulePlan(c *gin.Context) {
+	handle(c, http.StatusOK, true, func(a Actor, req PlanRescheduleRequest) (any, error) {
+		return h.svc.ReschedulePlan(c.Request.Context(), a, c.Param("id"), req)
+	})
+}
+
+// WaitingList handles GET /schedule/waiting/?status=
+func (h *Handler) WaitingList(c *gin.Context) {
+	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
+		return h.svc.WaitingList(c.Request.Context(), a, c.Query("status"))
+	})
+}
+
+// AddWaiting handles POST /schedule/waiting/
+func (h *Handler) AddWaiting(c *gin.Context) {
+	handle(c, http.StatusCreated, true, func(a Actor, req WaitingRequest) (any, error) {
+		return h.svc.AddWaiting(c.Request.Context(), a, req)
+	})
+}
+
+// UpdateWaiting handles PATCH /schedule/waiting/:id/
+func (h *Handler) UpdateWaiting(c *gin.Context) {
+	handle(c, http.StatusOK, true, func(a Actor, req WaitingUpdate) (any, error) {
+		return h.svc.UpdateWaiting(c.Request.Context(), a, c.Param("id"), req)
+	})
+}
+
 func (h *Handler) CancelSeries(c *gin.Context) {
 	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
 		n, err := h.svc.CancelSeries(c.Request.Context(), a, c.Param("id"), c.DefaultQuery("from", time.Now().Format(dateLayout)))

@@ -11,12 +11,18 @@ import {
   DivisionRequest,
   MissCount,
   MissReport,
+  MoveRequest,
   PatientHandover,
+  PlanRescheduleRequest,
+  PlanRescheduleResult,
   RangeView,
   SeriesRequest,
   SeriesResult,
   Shift,
   ShiftRequest,
+  WaitingEntry,
+  WaitingRequest,
+  WaitingStatus,
   YearStats,
 } from "@/components/TimeBoard/types";
 
@@ -25,6 +31,45 @@ import { PaginatedResponse } from "@/Utils/request/types";
 
 /** Time-board API (be/internal/modules/schedule/routes.go). */
 const BoardRoutes = {
+  moveAppointment: {
+    path: "/api/v1/schedule/appointments/{id}/move/",
+    method: "POST",
+    TBody: Type<MoveRequest>(),
+    TRes: Type<Appointment>(),
+  },
+  seriesSessions: {
+    path: "/api/v1/schedule/series/{id}/",
+    method: "GET",
+    TRes: Type<Appointment[]>(),
+  },
+  reschedulePlan: {
+    path: "/api/v1/schedule/series/{id}/reschedule/",
+    method: "POST",
+    TBody: Type<PlanRescheduleRequest>(),
+    TRes: Type<PlanRescheduleResult>(),
+  },
+  waiting: {
+    path: "/api/v1/schedule/waiting/",
+    method: "GET",
+    TRes: Type<WaitingEntry[]>(),
+  },
+  addWaiting: {
+    path: "/api/v1/schedule/waiting/",
+    method: "POST",
+    TBody: Type<WaitingRequest>(),
+    TRes: Type<WaitingEntry>(),
+  },
+  updateWaiting: {
+    path: "/api/v1/schedule/waiting/{id}/",
+    method: "PATCH",
+    TBody: Type<{
+      status?: WaitingStatus;
+      series_id?: string;
+      urgent?: boolean;
+      note?: string;
+    }>(),
+    TRes: Type<WaitingEntry>(),
+  },
   missed: {
     path: "/api/v1/schedule/missed/",
     method: "GET",

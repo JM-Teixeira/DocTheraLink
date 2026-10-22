@@ -64,6 +64,88 @@ type Repository interface {
 	// MissedCounts counts missed sessions per patient since a date (one
 	// patient if patientID is set), with the patients' names.
 	MissedCounts(ctx context.Context, clinicID string, from time.Time, patientID string) ([]MissCount, error)
+
+	// Reschedule moves a session to another date/hour/physio under the same
+	// limits and locks as Book (the session itself is not counted).
+	Reschedule(ctx context.Context, a *Appointment, date time.Time, hour int, to uint, capacity, creditLimit int) error
+
+	// SeriesAppointments are a plan's still-booked sessions from a date on.
+	SeriesAppointments(ctx context.Context, clinicID, seriesID string, from time.Time) ([]Appointment, error)
+
+	Waiting(ctx context.Context, clinicID, status string) ([]WaitingEntry, error)
+	GetWaiting(ctx context.Context, clinicID, id string) (*WaitingEntry, error)
+	SaveWaiting(ctx context.Context, e *WaitingEntry) error
+	UpdateWaiting(ctx context.Context, id string, fields map[string]any) error
+}
+
+func (g *GormRepository) Reschedule(ctx context.Context, a *Appointment, date time.Time, hour int, to uint, capacity, creditLimit int) error {
+	return g.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, key := range []string{
+			fmt.Sprintf("appt:%s:%d:%s:%d", a.ClinicID, to, day(date), hour),
+			fmt.Sprintf("patient:%s:%s:%d", a.PatientID, day(date), hour),
+		} {
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", key).Error; err != nil {
+				return err
+			}
+		}
+		var load struct {
+			N       int
+			Credits int
+		}
+		if err := tx.Model(&Appointment{}).Select("COUNT(*) AS n, COALESCE(SUM(credits), 0) AS credits").
+			Where("therapist_id = ? AND date = ? AND hour = ? AND id <> ?", to, day(date), hour, a.ID).
+			Scan(&load).Error; err != nil {
+			return err
+		}
+		switch {
+		case load.N >= capacity:
+			return ErrFull
+		case load.Credits+a.Credits > creditLimit:
+			return ErrOverCredits
+		}
+		var busy int64
+		if err := tx.Model(&Appointment{}).Where("patient_id = ? AND date = ? AND hour = ? AND id <> ?",
+			a.PatientID, day(date), hour, a.ID).Count(&busy).Error; err != nil {
+			return err
+		}
+		if busy > 0 {
+			return ErrPatientBusy
+		}
+		return tx.Model(&Appointment{}).Where("id = ?", a.ID).
+			Updates(map[string]any{"date": day(date), "hour": hour, "therapist_id": to}).Error
+	})
+}
+
+func (g *GormRepository) SeriesAppointments(ctx context.Context, clinicID, seriesID string, from time.Time) ([]Appointment, error) {
+	var out []Appointment
+	err := g.db.WithContext(ctx).Preload("Patient").
+		Where("clinic_id = ? AND series_id = ? AND status = ? AND date >= ?", clinicID, seriesID, StatusBooked, day(from)).
+		Order("date, hour").Find(&out).Error
+	return out, err
+}
+
+func (g *GormRepository) Waiting(ctx context.Context, clinicID, status string) ([]WaitingEntry, error) {
+	var out []WaitingEntry
+	err := g.db.WithContext(ctx).Preload("Patient").Where("clinic_id = ? AND status = ?", clinicID, status).
+		Order("urgent DESC, created_at ASC").Find(&out).Error
+	return out, err
+}
+
+func (g *GormRepository) GetWaiting(ctx context.Context, clinicID, id string) (*WaitingEntry, error) {
+	var e WaitingEntry
+	err := g.db.WithContext(ctx).Preload("Patient").Where("clinic_id = ? AND id = ?", clinicID, id).First(&e).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	return &e, err
+}
+
+func (g *GormRepository) SaveWaiting(ctx context.Context, e *WaitingEntry) error {
+	return g.db.WithContext(ctx).Omit("Patient").Create(e).Error
+}
+
+func (g *GormRepository) UpdateWaiting(ctx context.Context, id string, fields map[string]any) error {
+	return g.db.WithContext(ctx).Model(&WaitingEntry{}).Where("id = ?", id).Updates(fields).Error
 }
 
 func (g *GormRepository) MissedCounts(ctx context.Context, clinicID string, from time.Time, patientID string) ([]MissCount, error) {

@@ -46,6 +46,8 @@ export interface PlanPreset {
   therapistId: number;
   hour: number;
   startDate: string;
+  /** Preferred weekdays (e.g. from the waiting list); default the start date weekday. */
+  weekdays?: number[];
 }
 
 /**
@@ -63,7 +65,7 @@ export function SeriesDialog({
   preset: PlanPreset | null;
   therapists: { id: number; first_name: string; last_name: string }[];
   onClose: () => void;
-  onDone: () => void;
+  onDone: (r: SeriesResult) => void;
 }) {
   const { t } = useTranslation();
   const [patient, setPatient] = useState<PatientRef | null>(null);
@@ -82,7 +84,11 @@ export function SeriesDialog({
     setTherapist(preset.therapistId);
     setHour(preset.hour);
     setStart(preset.startDate);
-    setDays([dayjs(preset.startDate).day()]);
+    setDays(
+      preset.weekdays?.length
+        ? preset.weekdays
+        : [dayjs(preset.startDate).day()],
+    );
     setSessions(10);
     setSearch("");
     setPreview(null);
@@ -124,7 +130,7 @@ export function SeriesDialog({
       Notification.Success({
         msg: t("plan_booked", { count: r.booked.length }),
       });
-      onDone();
+      onDone(r);
     },
     onError: fail,
   });

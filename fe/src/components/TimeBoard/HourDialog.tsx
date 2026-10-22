@@ -1,5 +1,13 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CalendarRange, Check, Plus, Search, UserX, X } from "lucide-react";
+import {
+  CalendarRange,
+  Check,
+  MoveRight,
+  Plus,
+  Search,
+  UserX,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -17,6 +25,11 @@ import {
 import PatientIds from "@/components/Patient/PatientIds";
 import { apiError } from "@/components/TimeBoard/BoardDialogs";
 import MissDialog, { statusLabel } from "@/components/TimeBoard/MissDialog";
+import {
+  MoveSessionDialog,
+  MovingSession,
+  ReschedulePlanDialog,
+} from "@/components/TimeBoard/MoveDialogs";
 import BoardRoutes from "@/components/TimeBoard/api";
 import {
   CARE_LEVEL_STYLES,
@@ -72,6 +85,15 @@ export default function HourDialog({
   const debounced = useDebouncedValue(search);
   useEffect(() => setSearch(""), [load?.hour, therapist?.id]);
   const canBook = board.permissions.book_patients;
+  // Moving sessions and plans: coordinators and admins
+  const canManageMoves = board.permissions.manage_shifts;
+  const [moving, setMoving] = useState<MovingSession | null>(null);
+  const [replanning, setReplanning] = useState<{
+    seriesId: string;
+    patientName: string;
+    therapistId: number;
+    hour: number;
+  } | null>(null);
   const division = board.divisions.find((d) => d.id === load?.division_id);
   const full = load ? hourIsFull(load) : false;
 
@@ -232,6 +254,51 @@ export default function HourDialog({
                 >
                   <UserX className="size-4 text-amber-600" aria-hidden />
                 </Button>
+                {canManageMoves && ap.status === "booked" && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label={t("move_session_of", {
+                      name: ap.patient?.name,
+                    })}
+                    onClick={() =>
+                      setMoving({
+                        id: ap.id,
+                        patientName: ap.patient?.name ?? "",
+                        date: board.date,
+                        hour: load!.hour,
+                        therapistId: therapist!.id,
+                      })
+                    }
+                  >
+                    <MoveRight
+                      className="size-4 text-primary-700"
+                      aria-hidden
+                    />
+                  </Button>
+                )}
+                {canManageMoves && ap.series_id && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label={t("reschedule_plan_of", {
+                      name: ap.patient?.name,
+                    })}
+                    onClick={() =>
+                      setReplanning({
+                        seriesId: ap.series_id!,
+                        patientName: ap.patient?.name ?? "",
+                        therapistId: therapist!.id,
+                        hour: load!.hour,
+                      })
+                    }
+                  >
+                    <CalendarRange
+                      className="size-4 text-primary-700"
+                      aria-hidden
+                    />
+                  </Button>
+                )}
                 {canBook && (
                   <Button
                     size="icon"
@@ -330,6 +397,24 @@ export default function HourDialog({
             </div>
           ))}
       </DialogContent>
+      <MoveSessionDialog
+        session={moving}
+        physios={board.therapists}
+        onClose={() => setMoving(null)}
+        onMoved={() => {
+          setMoving(null);
+          onChanged();
+        }}
+      />
+      <ReschedulePlanDialog
+        plan={replanning}
+        physios={board.therapists}
+        onClose={() => setReplanning(null)}
+        onDone={() => {
+          setReplanning(null);
+          onChanged();
+        }}
+      />
       <MissDialog
         patientName={missing?.name ?? null}
         initial={

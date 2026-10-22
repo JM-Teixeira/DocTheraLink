@@ -46,6 +46,8 @@ be/                Go backend (Go module name: klyniva)
                    weekly plans (series), range/year stats; SessionHook → inventory;
                    divisions have a floor; absences with cover + handover notes
                    (CoveredBy → referral.WithCovers lets the cover read referrals)
+                   move one session / reschedule a plan (reschedule.go, same
+                   planner checks); waiting list of patients (waiting.go)
       staff/       skills catalogue + user skills, home clinic, employment
                    status (active / on_leave / left → is_active false)
     api/handlers/access.go  who may see/change users and clinics (legacy handlers; pure, tested)

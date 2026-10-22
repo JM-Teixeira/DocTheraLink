@@ -16,6 +16,7 @@ const appt = (
   credits = 1,
 ): Appointment => ({
   id,
+  date: "2026-10-26",
   hour: 0,
   therapist_id: 0,
   patient_id: id,

@@ -108,7 +108,7 @@ type Appointment struct {
 
 // Models lists the tables for AutoMigrate.
 func Models() []any {
-	return []any{&Division{}, &Shift{}, &Appointment{}, &Absence{}, &HandoverNote{}}
+	return []any{&Division{}, &Shift{}, &Appointment{}, &Absence{}, &HandoverNote{}, &WaitingEntry{}}
 }
 
 // SessionHook reacts to sessions being held, e.g. the inventory using the

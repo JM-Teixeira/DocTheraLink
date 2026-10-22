@@ -126,7 +126,10 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] Misses: justified or not (+ reason); 3 unjustified in 90 days flag the patient to the coordinator.
 - [ ] Absences next: partial days; notify the physios who receive patients; only the default cover reads the referrals today - extend to everyone who received a patient.
 - [ ] Misses next: threshold and window per clinic; tell the doctor of the referral; list of misses on the patient page.
-- [ ] Next on the board: drag to move an appointment; reschedule a whole plan; waiting list; a physio's own "my day" view; print the day sheet.
+- [x] Move a session: drag it to another hour in the physio day, or "Mudar sessão" (other day/hour/physio); same checks as booking.
+- [x] Reschedule the rest of a plan to new days/hour/physio (preview first, same number of sessions, plan keeps its id).
+- [x] Waiting list: urgent first then oldest, preferred days/period/physio; "Marcar plano" books it and the patient leaves the list; count on the board and the coordinator home.
+- [ ] Next on the board: a physio's own "my day" view; print the day sheet.
 - [ ] Link board appointments to referrals (field exists) and book the whole series of N sessions at once; receptionists manage them.
 - [ ] Therapist availability from the timetable; room/section capacity; conflict checks.
 - [x] Old unrouted WIP screens (`Facility/TimetableGrid`, `Therapy/*`) and the legacy `/timetable` + `/sections` API removed — superseded by the time board.

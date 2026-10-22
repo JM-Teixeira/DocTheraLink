@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   LayoutGrid,
+  ListOrdered,
   Plane,
   Plus,
   Repeat,
@@ -44,6 +45,7 @@ import {
   WeekView,
   YearView,
 } from "@/components/TimeBoard/RangeViews";
+import WaitingListDialog from "@/components/TimeBoard/WaitingList";
 import BoardRoutes from "@/components/TimeBoard/api";
 import {
   BoardFilter,
@@ -68,7 +70,7 @@ import {
   Shift,
 } from "@/components/TimeBoard/types";
 
-import query from "@/Utils/request/query";
+import query, { callApi } from "@/Utils/request/query";
 
 type Mode = "day" | "week" | "month" | "year";
 type DayView = "physio" | "division";
@@ -133,8 +135,10 @@ export default function TimeBoardPage() {
   const [plan, setPlan] = useState<PlanPreset | null>(null);
   const [patientId, setPatientId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<
-    "divisions" | "copy" | "repeat" | "absences" | null
+    "divisions" | "copy" | "repeat" | "absences" | "waiting" | null
   >(null);
+  // The waiting-list entry a plan is being booked for
+  const [waitingFor, setWaitingFor] = useState<string | null>(null);
 
   const setFilter = (f: BoardFilter) => {
     setFilterState(f);
@@ -145,6 +149,12 @@ export default function TimeBoardPage() {
     queryKey: ["board", date],
     queryFn: query(BoardRoutes.board, { queryParams: { date } }),
     refetchInterval: 60_000, // others change it too
+  });
+
+  const { data: waiting } = useQuery({
+    queryKey: ["waiting-list"],
+    queryFn: query(BoardRoutes.waiting, { silent: true }),
+    retry: false,
   });
 
   const refresh = async () => {
@@ -172,6 +182,15 @@ export default function TimeBoardPage() {
       options={
         manage && (
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setDialog("waiting")}>
+              <ListOrdered className="mr-2 size-4" aria-hidden />
+              {t("waiting_list")}
+              {!!waiting?.length && (
+                <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">
+                  {waiting.length}
+                </span>
+              )}
+            </Button>
             <Button variant="outline" onClick={() => setDialog("absences")}>
               <Plane className="mr-2 size-4" aria-hidden />
               {t("absences")}
@@ -386,6 +405,7 @@ export default function TimeBoardPage() {
         board={board}
         therapist={find(physio) ?? null}
         onClose={() => setPhysio(null)}
+        onChanged={refresh}
         onPatient={setPatientId}
         onShift={
           manage
@@ -425,9 +445,22 @@ export default function TimeBoardPage() {
       <SeriesDialog
         preset={plan}
         therapists={board.therapists}
-        onClose={() => setPlan(null)}
-        onDone={() => {
+        onClose={() => {
           setPlan(null);
+          setWaitingFor(null);
+        }}
+        onDone={async (r) => {
+          setPlan(null);
+          // Booked from the waiting list: the patient leaves it
+          if (waitingFor && r.series_id) {
+            await callApi(BoardRoutes.updateWaiting, {
+              pathParams: { id: waitingFor },
+              body: { status: "scheduled", series_id: r.series_id },
+              silent: true,
+            }).catch(() => undefined);
+            setWaitingFor(null);
+            queryClient.invalidateQueries({ queryKey: ["waiting-list"] });
+          }
           refresh();
         }}
       />
@@ -446,6 +479,29 @@ export default function TimeBoardPage() {
         divisions={board.divisions}
         onClose={() => setDialog(null)}
         onChanged={refresh}
+      />
+      <WaitingListDialog
+        open={dialog === "waiting"}
+        physios={board.therapists}
+        onClose={() => setDialog(null)}
+        onPlan={(e) => {
+          setDialog(null);
+          setWaitingFor(e.id);
+          setPlan({
+            patient: e.patient
+              ? {
+                  id: e.patient.id,
+                  name: e.patient.name,
+                  care_level: e.patient.care_level,
+                }
+              : null,
+            therapistId:
+              e.preferred_therapist_id ?? board.therapists[0]?.id ?? 0,
+            hour: e.period === "afternoon" ? 15 : 9,
+            startDate: date,
+            weekdays: e.weekdays,
+          });
+        }}
       />
       <AbsencesDialog
         open={dialog === "absences"}

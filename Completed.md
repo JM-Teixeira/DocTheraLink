@@ -5,6 +5,25 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.7.0 (branch `feat/m4-patients`)
+
+### Time board: move sessions, reschedule plans, waiting list (TODO)
+- **Move a session** by dragging it to another hour in the physio day, or
+  with "Mudar sessão" (another day, hour or physio); the server applies
+  the booking rules (on shift, room, credits, patient free, not absent).
+- **Reschedule a plan** from a date on to new weekdays/hour/physio,
+  keeping the number of sessions; preview first; the plan keeps its id.
+- **Waiting list**: urgent first, then whoever waits longest; preferred
+  days, period and physio; "Marcar plano" opens the weekly plan with those
+  days and the entry leaves the list once booked; count on the board
+  button and on the coordinator home.
+- Fix: Portuguese counters said "1" for zero ("há 1 dia", "1 pessoa"):
+  i18next uses Brazilian plural rules for `pt`, where 0 is singular; every
+  pt plural now has a zero form, checked by a unit test.
+- Tests: unit (move, reschedule, waiting list), e2e
+  `TestMoveAndReschedule`, `TestWaitingList`, browser drag-and-drop and
+  waiting-list journeys; 43 browser tests.
+
 ## 2026-10-22 · Klyniva 0.6.0 (branch `feat/m4-patients`)
 
 ### 2026-10-23 · About page, access from other laptops

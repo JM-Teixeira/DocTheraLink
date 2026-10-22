@@ -35,6 +35,7 @@ export type AppointmentStatus = "booked" | "attended" | "missed";
 
 export interface Appointment {
   id: string;
+  date: string; // YYYY-MM-DD
   hour: number;
   therapist_id: number;
   patient_id: string;
@@ -271,4 +272,52 @@ export interface MissReport {
 export interface MissInput {
   justified: boolean;
   reason: string;
+}
+
+/** Moves one booked session to another slot. */
+export interface MoveRequest {
+  date: string;
+  hour: number;
+  therapist_id: number;
+}
+
+/** New weekly pattern for the rest of a plan. */
+export interface PlanRescheduleRequest {
+  from: string;
+  weekdays: number[];
+  hour: number;
+  therapist_id: number;
+  dry_run?: boolean;
+}
+
+export interface PlanRescheduleResult extends SeriesResult {
+  replaced: number;
+}
+
+export type WaitingStatus = "waiting" | "scheduled" | "removed";
+export type WaitingPeriod = "morning" | "afternoon" | "any";
+
+/** A patient waiting for a slot (urgent first, then oldest). */
+export interface WaitingEntry {
+  id: string;
+  patient_id: string;
+  patient?: { id: string; name: string; care_level: number };
+  referral_id?: string | null;
+  urgent: boolean;
+  weekdays: number[];
+  period: WaitingPeriod;
+  preferred_therapist_id?: number | null;
+  note: string;
+  status: WaitingStatus;
+  series_id?: string | null;
+  created_date: string;
+}
+
+export interface WaitingRequest {
+  patient_id: string;
+  urgent: boolean;
+  weekdays: number[];
+  period: WaitingPeriod;
+  preferred_therapist_id?: number;
+  note: string;
 }

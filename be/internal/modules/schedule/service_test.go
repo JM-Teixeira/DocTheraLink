@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sort"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ type fakeRepo struct {
 	shifts     map[string]Shift
 	appts      map[string]Appointment
 	absences   []Absence
+	waiting    map[string]WaitingEntry
 }
 
 func between(d, from, to time.Time) bool {
@@ -600,4 +602,91 @@ func TestAbsenceAndCover(t *testing.T) {
 	if err := f.svc.DeleteAbsence(ctx, coordinator, res.Absence.ID); err != nil {
 		t.Errorf("delete: %v", err)
 	}
+}
+
+func (f *fakeRepo) Reschedule(_ context.Context, a *Appointment, date time.Time, hour int, to uint, capacity, limit int) error {
+	n, credits := 0, 0
+	for id, o := range f.appts {
+		if id == a.ID || !sameDate(o.Date, date) || o.Hour != hour {
+			continue
+		}
+		if o.PatientID == a.PatientID {
+			return ErrPatientBusy
+		}
+		if o.TherapistID == to {
+			n++
+			credits += o.Credits
+		}
+	}
+	switch {
+	case n >= capacity:
+		return ErrFull
+	case credits+a.Credits > limit:
+		return ErrOverCredits
+	}
+	c := f.appts[a.ID]
+	c.Date, c.Hour, c.TherapistID = date, hour, to
+	f.appts[a.ID] = c
+	return nil
+}
+func (f *fakeRepo) Waiting(_ context.Context, cid, status string) ([]WaitingEntry, error) {
+	out := []WaitingEntry{}
+	for _, e := range f.waiting {
+		if e.ClinicID == cid && e.Status == status {
+			out = append(out, e)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Urgent != out[j].Urgent {
+			return out[i].Urgent
+		}
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out, nil
+}
+func (f *fakeRepo) GetWaiting(_ context.Context, cid, id string) (*WaitingEntry, error) {
+	e, ok := f.waiting[id]
+	if !ok || e.ClinicID != cid {
+		return nil, ErrNotFound
+	}
+	return &e, nil
+}
+func (f *fakeRepo) SaveWaiting(_ context.Context, e *WaitingEntry) error {
+	if f.waiting == nil {
+		f.waiting = map[string]WaitingEntry{}
+	}
+	e.ID = uuid.NewString()
+	e.CreatedAt = time.Now().Add(time.Duration(len(f.waiting)) * time.Second)
+	f.waiting[e.ID] = *e
+	return nil
+}
+func (f *fakeRepo) UpdateWaiting(_ context.Context, id string, fields map[string]any) error {
+	e := f.waiting[id]
+	for k, v := range fields {
+		switch k {
+		case "status":
+			e.Status = v.(string)
+		case "series_id":
+			sid := v.(string)
+			e.SeriesID = &sid
+		case "urgent":
+			e.Urgent = v.(bool)
+		case "note":
+			e.Note = v.(string)
+		}
+	}
+	f.waiting[id] = e
+	return nil
+}
+
+func (f *fakeRepo) SeriesAppointments(_ context.Context, cid, seriesID string, from time.Time) ([]Appointment, error) {
+	var out []Appointment
+	for _, a := range f.appts {
+		if a.ClinicID == cid && a.SeriesID != nil && *a.SeriesID == seriesID && a.Status == StatusBooked &&
+			a.Date.Format(dateLayout) >= from.Format(dateLayout) {
+			out = append(out, a)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Date.Before(out[j].Date) })
+	return out, nil
 }

@@ -7,6 +7,7 @@ import {
   Check,
   ClipboardList,
   Inbox,
+  ListOrdered,
   Package,
   PackageX,
   Plane,
@@ -666,9 +667,22 @@ function NeedsAttention({ pending }: { pending: number }) {
   });
   const expired = items?.filter((i) => i.open_expired) ?? [];
   const flagged = misses?.patients ?? [];
+  const { data: waiting } = useQuery({
+    queryKey: ["waiting-list"],
+    queryFn: query(BoardRoutes.waiting, { silent: true }),
+    retry: false,
+  });
   return (
     <Card title={t("needs_attention")}>
       <ul className="flex flex-col gap-2 text-sm">
+        {!!waiting?.length && (
+          <AttentionRow
+            icon={ListOrdered}
+            to="/time-board"
+            text={t("n_waiting_for_slot", { count: waiting.length })}
+            tone={waiting.some((w) => w.urgent) ? "danger" : "warn"}
+          />
+        )}
         {flagged.map((m) => (
           <AttentionRow
             key={m.patient_id}
@@ -711,9 +725,13 @@ function NeedsAttention({ pending }: { pending: number }) {
             tone={i.status === "out" ? "danger" : "warn"}
           />
         ))}
-        {!pending && !expired.length && !reorder?.length && !flagged.length && (
-          <li className="text-gray-500">{t("all_in_order")}</li>
-        )}
+        {!pending &&
+          !expired.length &&
+          !reorder?.length &&
+          !flagged.length &&
+          !waiting?.length && (
+            <li className="text-gray-500">{t("all_in_order")}</li>
+          )}
       </ul>
     </Card>
   );

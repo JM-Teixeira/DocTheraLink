@@ -36,6 +36,13 @@ func (s *Service) Series(ctx context.Context, a Actor, req SeriesRequest) (*Seri
 	if err != nil {
 		return nil, err
 	}
+	return s.bookSeries(ctx, a, cid, req, nil, "")
+}
+
+// bookSeries plans (and unless DryRun books) a series. exclude leaves some
+// appointments out of the checks (a plan being moved); seriesID keeps an
+// existing plan's id ("" = new).
+func (s *Service) bookSeries(ctx context.Context, a Actor, cid string, req SeriesRequest, exclude map[string]bool, seriesID string) (*SeriesResult, error) {
 	start, err := parseDate("start_date", req.StartDate)
 	if err != nil {
 		return nil, err
@@ -57,11 +64,17 @@ func (s *Service) Series(ctx context.Context, a Actor, req SeriesRequest) (*Seri
 	if err != nil {
 		return nil, err
 	}
-	plan := planner{data: data, level: level}
+	if exclude == nil {
+		exclude = map[string]bool{}
+	}
+	plan := planner{data: data, level: level, exclude: exclude}
 
 	res := &SeriesResult{Booked: []string{}, Skipped: []SkippedDate{}}
 	if !req.DryRun {
-		res.SeriesID = uuid.NewString()
+		res.SeriesID = seriesID
+		if res.SeriesID == "" {
+			res.SeriesID = uuid.NewString()
+		}
 	}
 	for d := start; d.Before(end) && len(res.Booked) < req.Sessions && len(res.Skipped) < seriesMaxSkips; d = d.AddDate(0, 0, 1) {
 		if !weekdays[d.Weekday()] {
