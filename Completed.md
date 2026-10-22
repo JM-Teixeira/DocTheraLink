@@ -7,6 +7,17 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-22 · Security review, date preference, tests (branch `feat/m4-patients`)
 
+### 17:00 · Browser tests for the main clinic journeys (TODO §0)
+- `e2e/browser/tests/journeys.spec.ts`: register a patient, then the
+  same NIF is blocked and the same name + birth date warns ("É outra
+  pessoa" registers anyway), and the NIF finds exactly one; a weekly plan
+  (3× a week) booked from the board lands Mon/Wed/Fri at the chosen hour;
+  a holiday recorded in the Ausências dialog moves the session to the
+  cover physio, who reads the per-patient handover in the patient pop-up;
+  single-use items are used, containers opened and finished.
+- Each test makes and removes its own data; the suite runs one test at a
+  time (shared demo users). 15 browser tests, 45/45 over three runs.
+
 ### 15:30 · Referral journey in the browser, browser tests in CI (TODO §0)
 - `e2e/browser/tests/referral.spec.ts`: two browsers at once, the doctor
   refers a new patient to a named physio; the physio accepts, starts,

@@ -29,7 +29,8 @@ done** until all of these exist and CI is green:
 Open testing work:
 - [x] Browser E2E suite (Playwright, `e2e/browser`, `make e2e-browser`): login, people status filter, patient filters vs metrics, date preference, dropdown padding, no long dashes, clinic isolation, time board drill-down.
 - [x] Browser E2E of the referral journey (doctor refers → physio accepts, starts, writes a progress note the doctor reads, completes → discharge letter; other clinic and front desk locked out), and the browser suite runs in CI against the compose stack (report uploaded on failure).
-- [ ] P2 Browser E2E next: patient registration with duplicate warning; weekly plan on the time board; holiday cover with handover; inventory use/open/finish.
+- [x] Browser E2E: patient registration with soft and blocking duplicates and NIF search; weekly plan from the board; holiday cover with a per-patient handover read by the cover physio; inventory use / open / finish.
+- [ ] P3 Browser E2E later: notifications bell, printing the letter (PDF), mobile viewport pass, accessibility scan (axe) of the main pages.
 - [x] Access rules of the legacy user/facility/time-log handlers unit-tested (`api/handlers/access_test.go`) and covered by e2e (`TestNoPrivilegeEscalation`, `TestClinicIsolation`).
 - [ ] P2 HTTP-level tests (httptest + PostgreSQL) for the legacy user and facility handlers.
 - [ ] P1 Component tests for `ReferralDetail`, `ReferralList`, `CreateReferral` with a mocked API (role-dependent buttons, validation).

@@ -5,7 +5,9 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   timeout: 30_000,
-  fullyParallel: false, // tests share demo users (preferences, filters)
+  // One at a time: tests share demo users and days on the board
+  fullyParallel: false,
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never", outputFolder: "report" }]],
   use: {
