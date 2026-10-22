@@ -7,7 +7,6 @@ import Page from "@/components/Common/Page";
 import { userChildProps } from "@/components/Common/UserColumns";
 import Error404 from "@/components/ErrorPages/404";
 import EmploymentTab from "@/components/Staff/EmploymentTab";
-import PreferencesTab from "@/components/Staff/PreferencesTab";
 import SkillsTab from "@/components/Staff/SkillsTab";
 import UserBanner from "@/components/Users/UserBanner";
 import UserSummaryTab from "@/components/Users/UserSummary";
@@ -73,7 +72,6 @@ export default function UserHome(props: UserHomeProps) {
     PROFILE: tabChildProp;
     SKILLS: tabChildProp;
     FACILITIES: tabChildProp;
-    PREFERENCES: tabChildProp;
   } = {
     PROFILE: { body: UserSummaryTab },
     SKILLS: { body: SkillsTab },
@@ -81,11 +79,6 @@ export default function UserHome(props: UserHomeProps) {
     FACILITIES: {
       body: EmploymentTab,
       hidden: !editPermissions && !managesStaff(authUser, userData),
-    },
-    // Own display preferences (date format)
-    PREFERENCES: {
-      body: PreferencesTab,
-      hidden: !loggedInUser,
     },
   };
 

@@ -23,6 +23,9 @@ test("the version lives on the profile and the About page, not in the menu", asy
   const versions = await page.locator("dl dd").allInnerTexts();
   expect(versions[0]).toMatch(/^0\.\d+\.\d+$/);
   expect(versions[1]).toBe(versions[0]); // app and server agree
+  // The update check moved to Settings; About links there
+  await page.getByRole("link", { name: "Definições" }).click();
+  await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByText(/Não altera o servidor, os dados nem outros computadores/)).toBeVisible();
   await page.getByRole("button", { name: "Procurar atualização" }).click();
   await expect(page.getByText(/Já tem a versão mais recente|Há uma atualização/).first()).toBeVisible();

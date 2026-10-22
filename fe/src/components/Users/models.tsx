@@ -58,6 +58,11 @@ export type UserModel = UserBareMinimum & {
   employment_since?: string | null;
   employment_note?: string;
   date_format?: "dmy" | "mdy" | "ymd" | "long" | "";
+  /** Settings page ("" = default) */
+  theme?: string;
+  text_size?: string;
+  start_page?: string;
+  language?: string;
 };
 
 export type UserBaseModel = {

@@ -52,6 +52,7 @@ be/                Go backend (Go module name: klyniva)
       timeline/    patient history (GET /patient/:id/timeline/): no tables, reads
                    patient, referral, attachment and schedule services so each
                    keeps its own access rules
+      feedback/    suggestions about the app: everyone sends, admins triage and answer
       staff/       skills catalogue + user skills, home clinic, employment
                    status (active / on_leave / left → is_active false)
     api/handlers/access.go  who may see/change users and clinics (legacy handlers; pure, tested)

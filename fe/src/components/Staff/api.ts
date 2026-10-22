@@ -59,7 +59,13 @@ const StaffRoutes = {
   setPreferences: {
     path: "/api/v1/users/{username}/preferences/",
     method: "PATCH",
-    TBody: Type<{ date_format: DateFormat }>(),
+    TBody: Type<{
+      date_format?: DateFormat;
+      theme?: string;
+      text_size?: string;
+      start_page?: string;
+      language?: string;
+    }>(),
     TRes: Type<UserModel>(),
   },
   setEmployment: {

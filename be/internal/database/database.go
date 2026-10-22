@@ -8,6 +8,7 @@ import (
 	"klyniva/internal/config"
 	"klyniva/internal/models"
 	"klyniva/internal/modules/attachment"
+	"klyniva/internal/modules/feedback"
 	"klyniva/internal/modules/inventory"
 	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/patient"
@@ -121,6 +122,7 @@ func Migrate() error {
 		{"referrals", referral.Models()},
 		{"notifications", notification.Models()},
 		{"attachments", attachment.Models()},
+		{"suggestions", feedback.Models()},
 	}
 	for i, p := range phases {
 		log.Printf("Migrating phase %d: %s...", i+1, p.name)

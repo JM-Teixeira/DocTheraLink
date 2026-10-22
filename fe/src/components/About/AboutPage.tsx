@@ -4,7 +4,6 @@ import { Link } from "raviger";
 import { useTranslation } from "react-i18next";
 
 import Page from "@/components/Common/Page";
-import UserSoftwareUpdate from "@/components/Users/UserSoftwareUpdate";
 
 import useDateFormat from "@/hooks/useDateFormat";
 
@@ -79,10 +78,12 @@ export default function AboutPage() {
           <h2 className="text-base font-semibold text-gray-900">
             {t("software_update")}
           </h2>
-          <p className="mb-4 mt-1 text-sm text-gray-600">
-            {t("software_update_explained")}
+          <p className="mt-1 text-sm text-gray-600">
+            {t("software_update_moved")}{" "}
+            <Link href="/settings" className="text-primary-700 underline">
+              {t("settings")}
+            </Link>
           </p>
-          <UserSoftwareUpdate />
         </section>
       </div>
     </Page>

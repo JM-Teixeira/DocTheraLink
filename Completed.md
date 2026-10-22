@@ -5,6 +5,22 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.14.0 (branch `feat/m4-patients`)
+
+### Settings and suggestions (batch 3, part C)
+- Settings page (user menu → Definições): theme light / dark / same as the
+  computer, text size, language, date format, start page after signing in,
+  and the software update check (moved from About). Saved on the account,
+  so they follow the person to any computer.
+- Dark theme: one stylesheet (`style/theme.css`) remaps the light colours
+  under `html.dark`; pages need no changes of their own.
+- Suggestions: anyone sends an idea / problem from Settings and sees its
+  status and the answer; admins get "Sugestões" in the menu (badge with the
+  new ones), filter by status, set where each stands and answer. New module
+  `feedback`.
+- The profile's "Preferências" tab is gone (now in Settings).
+- Tests: unit, API e2e `TestSuggestions`, browser `settings.spec.ts`.
+
 ## 2026-10-22 · Klyniva 0.13.0 (branch `feat/m4-patients`)
 
 ### Treatment plan per referral (batch 3)

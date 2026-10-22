@@ -14,6 +14,7 @@ import Error404 from "@/components/ErrorPages/404";
 import SessionExpired from "@/components/ErrorPages/SessionExpired";
 import HomePage from "@/components/Home/HomePage";
 
+import useApplySettings from "@/hooks/useApplySettings";
 import { usePluginRoutes } from "@/hooks/useCareApps";
 
 import { BLACKLISTED_PATHS } from "@/common/constants";
@@ -62,6 +63,7 @@ export default function AppRouter() {
   let routes = Routes;
 
   useRedirect("/user", "/users");
+  useApplySettings(); // theme, text size, language, start page
 
   // Merge in Plugin Routes
   routes = {

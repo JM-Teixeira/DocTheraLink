@@ -12,6 +12,7 @@ import (
 	"klyniva/internal/models"
 	"klyniva/internal/modules/attachment"
 	"klyniva/internal/modules/catalog"
+	"klyniva/internal/modules/feedback"
 	"klyniva/internal/modules/inventory"
 	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/patient"
@@ -152,6 +153,9 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	timeline.RegisterRoutes(protected, timeline.Services{
 		Patients: patients, Referrals: referrals, Files: files, Board: board,
 	})
+
+	// Suggestions about the app (everyone sends, admins read)
+	feedback.RegisterRoutes(protected, db)
 
 	// Skills, clinic and employment status of staff
 	staff.RegisterRoutes(protected, staff.NewService(staff.NewGormRepository(db)))

@@ -58,7 +58,7 @@ test("dates follow the person's preference", async ({ page, request }) => {
     await expect(page.getByLabel("Data", { exact: true })).toHaveValue(today);
 
     // Change it from the profile, as a person would
-    await page.goto("/user/preferences");
+    await page.goto("/settings");
     await page.getByRole("radio", { name: /Dia \/ mês \/ ano/ }).click();
     await expect(page.getByRole("radio", { name: /Dia \/ mês \/ ano/ })).toHaveAttribute("aria-checked", "true");
     await page.goto("/time-board");

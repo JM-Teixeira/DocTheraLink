@@ -1,0 +1,94 @@
+/*
+ * Dark theme and large text (Settings page, hooks/useApplySettings.ts).
+ *
+ * The pages use Tailwind's light grey/white utilities; under html.dark the
+ * common ones are remapped here, so no page needs its own dark classes.
+ * Add a utility here when a new light colour shows up in dark mode.
+ */
+
+html.text-large {
+  font-size: 112.5%; /* every rem-based size grows */
+}
+
+html.dark body,
+html.dark .bg-gray-50,
+html.dark .bg-gray-100,
+html.dark #pages {
+  background-color: #0f172a;
+}
+html.dark .bg-white,
+html.dark .login-hero-form {
+  background-color: #1e293b;
+}
+html.dark .bg-gray-200,
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover,
+html.dark .hover\:bg-gray-200:hover {
+  background-color: #334155;
+}
+
+html.dark,
+html.dark .text-black,
+html.dark .text-gray-900 {
+  color: #f1f5f9;
+}
+html.dark .text-gray-800 {
+  color: #e2e8f0;
+}
+html.dark .text-gray-700 {
+  color: #cbd5e1;
+}
+html.dark .text-gray-600,
+html.dark .text-gray-500 {
+  color: #94a3b8;
+}
+
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .divide-gray-100 > * + *,
+html.dark .border-gray-300 {
+  border-color: #334155;
+}
+html.dark .ring-gray-200,
+html.dark .ring-gray-300 {
+  --tw-ring-color: #475569;
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b;
+}
+
+/* Light tints used for chips and callouts: same hue, dark background */
+html.dark .bg-primary-50 {
+  background-color: rgb(16 185 129 / 0.12);
+}
+html.dark .bg-amber-50 {
+  background-color: rgb(245 158 11 / 0.12);
+}
+html.dark .bg-rose-50 {
+  background-color: rgb(244 63 94 / 0.12);
+}
+html.dark .bg-emerald-50 {
+  background-color: rgb(16 185 129 / 0.12);
+}
+html.dark .text-primary-700,
+html.dark .text-primary-800,
+html.dark .text-primary-900 {
+  color: #6ee7b7;
+}
+html.dark .text-amber-900,
+html.dark .text-amber-800 {
+  color: #fcd34d;
+}
+html.dark .text-rose-700,
+html.dark .text-rose-800 {
+  color: #fda4af;
+}

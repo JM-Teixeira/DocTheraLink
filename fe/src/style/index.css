@@ -10,6 +10,7 @@
 @import "@pnotify/mobile/dist/PNotifyMobile.css";
 @import "@pnotify/core/dist/BrightTheme.css";
 @import "./CAREUI.css";
+@import "./theme.css";
 
 @tailwind base;
 @tailwind components;

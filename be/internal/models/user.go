@@ -74,6 +74,12 @@ type User struct {
 
 	// How the person wants dates shown: dmy, mdy, ymd or long ("" = dmy).
 	DateFormat string `json:"date_format" gorm:"size:8"`
+	// Settings page: theme light/dark/system, text size normal/large, the
+	// page opened after sign-in and the language ("" = defaults)
+	Theme     string `json:"theme" gorm:"size:8"`
+	TextSize  string `json:"text_size" gorm:"size:8"`
+	StartPage string `json:"start_page" gorm:"size:20"`
+	Language  string `json:"language" gorm:"size:5"`
 
 	// Relationships
 	LocalBody    *LocalBody  `json:"local_body_object" gorm:"foreignKey:LocalBodyID"`

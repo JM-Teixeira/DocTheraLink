@@ -45,6 +45,14 @@ func (f *fakeRepo) UpdateUser(_ context.Context, id uint, fields map[string]any)
 			u.IsActive = v.(bool)
 		case "date_format":
 			u.DateFormat = v.(string)
+		case "theme":
+			u.Theme = v.(string)
+		case "text_size":
+			u.TextSize = v.(string)
+		case "start_page":
+			u.StartPage = v.(string)
+		case "language":
+			u.Language = v.(string)
 		case "home_facility_id":
 			u.HomeFacilityID = v.(*string)
 		}
@@ -244,5 +252,16 @@ func TestPreferences(t *testing.T) {
 	}
 	if repo.users[1].DateFormat != "ymd" {
 		t.Error("a rejected change must not be saved")
+	}
+
+	// Settings page: several at once; empty ones stay as they are
+	u, err = s.SetPreferences(ctx, sarah, "sarah", PreferencesRequest{Theme: "dark", TextSize: "large", StartPage: "time-board", Language: "en"})
+	if err != nil || u.Theme != "dark" || u.TextSize != "large" || u.StartPage != "time-board" || u.Language != "en" || u.DateFormat != "ymd" {
+		t.Errorf("settings: %+v %v", u, err)
+	}
+	for _, bad := range []PreferencesRequest{{Theme: "pink"}, {TextSize: "huge"}, {StartPage: "/admin"}, {Language: "fr"}} {
+		if _, err := s.SetPreferences(ctx, sarah, "sarah", bad); !errors.As(err, &verr) {
+			t.Errorf("%+v: %v", bad, err)
+		}
 	}
 }

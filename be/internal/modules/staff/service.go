@@ -12,6 +12,7 @@ package staff
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -54,8 +55,22 @@ type EmploymentRequest struct {
 }
 
 // PreferencesRequest changes how the app is shown to the person.
+// PreferencesRequest changes the settings sent; empty ones stay as they are.
 type PreferencesRequest struct {
-	DateFormat string `json:"date_format" binding:"required,oneof=dmy mdy ymd long"`
+	DateFormat string `json:"date_format"`
+	Theme      string `json:"theme"`
+	TextSize   string `json:"text_size"`
+	StartPage  string `json:"start_page"`
+	Language   string `json:"language"`
+}
+
+// preferenceValues are the accepted values of each setting.
+var preferenceValues = map[string][]string{
+	"date_format": {"dmy", "mdy", "ymd", "long"},
+	"theme":       {"light", "dark", "system"},
+	"text_size":   {"normal", "large"},
+	"start_page":  {"home", "patients", "referrals", "time-board", "inventory"},
+	"language":    {"pt", "en"},
 }
 
 // Service holds the staff rules.
@@ -253,13 +268,23 @@ func (s *Service) SetPreferences(ctx context.Context, a Actor, username string, 
 	if u.ID != a.ID {
 		return nil, ErrForbidden
 	}
-	switch req.DateFormat {
-	case "dmy", "mdy", "ymd", "long":
-	default:
-		return nil, &ValidationError{"date_format", "must be dmy, mdy, ymd or long"}
+	fields := map[string]any{}
+	for col, v := range map[string]string{
+		"date_format": req.DateFormat, "theme": req.Theme, "text_size": req.TextSize,
+		"start_page": req.StartPage, "language": req.Language,
+	} {
+		if v == "" {
+			continue
+		}
+		if !slices.Contains(preferenceValues[col], v) {
+			return nil, &ValidationError{col, "must be one of " + strings.Join(preferenceValues[col], ", ")}
+		}
+		fields[col] = v
 	}
-	if err := s.repo.UpdateUser(ctx, u.ID, map[string]any{"date_format": req.DateFormat}); err != nil {
-		return nil, err
+	if len(fields) > 0 {
+		if err := s.repo.UpdateUser(ctx, u.ID, fields); err != nil {
+			return nil, err
+		}
 	}
 	return s.repo.UserByID(ctx, u.ID)
 }
