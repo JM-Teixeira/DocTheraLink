@@ -93,65 +93,63 @@ export default function Breadcrumbs({
   return (
     <Breadcrumb>
       <nav className={classNames("w-full", className)} aria-label="Breadcrumb">
-        <BreadcrumbList>
-          <ol className="flex flex-wrap items-center">
-            {!hideBack && (
-              <li className="mr-3 flex items-center">
+        <BreadcrumbList className="gap-0 sm:gap-0">
+          {!hideBack && (
+            <li className="mr-3 flex items-center">
+              <Button
+                variant="link"
+                className="rounded bg-gray-200/50 px-1 text-sm font-normal text-gray-800 transition hover:bg-gray-200/75 hover:no-underline"
+                size="xs"
+                onClick={() => {
+                  if (onBackClick && onBackClick() === false) return;
+                  goBack(backUrl);
+                }}
+              >
+                <CareIcon icon="l-arrow-left" className="h-5 text-gray-700" />
+                <span className="pr-2">{t("back")}</span>
+              </Button>
+            </li>
+          )}
+          <BreadcrumbItem>
+            <Button
+              asChild
+              variant="link"
+              className="p-1 font-normal text-gray-800 hover:text-gray-700"
+            >
+              <Link href="/">{t("home")}</Link>
+            </Button>
+          </BreadcrumbItem>
+          {shown.map((crumb, i) => (
+            <li
+              key={crumb ? crumb.uri : "collapsed"}
+              className={classNames(
+                "flex items-center text-sm font-normal",
+                crumb?.style ?? "",
+              )}
+            >
+              <BreadcrumbSeparator className="text-gray-400" />
+              {crumb === null ? (
                 <Button
                   variant="link"
-                  className="rounded bg-gray-200/50 px-1 text-sm font-normal text-gray-800 transition hover:bg-gray-200/75 hover:no-underline"
-                  size="xs"
-                  onClick={() => {
-                    if (onBackClick && onBackClick() === false) return;
-                    goBack(backUrl);
-                  }}
+                  className="h-auto p-1 font-light text-gray-500 hover:text-gray-700"
+                  onClick={() => setExpanded(true)}
+                  aria-label={t("show_full_path")}
                 >
-                  <CareIcon icon="l-arrow-left" className="h-5 text-gray-700" />
-                  <span className="pr-2">{t("back")}</span>
+                  •••
                 </Button>
-              </li>
-            )}
-            <BreadcrumbItem>
-              <Button
-                asChild
-                variant="link"
-                className="p-1 font-normal text-gray-800 hover:text-gray-700"
-              >
-                <Link href="/">{t("home")}</Link>
-              </Button>
-            </BreadcrumbItem>
-            {shown.map((crumb, i) => (
-              <li
-                key={crumb ? crumb.uri : "collapsed"}
-                className={classNames(
-                  "flex items-center text-sm font-normal",
-                  crumb?.style ?? "",
-                )}
-              >
-                <BreadcrumbSeparator className="text-gray-400" />
-                {crumb === null ? (
-                  <Button
-                    variant="link"
-                    className="h-auto p-1 font-light text-gray-500 hover:text-gray-700"
-                    onClick={() => setExpanded(true)}
-                    aria-label={t("show_full_path")}
-                  >
-                    •••
-                  </Button>
-                ) : i === shown.length - 1 ? (
-                  <span className="p-1 text-gray-600">{crumb.name}</span>
-                ) : (
-                  <Button
-                    asChild
-                    variant="link"
-                    className="p-1 font-normal text-gray-800 hover:text-gray-700"
-                  >
-                    <Link href={crumb.uri}>{crumb.name}</Link>
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ol>
+              ) : i === shown.length - 1 ? (
+                <span className="p-1 text-gray-600">{crumb.name}</span>
+              ) : (
+                <Button
+                  asChild
+                  variant="link"
+                  className="p-1 font-normal text-gray-800 hover:text-gray-700"
+                >
+                  <Link href={crumb.uri}>{crumb.name}</Link>
+                </Button>
+              )}
+            </li>
+          ))}
         </BreadcrumbList>
       </nav>
     </Breadcrumb>

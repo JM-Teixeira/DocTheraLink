@@ -45,7 +45,9 @@ export default function CareIcon({
     <svg
       id={id}
       className={`care-${icon} ${svgClassName}`}
-      role="img"
+      // Decorative: the button or text next to it carries the meaning
+      aria-hidden="true"
+      focusable="false"
       xmlns="http://www.w3.org/2000/svg"
       onClick={onClick}
       viewBox={`0 0 ${viewBox} ${viewBox}`}

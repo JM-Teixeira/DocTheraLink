@@ -4,6 +4,7 @@ import { t } from "i18next";
 import { Avatar } from "@/components/Common/Avatar";
 import UserDetails from "@/components/Common/UserDetails";
 import UserDetailComponent from "@/components/Common/UserDetailsComponet";
+import { roleKey } from "@/components/Staff/staffUtils";
 import { UserModel } from "@/components/Users/models";
 
 import { formatDisplayName, formatName } from "@/Utils/utils";
@@ -29,14 +30,14 @@ export default function UserBanner({ userData }: { userData: UserModel }) {
               <h1 className="text-xl font-bold" id="users-name">
                 {formatName(userData)}
               </h1>
-              <div className="min-width-50 shrink-0 text-sm text-secondary-600">
+              <div className="min-width-50 shrink-0 text-sm text-gray-600">
                 <UserStatusIndicator user={userData} addPadding />
               </div>
             </div>
 
             <span
               id="username"
-              className="text-sm font-light leading-relaxed text-secondary-600"
+              className="text-sm font-light leading-relaxed text-gray-600"
             >
               {userData.username}
             </span>
@@ -46,14 +47,16 @@ export default function UserBanner({ userData }: { userData: UserModel }) {
           {userData.user_type && (
             <UserDetailComponent
               id="role"
-              title="Role"
-              value={userData.user_type}
+              title={t("role")}
+              value={t(roleKey(userData.user_type), {
+                defaultValue: userData.user_type,
+              })}
             />
           )}
           {userData.district_object && (
             <UserDetailComponent
               id="district"
-              title="District"
+              title={t("district")}
               value={userData.district_object.name}
             />
           )}
@@ -67,7 +70,7 @@ export default function UserBanner({ userData }: { userData: UserModel }) {
               {userData.qualification ? (
                 <span className="font-semibold">{userData.qualification}</span>
               ) : (
-                <span className="text-secondary-600">{t("unknown")}</span>
+                <span className="text-gray-600">{t("unknown")}</span>
               )}
             </UserDetails>
           )}
@@ -83,7 +86,7 @@ export default function UserBanner({ userData }: { userData: UserModel }) {
                   years
                 </span>
               ) : (
-                <span className="text-secondary-600">{t("unknown")}</span>
+                <span className="text-gray-600">{t("unknown")}</span>
               )}
             </UserDetails>
           )}

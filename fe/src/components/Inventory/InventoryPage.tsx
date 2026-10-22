@@ -244,7 +244,9 @@ export default function InventoryPage() {
                     <span
                       className={cn(
                         "rounded-full px-1.5 text-xs",
-                        filter === f.key ? "bg-white/20" : "bg-gray-100",
+                        filter === f.key
+                          ? "bg-white text-primary-700"
+                          : "bg-gray-100",
                       )}
                     >
                       {f.count}

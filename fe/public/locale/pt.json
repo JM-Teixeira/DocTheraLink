@@ -689,5 +689,10 @@
   "date_month_letters": "MM",
   "date_year_letters": "AAAA",
   "open_calendar": "Abrir calendário",
-  "invalid_date_format": "Indique uma data válida no formato {{pattern}}"
+  "invalid_date_format": "Indique uma data válida no formato {{pattern}}",
+  "district": "Distrito",
+  "home_facility": "Clínica",
+  "no_home_facility": "Sem clínica",
+  "expand_sidebar": "Expandir menu",
+  "collapse_sidebar": "Recolher menu"
 }

@@ -243,7 +243,9 @@ export default function ReferralList() {
               <span
                 className={cn(
                   "ml-1.5 rounded-full px-1.5 text-xs tabular-nums",
-                  status === f ? "bg-white/20" : "bg-gray-100 text-gray-600",
+                  status === f
+                    ? "bg-white text-primary-700"
+                    : "bg-gray-100 text-gray-600",
                 )}
               >
                 {f ? (counts[f] ?? 0) : sumCounts(counts)}

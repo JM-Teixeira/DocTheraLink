@@ -133,7 +133,7 @@ export default function UserHome(props: UserHomeProps) {
                               "min-w-max-content cursor-pointer whitespace-nowrap text-sm font-semibold",
                               currentTab === p
                                 ? "border-b-2 border-primary-500 text-primary-600 hover:border-secondary-300"
-                                : "text-secondary-700 hover:text-secondary-700",
+                                : "text-gray-600 hover:text-gray-900",
                             )}
                             href={`${urlPrefix}/${p.toLocaleLowerCase()}`}
                           >

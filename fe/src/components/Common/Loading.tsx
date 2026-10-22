@@ -29,11 +29,7 @@ const Loading = () => {
       className="flex w-full items-center justify-center transition-[height]"
       style={{ height: `calc(100vh - ${offsetTop}px)` }}
     >
-      <img
-        src="/images/klyniva-gray.png"
-        className="App-logo"
-        alt="loading"
-      />
+      <img src="/images/klyniva-gray.png" className="App-logo" alt="loading" />
     </div>
   );
 };
