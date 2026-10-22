@@ -174,7 +174,7 @@ export default function PatientList() {
               placeholder={t("diagnosis_or_icd")}
               value={filter.diagnosis}
               onChange={(e) => set({ diagnosis: e.target.value })}
-              className="h-10 w-48 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              className="h-10 w-64 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
             />
           )}
           {isFiltered(filter) && (

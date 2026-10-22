@@ -1083,5 +1083,8 @@
   "show_consent_history_one": "Ver histórico (1 registo)",
   "show_consent_history_other": "Ver histórico ({{count}} registos)",
   "hide_consent_history": "Esconder histórico",
-  "show_consent_history_zero": "Ver histórico ({{count}} registos)"
+  "show_consent_history_zero": "Ver histórico ({{count}} registos)",
+  "choose_clinic": "Escolha a clínica",
+  "export": "Exportar",
+  "exporting": "A exportar..."
 }

@@ -103,6 +103,13 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 
 	db := database.GetDB()
 
+	// Tokens of people who left or were deactivated stop working (auth.ActiveChecker)
+	auth.ActiveChecker = func(id uint) (bool, error) {
+		var active []bool
+		err := db.Model(&models.User{}).Where("id = ?", id).Pluck("is_active", &active).Error
+		return len(active) == 1 && active[0], err
+	}
+
 	// Patients (module)
 	patients := patient.RegisterRoutes(protected.Group("/patient"), db)
 

@@ -71,12 +71,17 @@ export function ItemDialog({
   pending,
   floors,
   categories,
+  clinics,
+  defaultClinic = "",
   onClose,
   onSave,
 }: {
   open: boolean;
   item: StockItem | null;
   pending: boolean;
+  /** Admins adding an item choose its clinic (default: the one in view). */
+  clinics?: { id: string; name: string }[];
+  defaultClinic?: string;
   /** Floors of the clinic (from its divisions) and categories in use. */
   floors: number[];
   categories: string[];
@@ -85,8 +90,10 @@ export function ItemDialog({
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState<ItemForm>(EMPTY);
+  const [clinicId, setClinicId] = useState(defaultClinic);
   useEffect(() => {
     if (!open) return;
+    setClinicId(defaultClinic);
     setForm(
       item
         ? {
@@ -103,10 +110,13 @@ export function ItemDialog({
           }
         : EMPTY,
     );
-  }, [open, item]);
+  }, [open, item, defaultClinic]);
   const set = (k: keyof ItemForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
-  const valid = form.name.trim().length >= 2 && Number(form.min) >= 0;
+  const valid =
+    form.name.trim().length >= 2 &&
+    Number(form.min) >= 0 &&
+    (!clinics || !!clinicId);
   const container = form.tracking === "container";
 
   return (
@@ -131,9 +141,28 @@ export function ItemDialog({
               open_life_days: container ? Number(form.openLife) || 0 : 0,
               floor: form.floor ? Number(form.floor) : null,
               ...(item ? {} : { quantity: Number(form.quantity) }),
+              ...(clinics ? { clinic_id: clinicId } : {}),
             });
           }}
         >
+          {clinics && (
+            <label className="text-sm font-medium text-gray-700">
+              {t("clinic")} *
+              <select
+                value={clinicId}
+                onChange={(e) => setClinicId(e.target.value)}
+                className={fieldClass}
+                required
+              >
+                <option value="">{t("choose_clinic")}</option>
+                {clinics.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="text-sm font-medium text-gray-700">
             {t("item_name")} *
             <input

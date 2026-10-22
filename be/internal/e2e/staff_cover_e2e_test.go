@@ -273,3 +273,18 @@ func TestHolidayCover(t *testing.T) {
 	}
 	coord.call("DELETE", "/schedule/shifts/"+shiftB["id"].(string)+"/", nil, nil)
 }
+
+// TestLeftUserLosesSession: a token issued before someone is marked as having
+// left stops working right away, and works again when they come back.
+func TestLeftUserLosesSession(t *testing.T) {
+	coord, _ := login(t, "cm.coordenacao")
+	tiago, _ := login(t, "cm.fisio6")
+	expect(t, "signed in", tiago.call("GET", "/users/getcurrentuser/", nil, nil), 200)
+
+	expect(t, "mark as left", coord.call("PATCH", "/users/cm.fisio6/employment/", map[string]any{"status": "left", "note": "e2e"}, nil), 200)
+	defer coord.call("PATCH", "/users/cm.fisio6/employment/", map[string]any{"status": "active"}, nil)
+	expect(t, "old token refused", tiago.call("GET", "/users/getcurrentuser/", nil, nil), 401)
+
+	expect(t, "back", coord.call("PATCH", "/users/cm.fisio6/employment/", map[string]any{"status": "active"}, nil), 200)
+	expect(t, "token works again", tiago.call("GET", "/users/getcurrentuser/", nil, nil), 200)
+}

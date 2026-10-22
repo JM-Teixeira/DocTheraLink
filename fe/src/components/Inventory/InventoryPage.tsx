@@ -130,11 +130,9 @@ export default function InventoryPage() {
   const categories = [
     ...new Set((items ?? []).map((i) => i.category).filter(Boolean)),
   ].sort();
-  // Who may add items: managers, or anyone with a grant (admins pick a clinic first)
-  const canCreate =
-    !!access &&
-    (access.manage || access.grants.length > 0) &&
-    (!admin || !!clinic);
+  // Who may add items: managers, or anyone with a grant (admins choose the
+  // clinic in the dialog)
+  const canCreate = !!access && (access.manage || access.grants.length > 0);
   const readOnly = !!access && !access.manage && access.grants.length === 0;
 
   const refresh = () => {
@@ -159,7 +157,7 @@ export default function InventoryPage() {
             silent: true,
           })
         : callApi(InventoryRoutes.create, {
-            body: admin ? { ...req, clinic_id: clinic } : req,
+            body: admin ? { ...req, clinic_id: req.clinic_id || clinic } : req,
             silent: true,
           }),
     onSuccess: () => {
@@ -208,13 +206,8 @@ export default function InventoryPage() {
     <Page
       title={t("inventory")}
       options={
-        (canCreate || (admin && !clinic)) && (
-          <Button
-            variant="primary"
-            disabled={!canCreate}
-            title={canCreate ? undefined : t("choose_clinic_first")}
-            onClick={() => setEditing(null)}
-          >
+        canCreate && (
+          <Button variant="primary" onClick={() => setEditing(null)}>
             <Plus className="mr-2 size-4" aria-hidden />
             {t("new_item")}
           </Button>
@@ -409,6 +402,8 @@ export default function InventoryPage() {
         pending={save.isPending}
         floors={floors}
         categories={categories}
+        clinics={admin && !editing ? clinics?.results : undefined}
+        defaultClinic={clinic}
         onClose={() => setEditing(undefined)}
         onSave={(req) => save.mutate(req)}
       />

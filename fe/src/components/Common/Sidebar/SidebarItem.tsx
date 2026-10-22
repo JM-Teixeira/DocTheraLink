@@ -57,16 +57,18 @@ const SidebarItemBase = forwardRef<HTMLAnchorElement, SidebarItemBaseProps>(
         <span className={`tooltip-text tooltip-right ${!shrinked && "hidden"}`}>
           {t(props.text)}
         </span>
-        <div
-          className={`flex h-full items-center ${
-            shrinked ? "justify-center" : "justify-start pl-5 pr-4"
-          } transition-all duration-200 ease-in-out`}
-        >
+        {/* Same layout open and closed: the icon keeps its place (centred in
+            the narrow bar) and the label fades out, so closing is as smooth
+            as opening */}
+        <div className="flex h-full items-center justify-start overflow-hidden pl-3 pr-2">
           <div className="flex-none text-lg">{props.icon}</div>
           <span
+            aria-hidden={shrinked}
             className={`${
-              shrinked ? "hidden" : "grow"
-            } flex w-full items-center text-nowrap pl-4 text-sm tracking-wide`}
+              shrinked
+                ? "max-w-0 pl-0 opacity-0"
+                : "max-w-[12rem] grow pl-4 opacity-100"
+            } flex items-center overflow-hidden text-nowrap text-sm tracking-wide transition-all duration-300 ease-in-out`}
           >
             {t(props.text)}
           </span>

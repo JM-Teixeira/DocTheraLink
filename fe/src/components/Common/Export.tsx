@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import CareIcon from "@/CAREUI/icons/CareIcon";
 
 import ButtonV2 from "@/components/Common/ButtonV2";
@@ -39,11 +41,13 @@ interface ExportButtonProps {
 }
 
 export const ExportMenu = ({
-  label = "Export",
+  label,
   disabled,
   exportItems,
 }: ExportMenuProps) => {
+  const { t } = useTranslation();
   const { isExporting, exportFile } = useExport();
+  label ??= t("export");
 
   if (exportItems.length === 1) {
     const item = exportItems[0];
@@ -68,7 +72,7 @@ export const ExportMenu = ({
         className="py-2.5"
       >
         <CareIcon icon="l-export" />
-        {isExporting ? "Exporting..." : label}
+        {isExporting ? t("exporting") : label}
       </ButtonV2>
     );
   }
@@ -77,7 +81,7 @@ export const ExportMenu = ({
     <div key="export-menu" id="export-button">
       <DropdownMenu
         disabled={isExporting || disabled}
-        title={isExporting ? "Exporting..." : label}
+        title={isExporting ? t("exporting") : label}
         icon={<CareIcon icon="l-export" />}
         className="tooltip border-primary-500 bg-white text-primary-500 hover:bg-primary-100 enabled:border"
       >

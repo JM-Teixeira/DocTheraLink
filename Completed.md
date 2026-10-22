@@ -5,6 +5,22 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.11.1 (branch `feat/m4-patients`)
+
+### Fixes from the review (batch 3, part A)
+- State admins can add stock items: the button is always on and the
+  dialog asks for the clinic (it was disabled under "all clinics").
+- Login page: the Klyniva title no longer moves when switching language
+  (fixed offset instead of centring texts of different lengths).
+- Patients: the diagnosis filter is wide enough for its placeholder.
+- Every page header keeps a gap above the first card (e.g. "Nova clínica").
+- "Export" button translated.
+- People who left cannot sign in (already true) and now also lose an open
+  session at once: the API checks the account is still active (cached
+  30 s, cleared when the status changes).
+- Sidebar: one layout open and closed (icon stays, label fades), so
+  closing is as smooth as opening.
+
 ## 2026-10-22 · Klyniva 0.11.0 (branch `feat/m4-patients`)
 
 ### Network access from other laptops really works

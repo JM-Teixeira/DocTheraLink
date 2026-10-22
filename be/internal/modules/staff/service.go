@@ -240,6 +240,7 @@ func (s *Service) SetEmployment(ctx context.Context, a Actor, username string, r
 	if err := s.repo.UpdateUser(ctx, u.ID, fields); err != nil {
 		return nil, err
 	}
+	auth.ForgetActive(u.ID) // a person who left loses access now, not in 30 s
 	return s.repo.UserByID(ctx, u.ID)
 }
 

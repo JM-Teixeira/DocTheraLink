@@ -63,6 +63,16 @@ func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 			return
 		}
 
+		// Someone who left (or was deactivated) loses access within activeCacheTTL
+		if !userActive(payload.UserID) {
+			ctx.JSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error:   "account_inactive",
+				Message: "This account is no longer active",
+			})
+			ctx.Abort()
+			return
+		}
+
 		ctx.Set(AuthorizationPayloadKey, payload)
 		ctx.Set(UserIDKey, payload.UserID)
 		ctx.Next()

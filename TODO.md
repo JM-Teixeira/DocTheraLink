@@ -8,6 +8,37 @@ Status tags: **[proposed]** = waiting for product-owner review before work start
 
 ---
 
+## Requests 2026-10-22 (batch 3, in progress)
+
+Bugs / quick fixes
+- [ ] Adding a clinic user gets stuck on "loading plugin".
+- [x] State admin cannot create inventory items.
+- [x] Home: the Klyniva logo moves when switching EN/PT (fixed height).
+- [x] Patients: the diagnosis filter text is cut ("CID").
+- [x] Clinics: "Nova clínica" too close to the card below.
+- [x] Confirm users with status "left" cannot sign in.
+- [x] Sidebar collapse animation as smooth as the expand.
+
+Features
+- [ ] Settings page (user): date format, theme light/dark, language, software update, other useful preferences.
+- [ ] Suggestions: anyone sends ideas from Settings; admins read them in one place.
+- [ ] "?" help on each page: what it does and its features, in a pop-up (keeps pages short).
+- [ ] Admins can view the app as any role ("ver como") to check what each role sees.
+- [ ] Users: filters (dropdowns) for who can change which stock (category x floor), counting "all floors / all categories" grants.
+- [ ] User page: professional situation at a glance (joined on, leave from/to, left on), from a dated history.
+- [ ] Clinic code (demo "de", Climutua "cm") and a username standard `<code>.<first>.<last>` (+ number on clash), applied to everyone.
+- [ ] Waiting list: confirm several patients; highlight entries when a matching slot is free (any or a chosen physio) and alert the coordinator.
+- [ ] User: field for what the person does with patients (to clarify with the product owner).
+
+Repo / docs
+- [ ] Clean up unused files, clear layout, rewrite README.md.
+
+Hosting
+- [ ] TLS certificates (local CA now, Let's Encrypt when public).
+- [ ] Move hosting to the Ubuntu laptop as a server: same k8s manifests (k3s), notes to keep it modular and ready to scale (stateless backend, S3 uploads, managed Postgres, versioned migrations).
+
+---
+
 ## 0. Testing policy (mandatory for every change)
 
 Tests are what let us change the product safely. A feature or fix is **not
