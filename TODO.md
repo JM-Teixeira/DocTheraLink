@@ -105,7 +105,7 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] New Klyniva patient pages: list/search, detail, create/edit (replace CARE's 3k-line pages).
 - [x] Duplicate detection with confirmation: same NIF/SNS in the clinic is blocked (also by a partial unique index); similar name + same birth date or phone asks "different person?".
 - [x] Patient form: draft auto-save (per user, 24 h, cleared on sign-out; restore or discard), e-mail, street / postal code / city, emergency contact name + relationship, insurer + member number; browser E2E of the flow.
-- [ ] Rest of the old "centralized patient creation" spec: retry on network errors, ≥80 % coverage, structured allergies/medications/conditions (lists instead of free text).
+- [x] Rest of the old "centralized patient creation" spec: retry on network errors (only when the server cannot have done the work), structured allergies / conditions / medications, ≥80 % coverage of the patient flow enforced in CI; unused old spec code removed.
 - [x] Portuguese identifiers: NIF (mod-11 check digit) and SNS number (9 digits), stored normalised.
 - [x] Patient filters (care level, age band, gender, clinic) with metrics of the match; search by name, NIF or SNS number.
 - [ ] Patient metrics next: export CSV; trends over time; filter by physio / diagnosis.

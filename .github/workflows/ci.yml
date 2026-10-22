@@ -54,7 +54,7 @@ jobs:
       # Strict lint for new modules; the inherited codebase still needs a
       # formatting pass (see TODO.md) before linting all of src/.
       - run: npm run lint:strict
-      - run: npm test
+      - run: npm run test:coverage # tests + the 80 % patient coverage gate
       - name: Build
         run: npm run build:meta && npm run generate && npm run build:react
         env:

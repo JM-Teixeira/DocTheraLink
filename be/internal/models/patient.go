@@ -37,6 +37,26 @@ const (
 	RationCardCategoryNone RationCardCategory = "NONE"
 )
 
+// Allergy is one known allergy; Severity is mild, moderate or severe.
+type Allergy struct {
+	Substance string `json:"substance"`
+	Reaction  string `json:"reaction,omitempty"`
+	Severity  string `json:"severity,omitempty"`
+}
+
+// Medication is one medicine the patient takes.
+type Medication struct {
+	Name      string `json:"name"`
+	Dose      string `json:"dose,omitempty"`
+	Frequency string `json:"frequency,omitempty"`
+}
+
+// Condition is a known health problem, optionally with the year it began.
+type Condition struct {
+	Name  string `json:"name"`
+	Since *int   `json:"since,omitempty"`
+}
+
 type Patient struct {
 	tableName            struct{} `gorm:"table:patients"`
 	ID                   string   `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
@@ -76,6 +96,10 @@ type Patient struct {
 	MedicalHistoryDetails *string `json:"medical_history_details"`
 	OngoingMedication     *string `json:"ongoing_medication"`
 	PresentHealth         *string `json:"present_health"`
+	// Structured lists; the free-text fields above stay as extra notes
+	AllergyList    []Allergy    `json:"allergy_list" gorm:"serializer:json;type:text"`
+	MedicationList []Medication `json:"medication_list" gorm:"serializer:json;type:text"`
+	ConditionList  []Condition  `json:"condition_list" gorm:"serializer:json;type:text"`
 
 	// COVID-related fields
 	ContactWithCarrier   *bool      `json:"contact_with_carrier"`

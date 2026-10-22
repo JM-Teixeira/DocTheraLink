@@ -12,6 +12,7 @@ import {
   genderKey,
   patientToForm,
   readDraft,
+  rowsToPayload,
   serverErrorsToForm,
   validNif,
   validSns,
@@ -258,5 +259,67 @@ describe("form drafts", () => {
     clearAllDrafts(s);
     expect(s.length).toBe(1);
     expect(s.getItem("other")).toBe("keep");
+  });
+});
+
+describe("clinical lists", () => {
+  it("turns rows into API items, dropping empty rows and cells", () => {
+    expect(
+      rowsToPayload({
+        allergy_list: [
+          { substance: " Penicilina ", reaction: "", severity: "severe" },
+          { substance: " ", reaction: "x", severity: "" },
+        ],
+        medication_list: [
+          { name: "Ibuprofeno", dose: "400 mg", frequency: "" },
+        ],
+        condition_list: [
+          { name: "Asma", since: "2010" },
+          { name: "HTA", since: "" },
+        ],
+      }),
+    ).toEqual({
+      allergy_list: [{ substance: "Penicilina", severity: "severe" }],
+      medication_list: [{ name: "Ibuprofeno", dose: "400 mg" }],
+      condition_list: [{ name: "Asma", since: 2010 }, { name: "HTA" }],
+    });
+  });
+
+  it("reads lists from a patient and checks condition years", () => {
+    const f = patientToForm({
+      name: "Ana",
+      allergy_list: [{ substance: "Látex" }],
+      condition_list: [{ name: "Asma", since: 2010 }],
+    });
+    expect(f.allergy_list).toEqual([
+      { substance: "Látex", reaction: "", severity: "" },
+    ]);
+    expect(f.condition_list[0].since).toBe("2010");
+    expect(f.medication_list).toEqual([]);
+    const bad = { ...f, condition_list: [{ name: "Asma", since: "2099" }] };
+    expect(validatePatientForm(bad, today).condition_list).toBe(
+      "error__invalid_year",
+    );
+  });
+
+  it("restores list rows from a draft, keeping only known cells", () => {
+    const s = new Map<string, string>();
+    const storage = { getItem: (k: string) => s.get(k) ?? null };
+    s.set(
+      "k",
+      JSON.stringify({
+        saved_at: today.toISOString(),
+        form: {
+          name: "Ana",
+          allergy_list: [{ substance: "Pó", evil: "x" }, "junk"],
+          medication_list: "not a list",
+        },
+      }),
+    );
+    const d = readDraft(storage, "k", today);
+    expect(d?.form.allergy_list).toEqual([
+      { substance: "Pó", reaction: "", severity: "" },
+    ]);
+    expect(d?.form.medication_list).toEqual([]);
   });
 });

@@ -80,3 +80,35 @@ test("the patient history gathers the referral, its messages and sessions", asyn
   await history.getByRole("link", { name: "Nota de evolução" }).click();
   await expect(page).toHaveURL(new RegExp(`/referrals/${ref.id}$`));
 });
+
+test("allergies as a list, and saving survives a dropped connection", async ({ page, request }) => {
+  await signIn(page, request, "cm.rececao1");
+  const name = `Lista ${stamp()}`;
+  await page.goto("/patients/new");
+  await page.locator("#name").fill(name);
+  await page.getByRole("button", { name: "Adicionar alergia" }).click();
+  await page.getByLabel("Substância 1").fill("Penicilina");
+  await page.getByLabel("Gravidade 1").selectOption("severe");
+  await page.getByRole("button", { name: "Adicionar medicamento" }).click();
+  await page.getByLabel("Medicamento 1").fill("Ibuprofeno");
+  await page.getByLabel("Dose 1").fill("400 mg");
+
+  // The server cannot be reached: the save is tried 3 times, then the user is told
+  let attempts = 0;
+  await page.route("**/api/v1/patient/", (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    attempts++;
+    return route.abort("internetdisconnected");
+  });
+  await page.getByRole("button", { name: "Registar utente" }).click();
+  await expect(page.getByRole("alert")).toContainText("Não foi possível contactar o servidor", { timeout: 15000 });
+  expect(attempts).toBe(3);
+
+  // Back online: "Tentar de novo" registers the patient with the lists
+  await page.unroute("**/api/v1/patient/");
+  await page.getByRole("button", { name: "Tentar de novo" }).click();
+  await expect(page).toHaveURL(/\/patients\/[0-9a-f-]{36}$/);
+  await expect(page.getByText("Alergias: Penicilina")).toBeVisible();
+  await expect(page.getByText("Penicilina · Grave")).toBeVisible();
+  await expect(page.getByText("Ibuprofeno · 400 mg")).toBeVisible();
+});

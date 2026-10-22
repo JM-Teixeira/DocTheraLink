@@ -48,6 +48,17 @@ export interface APICallOptions<TBody = unknown> {
 
 type HTTPErrorCause = Record<string, unknown> | undefined;
 
+/** The request never got an answer (offline, server unreachable). */
+export class NetworkError extends Error {
+  silent: boolean;
+
+  constructor(silent = false) {
+    super("Network Error");
+    this.name = "NetworkError";
+    this.silent = silent;
+  }
+}
+
 export class HTTPError extends Error {
   status: number;
   silent: boolean;

@@ -81,6 +81,8 @@ type CreateRequest struct {
 	// AllowDuplicate confirms the user checked the name-based possible
 	// duplicates and this is a different person. Same NIF/SNS is never allowed.
 	AllowDuplicate bool `json:"allow_duplicate"`
+	// Structured allergies, medications and conditions
+	ClinicalLists
 	// CareLevel 1–5 (default 1), see models.Patient.
 	CareLevel *int `json:"care_level" binding:"omitempty,min=1,max=5"`
 }
@@ -166,6 +168,9 @@ func (s *Service) Create(ctx context.Context, a Actor, req CreateRequest) (*mode
 	if err != nil {
 		return nil, err
 	}
+	if err := req.ClinicalLists.clean(s.now()); err != nil {
+		return nil, err
+	}
 	dob, err := s.parseBirthDate(req.DateOfBirth)
 	if err != nil {
 		return nil, err
@@ -228,6 +233,9 @@ func (s *Service) Create(ctx context.Context, a Actor, req CreateRequest) (*mode
 		MedicalHistoryDetails:    req.MedicalHistoryDetails,
 		OngoingMedication:        req.OngoingMedication,
 		PresentHealth:            req.PresentHealth,
+		AllergyList:              req.ClinicalLists.Allergies,
+		MedicationList:           req.ClinicalLists.Medications,
+		ConditionList:            req.ClinicalLists.Conditions,
 		FacilityID:               facility,
 		IsActive:                 true,
 		CreatedByID:              &a.ID,
@@ -260,6 +268,7 @@ const (
 	kindEmail
 	kindPostalCode
 	kindRelation
+	kindList // structured clinical list (clinical.go)
 )
 
 // editable maps JSON keys accepted by PUT/PATCH to their column and type.
@@ -293,6 +302,9 @@ var editable = map[string]struct {
 	"medical_history_details":    {"medical_history_details", kindString},
 	"ongoing_medication":         {"ongoing_medication", kindString},
 	"present_health":             {"present_health", kindString},
+	"allergy_list":               {"allergy_list", kindList},
+	"medication_list":            {"medication_list", kindList},
+	"condition_list":             {"condition_list", kindList},
 	"facility":                   {"facility_id", kindUUID},
 	"assigned_to":                {"assigned_to_id", kindInt},
 	"is_active":                  {"is_active", kindBool},
@@ -364,6 +376,8 @@ func (s *Service) coerce(key string, kind fieldKind, raw any) (any, error) {
 	}
 	bad := &ValidationError{key, "has an invalid value"}
 	switch kind {
+	case kindList:
+		return s.coerceList(key, raw)
 	case kindString:
 		str, ok := raw.(string)
 		if !ok {

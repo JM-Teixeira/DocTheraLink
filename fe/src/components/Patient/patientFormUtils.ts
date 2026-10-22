@@ -23,8 +23,42 @@ export const BLOOD_GROUP_OPTIONS = [
   "O-",
 ] as const;
 
-/** Form state: every field is a string so inputs stay controlled. */
-export interface PatientFormState {
+/** Rows of the structured clinical lists; every cell is a string too. */
+export type AllergyRow = {
+  substance: string;
+  reaction: string;
+  severity: string; // "" | "mild" | "moderate" | "severe"
+};
+export type MedicationRow = {
+  name: string;
+  dose: string;
+  frequency: string;
+};
+export type ConditionRow = {
+  name: string;
+  since: string; // year
+};
+export interface ClinicalRows {
+  allergy_list: AllergyRow[];
+  medication_list: MedicationRow[];
+  condition_list: ConditionRow[];
+}
+export const EMPTY_ROWS = {
+  allergy_list: { substance: "", reaction: "", severity: "" } as AllergyRow,
+  medication_list: { name: "", dose: "", frequency: "" } as MedicationRow,
+  condition_list: { name: "", since: "" } as ConditionRow,
+};
+export type ListField = keyof ClinicalRows;
+export const LIST_FIELDS = Object.keys(EMPTY_ROWS) as ListField[];
+export const SEVERITIES = ["mild", "moderate", "severe"] as const;
+
+/** Form state: text fields plus the clinical lists. */
+export type PatientFormState = PatientTextFields & ClinicalRows;
+/** A field edited with a plain input. */
+export type TextField = keyof PatientTextFields;
+
+/** Text fields of the form: every one is a string so inputs stay controlled. */
+export interface PatientTextFields {
   name: string;
   gender: string; // "" | "1" | "2" | "3"
   date_of_birth: string; // YYYY-MM-DD
@@ -70,6 +104,9 @@ export const EMPTY_PATIENT_FORM: PatientFormState = {
   allergies: "",
   medical_history_details: "",
   ongoing_medication: "",
+  allergy_list: [],
+  medication_list: [],
+  condition_list: [],
 };
 
 /** Fills the form from an existing patient (edit mode). */
@@ -96,6 +133,49 @@ export function patientToForm(p: PatientModel): PatientFormState {
     allergies: p.allergies ?? "",
     medical_history_details: p.medical_history_details ?? "",
     ongoing_medication: p.ongoing_medication ?? "",
+    allergy_list: (p.allergy_list ?? []).map((a) => ({
+      substance: a.substance,
+      reaction: a.reaction ?? "",
+      severity: a.severity ?? "",
+    })),
+    medication_list: (p.medication_list ?? []).map((m) => ({
+      name: m.name,
+      dose: m.dose ?? "",
+      frequency: m.frequency ?? "",
+    })),
+    condition_list: (p.condition_list ?? []).map((c) => ({
+      name: c.name,
+      since: c.since ? String(c.since) : "",
+    })),
+  };
+}
+
+/** Rows to API items: empty rows dropped, empty optional cells left out. */
+export function rowsToPayload(f: ClinicalRows) {
+  const t = (s: string) => s.trim();
+  const opt = <K extends string>(k: K, s: string) =>
+    t(s) ? { [k]: t(s) } : {};
+  return {
+    allergy_list: f.allergy_list
+      .filter((a) => t(a.substance))
+      .map((a) => ({
+        substance: t(a.substance),
+        ...opt("reaction", a.reaction),
+        ...opt("severity", a.severity),
+      })),
+    medication_list: f.medication_list
+      .filter((m) => t(m.name))
+      .map((m) => ({
+        name: t(m.name),
+        ...opt("dose", m.dose),
+        ...opt("frequency", m.frequency),
+      })),
+    condition_list: f.condition_list
+      .filter((c) => t(c.name))
+      .map((c) => ({
+        name: t(c.name),
+        ...(t(c.since) ? { since: Number(t(c.since)) } : {}),
+      })),
   };
 }
 
@@ -127,6 +207,7 @@ export function formToPayload(f: PatientFormState): Record<string, unknown> {
     allergies: opt(f.allergies),
     medical_history_details: opt(f.medical_history_details),
     ongoing_medication: opt(f.ongoing_medication),
+    ...rowsToPayload(f),
   };
 }
 
@@ -201,6 +282,14 @@ export function validatePatientForm(
     errors.email = "error__invalid_email";
   if (f.postal_code.trim() && !POSTAL_RE.test(f.postal_code.replace(/\s/g, "")))
     errors.postal_code = "error__invalid_postal_code";
+  const year = today.getFullYear();
+  if (
+    f.condition_list.some((c) => {
+      const y = c.since.trim();
+      return y && !(/^\d{4}$/.test(y) && +y >= 1900 && +y <= year);
+    })
+  )
+    errors.condition_list = "error__invalid_year";
   return errors;
 }
 
@@ -224,8 +313,26 @@ export const draftKey = (userId: string | number, patientId?: string) =>
 /** True when two forms hold the same values. */
 export const sameForm = (a: PatientFormState, b: PatientFormState) =>
   (Object.keys(EMPTY_PATIENT_FORM) as (keyof PatientFormState)[]).every(
-    (k) => a[k] === b[k],
+    (k) => JSON.stringify(a[k]) === JSON.stringify(b[k]),
   );
+
+const isListField = (k: string): k is ListField => k in EMPTY_ROWS;
+
+/** Saved rows with only the known cells, as strings. */
+function rowsFrom(k: ListField, v: unknown) {
+  if (!Array.isArray(v)) return [];
+  const template = EMPTY_ROWS[k] as unknown as Record<string, string>;
+  return v
+    .filter((r) => r && typeof r === "object")
+    .map((r) => {
+      const row = { ...template };
+      for (const cell of Object.keys(template)) {
+        const c = (r as Record<string, unknown>)[cell];
+        if (typeof c === "string") row[cell] = c;
+      }
+      return row;
+    });
+}
 
 /** Reads a draft; old, broken or foreign data gives null. */
 export function readDraft(
@@ -241,10 +348,12 @@ export function readDraft(
     if (!d.form || Number.isNaN(at.getTime())) return null;
     if (now.getTime() - at.getTime() > DRAFT_MAX_AGE_MS) return null;
     // Only known fields, as strings (new fields keep their empty value)
-    const form = { ...EMPTY_PATIENT_FORM };
+    const saved = d.form as unknown as Record<string, unknown>;
+    const form: PatientFormState = { ...EMPTY_PATIENT_FORM };
     for (const k of Object.keys(form) as (keyof PatientFormState)[]) {
-      const v = (d.form as unknown as Record<string, unknown>)[k];
-      if (typeof v === "string") form[k] = v;
+      const v = saved[k];
+      if (isListField(k)) form[k] = rowsFrom(k, v) as never;
+      else if (typeof v === "string") form[k] = v;
     }
     return { saved_at: at.toISOString(), form };
   } catch {

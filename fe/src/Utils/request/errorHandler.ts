@@ -1,11 +1,15 @@
 import { navigate } from "raviger";
 
 import * as Notifications from "@/Utils/Notifications";
-import { HTTPError } from "@/Utils/request/types";
+import { HTTPError, NetworkError } from "@/Utils/request/types";
 
 export function handleHttpError(error: Error) {
   if (error.name === "AbortError") {
     return;
+  }
+
+  if (error instanceof NetworkError && error.silent) {
+    return; // the screen shows its own message
   }
 
   if (!(error instanceof HTTPError)) {

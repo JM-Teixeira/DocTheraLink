@@ -11,8 +11,16 @@ export default defineConfig({
     css: false,
     coverage: {
       provider: "v8",
-      include: ["src/components/Referral/**", "src/components/Patient/**"],
+      include: [
+        "src/components/Referral/**/*.{ts,tsx}",
+        "src/components/Patient/**/*.{ts,tsx}",
+      ],
+      exclude: ["**/*.test.{ts,tsx}"],
       reporter: ["text", "html"],
+      // The patient flow must stay at least 80 % covered (CI runs test:coverage)
+      thresholds: {
+        "src/components/Patient/**": { lines: 80, statements: 80 },
+      },
     },
   },
   // Keep in sync with resolve.alias in vite.config.mts

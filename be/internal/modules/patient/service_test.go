@@ -3,6 +3,7 @@ package patient
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -292,6 +293,66 @@ func TestRegistrationExtras(t *testing.T) {
 	for _, body := range []map[string]any{{"postal_code": "abc"}, {"email": "x"}, {"emergency_contact_relation": "boss"}} {
 		var v *ValidationError
 		if _, err := s.Update(ctx, receptionist, p.ID, body); !errors.As(err, &v) {
+			t.Errorf("%v: want validation error, got %v", body, err)
+		}
+	}
+}
+
+func TestClinicalLists(t *testing.T) {
+	ctx := context.Background()
+	s, repo := newSvc()
+	since := 2015
+	p, err := s.Create(ctx, nurse, CreateRequest{Name: "Ana", ClinicalLists: ClinicalLists{
+		Allergies:   []models.Allergy{{Substance: " Penicilina ", Severity: "severe"}, {Substance: "  "}},
+		Medications: []models.Medication{{Name: "Ibuprofeno", Dose: "400 mg"}},
+		Conditions:  []models.Condition{{Name: "Diabetes tipo 2", Since: &since}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.AllergyList) != 1 || p.AllergyList[0].Substance != "Penicilina" || len(p.MedicationList) != 1 ||
+		*p.ConditionList[0].Since != 2015 {
+		t.Errorf("lists: %+v %+v %+v", p.AllergyList, p.MedicationList, p.ConditionList)
+	}
+
+	future := now.Year() + 1
+	long := strings.Repeat("x", maxItemText+1)
+	many := make([]models.Medication, maxListItems+1)
+	for i := range many {
+		many[i].Name = "m"
+	}
+	for name, l := range map[string]ClinicalLists{
+		"bad severity": {Allergies: []models.Allergy{{Substance: "Pó", Severity: "deadly"}}},
+		"future year":  {Conditions: []models.Condition{{Name: "Asma", Since: &future}}},
+		"long text":    {Medications: []models.Medication{{Name: long}}},
+		"too many":     {Medications: many},
+	} {
+		var v *ValidationError
+		if _, err := s.Create(ctx, nurse, CreateRequest{Name: "Ana", ClinicalLists: l}); !errors.As(err, &v) {
+			t.Errorf("%s: want validation error, got %v", name, err)
+		}
+	}
+
+	// PATCH stores the cleaned list as JSON text; null clears; junk fails
+	if _, err := s.Update(ctx, nurse, p.ID, map[string]any{
+		"allergy_list":    []any{map[string]any{"substance": " Látex ", "reaction": "urticária"}, map[string]any{"substance": ""}},
+		"medication_list": nil,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if repo.updates["allergy_list"] != `[{"substance":"Látex","reaction":"urticária"}]` {
+		t.Errorf("stored allergies: %v", repo.updates["allergy_list"])
+	}
+	if v, ok := repo.updates["medication_list"]; !ok || v != nil {
+		t.Errorf("null should clear medications: %v", v)
+	}
+	for _, body := range []map[string]any{
+		{"allergy_list": "penicilina"},
+		{"condition_list": []any{map[string]any{"name": "Asma", "since": "ontem"}}},
+		{"allergy_list": []any{map[string]any{"substance": "Pó", "severity": "x"}}},
+	} {
+		var v *ValidationError
+		if _, err := s.Update(ctx, nurse, p.ID, body); !errors.As(err, &v) {
 			t.Errorf("%v: want validation error, got %v", body, err)
 		}
 	}

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Pencil, Phone, Stethoscope } from "lucide-react";
+import { AlertTriangle, Pencil, Phone, Stethoscope } from "lucide-react";
 import { navigate } from "raviger";
 import { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -77,6 +77,16 @@ export default function PatientDetail({ id }: { id: string }) {
               <p className="text-sm text-gray-500">
                 {subtitle || t("age_unknown")}
               </p>
+              {!!patient.allergy_list?.length && (
+                <p className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2 py-0.5 text-sm font-medium text-rose-700 ring-1 ring-inset ring-rose-200">
+                  <AlertTriangle className="size-3.5" aria-hidden />
+                  {t("allergic_to", {
+                    list: patient.allergy_list
+                      .map((a) => a.substance)
+                      .join(", "),
+                  })}
+                </p>
+              )}
               {patient.phone_number && (
                 <a
                   href={`tel:${patient.phone_number}`}
@@ -155,14 +165,40 @@ export default function PatientDetail({ id }: { id: string }) {
               value={`${patient.care_level ?? 1} · ${t(`care_level_help__${patient.care_level ?? 1}`)}`}
             />
             <Item label={t("blood_group")} value={patient.blood_group} />
-            <Item label={t("allergies")} value={patient.allergies} />
+            <ListItem
+              label={t("allergies")}
+              items={(patient.allergy_list ?? []).map((a) =>
+                [
+                  a.substance,
+                  a.reaction,
+                  a.severity && t(`severity__${a.severity}`),
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+              )}
+              note={patient.allergies}
+            />
+            <ListItem
+              label={t("conditions")}
+              items={(patient.condition_list ?? []).map((c) =>
+                c.since
+                  ? `${c.name} (${t("since_n", { year: c.since })})`
+                  : c.name,
+              )}
+            />
+            <ListItem
+              label={t("medications")}
+              items={(patient.medication_list ?? []).map((m) =>
+                [m.name, m.dose, m.frequency].filter(Boolean).join(" · "),
+              )}
+            />
             <Item
               label={t("medical_history")}
               value={patient.medical_history_details}
               wide
             />
             <Item
-              label={t("ongoing_medication")}
+              label={t("medication_notes")}
               value={patient.ongoing_medication}
               wide
             />
@@ -221,6 +257,37 @@ function Item({
       </dt>
       <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-900">
         {value || "-"}
+      </dd>
+    </div>
+  );
+}
+
+/** A structured list, one per line, with the free-text note below it. */
+function ListItem({
+  label,
+  items,
+  note,
+}: {
+  label: string;
+  items: string[];
+  note?: string | null;
+}) {
+  return (
+    <div className="sm:col-span-2">
+      <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        {label}
+      </dt>
+      <dd className="mt-0.5 text-sm text-gray-900">
+        {items.length ? (
+          <ul className="list-inside list-disc">
+            {items.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        ) : (
+          !note && "-"
+        )}
+        {note && <p className="whitespace-pre-wrap text-gray-700">{note}</p>}
       </dd>
     </div>
   );

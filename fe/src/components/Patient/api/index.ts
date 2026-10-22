@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { callApi } from "@/Utils/request/query";
 import query from "@/Utils/request/query";
+import { retryDelay, retryTransient } from "@/Utils/request/retry";
 import { QueryParams } from "@/Utils/request/types";
 
 import { PatientModel } from "../models";
@@ -30,16 +31,8 @@ export function useCreatePatient() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: patientKeys.lists() });
     },
-    retry: (failureCount, error) => {
-      if (error && "status" in error && typeof error.status === "number") {
-        const status = error.status;
-        if (status >= 400 && status < 500) {
-          return false;
-        }
-      }
-      return failureCount < 2;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retry: retryTransient, // connection problems only (no double saves)
+    retryDelay,
   });
 }
 
@@ -124,16 +117,8 @@ export function useUpdatePatient() {
       });
       queryClient.invalidateQueries({ queryKey: patientKeys.lists() });
     },
-    retry: (failureCount, error) => {
-      if (error && "status" in error && typeof error.status === "number") {
-        const status = error.status;
-        if (status >= 400 && status < 500) {
-          return false;
-        }
-      }
-      return failureCount < 2;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retry: retryTransient, // connection problems only (no double saves)
+    retryDelay,
   });
 }
 
@@ -153,16 +138,8 @@ export function usePatchPatient() {
       });
       queryClient.invalidateQueries({ queryKey: patientKeys.lists() });
     },
-    retry: (failureCount, error) => {
-      if (error && "status" in error && typeof error.status === "number") {
-        const status = error.status;
-        if (status >= 400 && status < 500) {
-          return false;
-        }
-      }
-      return failureCount < 2;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retry: retryTransient, // connection problems only (no double saves)
+    retryDelay,
   });
 }
 

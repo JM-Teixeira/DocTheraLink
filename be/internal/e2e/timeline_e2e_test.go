@@ -18,15 +18,21 @@ func TestPatientExtrasAndTimeline(t *testing.T) {
 	sarahID := userIDOf(sarah)
 
 	expect(t, "bad postal code", desk.call("POST", "/patient/", map[string]any{"name": "Postal X", "postal_code": "12"}, nil), 400)
+	expect(t, "bad allergy severity", desk.call("POST", "/patient/", map[string]any{"name": "Postal X", "allergy_list": []any{map[string]any{"substance": "Pó", "severity": "x"}}}, nil), 400)
 	expect(t, "bad relation", desk.call("POST", "/patient/", map[string]any{"name": "Postal X", "emergency_contact_relation": "boss"}, nil), 400)
 	var p map[string]any
 	expect(t, "patient", desk.call("POST", "/patient/", map[string]any{
 		"name": "Linha Tempo " + time.Now().Format("150405.000"), "postal_code": "4000123", "city": "Porto",
 		"email": "linha@example.pt", "emergency_contact_name": "Rui", "emergency_contact_relation": "spouse",
 		"insurer": "ADSE", "insurance_number": "123",
+		"allergy_list":   []any{map[string]any{"substance": " Látex ", "severity": "severe"}, map[string]any{"substance": ""}},
+		"condition_list": []any{map[string]any{"name": "Asma", "since": 2010}},
 	}, &p), 201)
 	if p["postal_code"] != "4000-123" || p["emergency_contact_relation"] != "spouse" || p["insurer"] != "ADSE" {
 		t.Fatalf("extras: %v", p)
+	}
+	if al, _ := p["allergy_list"].([]any); len(al) != 1 || al[0].(map[string]any)["substance"] != "Látex" {
+		t.Errorf("allergy list: %v", p["allergy_list"])
 	}
 	pid := p["id"].(string)
 	var edited map[string]any

@@ -76,6 +76,14 @@ export interface PatientModel {
   city?: string | null;
   insurer?: string | null;
   insurance_number?: string | null;
+  /** Structured lists (the free-text fields stay as notes). */
+  allergy_list?:
+    | { substance: string; reaction?: string; severity?: string }[]
+    | null;
+  medication_list?:
+    | { name: string; dose?: string; frequency?: string }[]
+    | null;
+  condition_list?: { name: string; since?: number }[] | null;
   allergies?: string;
   medical_history?: Array<{ disease: string | number; details: string }>;
   facility_object?: {

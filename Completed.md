@@ -5,6 +5,25 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.9.0 (branch `feat/m4-patients`)
+
+### Patient form: lists, connection problems, coverage (TODO)
+- **Structured lists**: allergies (substance, reaction, severity),
+  conditions (with the year they began) and medications (dose, how often)
+  as rows; validated on both sides (30 rows, 120 characters, known
+  severities, sensible years). The old free-text fields stay as notes. The
+  patient page shows "Alergias: ..." under the name.
+- **Connection problems**: saves are retried twice (1 s, 2 s) only when the
+  server cannot have done the work (no connection, 502/503/504), so nothing
+  is registered twice by itself; then the form says so with "Tentar de
+  novo", and an offline notice while the browser has no network. The draft
+  keeps everything meanwhile.
+- **Coverage**: component tests for the form, history, list editor, patient
+  page and list; the patient folder is at about 94 % of lines and CI now
+  fails under 80 % (`npm run test:coverage`).
+- Removed about 1,350 lines of unused code from the old patient spec
+  (`types/`, `constants/`, `validation/patientValidation.ts`).
+
 ## 2026-10-22 · Klyniva 0.8.0 (branch `feat/m4-patients`)
 
 ### Patient registration extras and patient history (TODO)
