@@ -67,14 +67,8 @@ Open testing work:
 
 ## 3. Deployment & operations (P2/P3)
 
-- [ ] **[proposed] P2 Reach the local install from other laptops on the same network** (user request, 2026-10-22). Today it only answers on this PC (`http://localhost:8088`): k3d publishes the port inside WSL2, and WSL2 sits behind Windows' NAT. Plan:
-  1. WSL2 "mirrored" networking (`networkingMode=mirrored` in `%UserProfile%\.wslconfig`, then `wsl --shutdown`) so port 8088 is published on the PC's LAN address; fallback for older Windows: `netsh interface portproxy` from `0.0.0.0:8088` to the WSL address, refreshed on start by `start-klyniva.cmd`.
-  2. Windows Firewall inbound rule for TCP 8088 on the *Private* profile only (never Public networks).
-  3. A friendly name instead of the IP: mDNS `klyniva.local` (Windows announces its hostname; or a small mDNS responder), or a DHCP reservation + a name on the router.
-  4. Make the address configurable: `KLYNIVA_HOST` → `PUBLIC_URL` and `CORS_ALLOWED_ORIGINS` in `k8s/overlays/local` (links in e-mails and CORS must use the LAN name, not `localhost`).
-  5. `make k8s-lan` / start script prints the address to use (`http://<pc-name>.local:8088`) and a QR code; README section "Use it from another laptop".
-  6. Safety: demo users and password `1234@1` are fine on a home LAN but not on shared networks - warn in the README, and before real data use HTTPS (Caddy/Traefik with a local CA) and turn demo users off.
-
+- [x] Reach the local install from other laptops on the same network: `scripts/lan-access.ps1` (Windows, admin: port forwarding into WSL, firewall for private networks only, prints the addresses; `-Remove` undoes) + `scripts/k8s-local.sh lan` (backend address for links and CORS). README "Use it from another laptop".
+- [ ] P3 LAN next: run lan-access automatically at start (scheduled task) so a reboot needs nothing; HTTPS with a local CA (Caddy) before any real data; QR code with the address.
 - [ ] P2 Container registry + CD: GitHub Actions → GHCR tagged by git SHA, pin tags in `k8s/overlays/production`.
 - [ ] P2 Uploads to S3-compatible storage (needed for >1 backend replica) — add an S3 implementation of `internal/storage.Store`.
 - [ ] P2 Virus scanning of uploaded attachments (ClamAV sidecar) before they are downloadable.

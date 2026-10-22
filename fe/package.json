@@ -1,6 +1,6 @@
 {
   "name": "klyniva_fe",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Klyniva is an advanced healthcare management system enabling comprehensive patient care and facility administration.",
   "private": true,
   "repository": {
@@ -51,7 +51,7 @@
     "cypress:install": "cross-env NODE_ENV=development cypress install",
     "prepare": "husky",
     "lint": "eslint ./src",
-    "lint:strict": "eslint --max-warnings=0 src/components/Referral src/components/Inventory src/components/Home src/hooks/useActiveLink.ts src/components/TimeBoard src/Routers/routes/ClinicOpsRoutes.tsx src/components/Patient/PatientList.tsx src/components/Patient/PatientForm.tsx src/components/Patient/PatientDetail.tsx src/components/Patient/DuplicatePatientsDialog.tsx src/components/Patient/patientFormUtils.ts src/components/Patient/patientFormUtils.test.ts src/Utils/roles.ts src/Utils/person.ts src/hooks/useDebouncedValue.ts src/components/Notifications src/components/Facility/FacilityCard.tsx src/Routers src/test src/components/Staff src/components/Common/FilterChips.tsx src/components/Common/Breadcrumbs.tsx src/components/Patient/PatientMetrics.tsx src/components/Patient/patientFilters.ts src/components/Patient/patientFilters.test.ts src/components/Patient/PatientIds.tsx src/Utils/request/utils.test.ts src/components/Common/DateInput.tsx src/components/Common/DateInput.test.tsx src/components/Common/FilterChips.test.tsx src/Utils/dates.ts src/Utils/dates.test.ts src/hooks/useDateFormat.ts",
+    "lint:strict": "eslint --max-warnings=0 src/components/Referral src/components/Inventory src/components/Home src/hooks/useActiveLink.ts src/components/TimeBoard src/Routers/routes/ClinicOpsRoutes.tsx src/components/Patient/PatientList.tsx src/components/Patient/PatientForm.tsx src/components/Patient/PatientDetail.tsx src/components/Patient/DuplicatePatientsDialog.tsx src/components/Patient/patientFormUtils.ts src/components/Patient/patientFormUtils.test.ts src/Utils/roles.ts src/Utils/person.ts src/hooks/useDebouncedValue.ts src/components/Notifications src/components/Facility/FacilityCard.tsx src/Routers src/test src/components/Staff src/components/Common/FilterChips.tsx src/components/Common/Breadcrumbs.tsx src/components/Patient/PatientMetrics.tsx src/components/Patient/patientFilters.ts src/components/Patient/patientFilters.test.ts src/components/Patient/PatientIds.tsx src/Utils/request/utils.test.ts src/components/Common/DateInput.tsx src/components/Common/DateInput.test.tsx src/components/Common/FilterChips.test.tsx src/Utils/dates.ts src/Utils/dates.test.ts src/hooks/useDateFormat.ts src/components/About",
     "lint-fix": "eslint ./src --fix",
     "format": "prettier ./src ./cypress --write",
     "sort-locales": "node ./scripts/sort-locales.js"

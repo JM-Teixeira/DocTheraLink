@@ -7,6 +7,8 @@
 #   scripts/k8s-local.sh e2e      run the end-to-end API tests against the cluster
 #   scripts/k8s-local.sh status   show pods, services and ingress
 #   scripts/k8s-local.sh down     delete the cluster (all its data)
+#   scripts/k8s-local.sh lan H,.. tell the backend its names on the network ("off" = localhost only);
+#                                 used by scripts/lan-access.ps1 (Windows side)
 #
 # Safety: the cluster's kubeconfig lives in its own file (~/.kube/klyniva.yaml)
 # and every kubectl call passes it explicitly, so other contexts (e.g. cloud
@@ -81,9 +83,32 @@ deploy() {
   "${KUBECTL[@]}" rollout status statefulset/postgres --timeout=180s
   "${KUBECTL[@]}" rollout status deployment/backend --timeout=180s
   "${KUBECTL[@]}" rollout status deployment/frontend --timeout=120s
+  [[ -s "$LAN_FILE" ]] && apply_lan
   log "Ready: $URL"
 }
 
+# Names other computers use to reach this PC (saved by "lan", re-applied on deploy)
+LAN_FILE="$HOME/.klyniva-lan"
+apply_lan() {
+  local origins="http://localhost:${PORT}" public="$URL" h
+  if [[ -s "$LAN_FILE" ]]; then
+    IFS=, read -ra hs < "$LAN_FILE"
+    public="http://${hs[0]}:${PORT}"
+    for h in "${hs[@]}"; do origins+=",http://${h}:${PORT}"; done
+  fi
+  log "Backend address: $public"
+  "${KUBECTL[@]}" set env deployment/backend PUBLIC_URL="$public" CORS_ALLOWED_ORIGINS="$origins" >/dev/null
+  "${KUBECTL[@]}" rollout status deployment/backend --timeout=180s >/dev/null
+}
+lan() {
+  case "${1:-}" in
+    "") echo "usage: $0 lan <name,ip,...>|off" >&2; exit 2 ;;
+    off) rm -f "$LAN_FILE" ;;
+    *) [[ "$1" =~ ^[A-Za-z0-9.,-]+$ ]] || { echo "bad host list: $1" >&2; exit 2; }
+       printf "%s" "$1" > "$LAN_FILE" ;;
+  esac
+  apply_lan
+}
 print_access() {
   cat <<INFO
 
@@ -130,5 +155,6 @@ case "${1:-up}" in
     ;;
   status) "${KUBECTL[@]}" get pods,svc,ingress,pvc ;;
   down) k3d cluster delete "$CLUSTER" && rm -f "$KUBECONFIG" ;;
-  *) echo "usage: $0 {up|start|deploy|e2e|status|down}" >&2; exit 2 ;;
+  lan) lan "${2:-}" ;;
+  *) echo "usage: $0 {up|start|deploy|e2e|status|down|lan}" >&2; exit 2 ;;
 esac

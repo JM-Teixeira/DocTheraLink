@@ -7,6 +7,15 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-22 · Klyniva 0.6.0 (branch `feat/m4-patients`)
 
+### 2026-10-23 · About page, access from other laptops
+- **Sobre o Klyniva** page (`/about`): app and server versions, build
+  date, how version numbers work, and the update check with a plain
+  explanation (it only refreshes the app cached in this browser). The
+  profile links to it; the version left the menu and Preferences.
+- Profile and account screens translated to PT-PT (126 labels).
+- **Network access**: `scripts/lan-access.ps1` (port forward, firewall on
+  private networks only, prints the addresses) and `k8s-local.sh lan`.
+
 ### 23:30 · Referral conversation that works (TODO)
 - A *reply* answers one question (refused otherwise); questions show
   "Respondida" / "Por responder"; the card shows "n por responder" for

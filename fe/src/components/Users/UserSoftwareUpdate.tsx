@@ -30,7 +30,7 @@ export default function UserSoftwareUpdate() {
         isChecking: false,
       });
       Notification.Success({
-        msg: "No update available",
+        msg: t("no_update_available"),
       });
     }
   };

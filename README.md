@@ -68,6 +68,28 @@ only); production must run with it off. First time ever (no cluster yet):
 Troubleshooting: `make k8s-status` shows the pods; `http://localhost:4000`
 is the Docker Compose variant below and is not running unless you `make up`.
 
+### Use it from another laptop on the same network
+
+By default Klyniva answers only on this PC (`http://localhost:8088`). To open it
+from other computers on your **home or clinic network**:
+
+1. Start Klyniva as usual (`scripts\start-klyniva.cmd`).
+2. Open **PowerShell as Administrator** in the repository folder and run:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\lan-access.ps1
+   ```
+
+   It forwards port 8088 into WSL, opens it in the Windows Firewall for
+   **private networks only**, tells the backend its new address, and prints
+   the addresses to use, e.g. `http://my-pc.local:8088` or `http://192.168.1.20:8088`.
+3. On the other laptop open one of those addresses. If Windows marks your
+   network as *Public*, switch it to *Private* (Settings → Network → Properties).
+
+After a reboot the WSL address changes: run the script again. To stop sharing:
+`scripts\lan-access.ps1 -Remove`. Demo logins share one password - fine for a
+home network, not for shared ones; real patient data needs HTTPS first (TODO.md).
+
 ## Quick start (Docker Compose)
 
 Prerequisites: Docker with Compose v2.

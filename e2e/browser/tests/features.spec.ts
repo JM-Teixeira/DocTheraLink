@@ -12,15 +12,20 @@ async function token(request: APIRequestContext, username: string) {
 }
 const stamp = () => Date.now().toString().slice(-7);
 
-test("the version is shown in the menu and in preferences", async ({ page, request }) => {
+test("the version lives on the profile and the About page, not in the menu", async ({ page, request }) => {
   await signIn(page, request, "cm.fisio3");
   await page.goto("/");
-  await expect(page.getByText(/^Klyniva v0\.\d+\.\d+$/).first()).toBeVisible();
-  await page.goto("/user/preferences");
-  await expect(page.getByRole("heading", { name: "Sobre o Klyniva" })).toBeVisible();
+  await expect(page.getByText(/Klyniva v0\.\d+\.\d+/)).toHaveCount(0);
+  await page.goto("/user/profile");
+  await expect(page.getByText("Sobre o Klyniva").first()).toBeVisible();
+  await page.getByRole("link", { name: "Abrir a página Sobre" }).click();
+  await expect(page).toHaveURL(/\/about$/);
   const versions = await page.locator("dl dd").allInnerTexts();
   expect(versions[0]).toMatch(/^0\.\d+\.\d+$/);
   expect(versions[1]).toBe(versions[0]); // app and server agree
+  await expect(page.getByText(/Não altera o servidor, os dados nem outros computadores/)).toBeVisible();
+  await page.getByRole("button", { name: "Procurar atualização" }).click();
+  await expect(page.getByText(/Já tem a versão mais recente|Há uma atualização/).first()).toBeVisible();
 });
 
 test("stock permissions: the coordinator gives Pedro floor 2, Pedro can then restock only there", async ({ browser, page, request }) => {

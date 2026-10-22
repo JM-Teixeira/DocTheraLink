@@ -21,7 +21,6 @@ import { useCareAppNavItems } from "@/hooks/useCareApps";
 
 import { canSeeReferrals } from "@/Utils/roles";
 import { classNames } from "@/Utils/utils";
-import { APP_VERSION } from "@/Utils/version";
 
 export const SIDEBAR_SHRINK_PREFERENCE_KEY = "sidebarShrinkPreference";
 
@@ -205,12 +204,6 @@ const StatelessSidebar = ({
         <div className="hidden md:block md:flex-1" />
 
         <SidebarUserCard shrinked={shrinked} />
-        <p
-          className={`pb-2 text-xs text-gray-700 ${shrinked ? "text-center" : "px-5"}`}
-          title={t("app_version")}
-        >
-          {shrinked ? `v${APP_VERSION}` : `Klyniva v${APP_VERSION}`}
-        </p>
       </div>
     </nav>
   );

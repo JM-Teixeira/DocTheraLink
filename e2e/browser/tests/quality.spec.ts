@@ -61,7 +61,7 @@ test.describe("phone screen", () => {
 });
 
 // Serious and critical WCAG A/AA problems on the main pages
-for (const path of ["/", "/patients", "/patients/new", "/referrals", "/referrals/new", "/time-board", "/inventory", "/users", "/user/preferences"]) {
+for (const path of ["/", "/patients", "/patients/new", "/referrals", "/referrals/new", "/time-board", "/inventory", "/users", "/user/preferences", "/about"]) {
   test(`accessibility: ${path}`, async ({ page, request }) => {
     await signIn(page, request, "cm.coordenacao");
     await page.goto(path);
