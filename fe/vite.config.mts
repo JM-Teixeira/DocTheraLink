@@ -103,6 +103,10 @@ export default defineConfig(({ mode }) => {
   return {
     envPrefix: "REACT_",
     define: {
+      // Release number shown in the app (fe/package.json, same as the backend)
+      __APP_VERSION__: JSON.stringify(
+        JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), "utf8")).version,
+      ),
       __CUSTOM_DESCRIPTION_HTML__: getDescriptionHtml(
         env.REACT_CUSTOM_DESCRIPTION || "",
       ),

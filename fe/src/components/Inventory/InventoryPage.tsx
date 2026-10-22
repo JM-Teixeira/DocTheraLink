@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 
+import { FilterChips, FilterPanel } from "@/components/Common/FilterChips";
 import Page from "@/components/Common/Page";
 import InventoryAudit from "@/components/Inventory/InventoryAudit";
 import {
@@ -28,6 +29,7 @@ import {
   MovementDialog,
   SessionRulesDialog,
 } from "@/components/Inventory/InventoryDialogs";
+import PerSessionHelp from "@/components/Inventory/PerSessionHelp";
 import InventoryRoutes from "@/components/Inventory/api";
 import {
   STATUS_STYLES,
@@ -40,7 +42,11 @@ import {
   ItemRequest,
   MovementKind,
   StockItem,
+  Tracking,
 } from "@/components/Inventory/types";
+import StaffRoutes from "@/components/Staff/api";
+import BoardRoutes from "@/components/TimeBoard/api";
+import { floorsOf } from "@/components/TimeBoard/boardUtils";
 
 import useAuthUser from "@/hooks/useAuthUser";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
@@ -48,7 +54,7 @@ import useDebouncedValue from "@/hooks/useDebouncedValue";
 import * as Notification from "@/Utils/Notifications";
 import query, { callApi } from "@/Utils/request/query";
 import { HTTPError } from "@/Utils/request/types";
-import { canManageBoard, isReadOnly } from "@/Utils/roles";
+import { canManageBoard, isAdmin } from "@/Utils/roles";
 
 type Filter = "all" | "attention" | "out";
 type Tab = "stock" | "reorder" | "audit";
@@ -69,13 +75,18 @@ export default function InventoryPage() {
   const { t } = useTranslation();
   const user = useAuthUser();
   const queryClient = useQueryClient();
-  const canWrite = !isReadOnly(user);
   const manager = canManageBoard(user); // coordinators and admins
+  const admin = isAdmin(user);
 
   const [tab, setTab] = useState<Tab>("stock");
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search);
   const [filter, setFilter] = useState<Filter>("all");
+  const [kind, setKind] = useState<Tracking | "">("");
+  const [floor, setFloor] = useState<number | null>(null);
+  // Admins look at one clinic at a time (or all of them)
+  const [clinic, setClinic] = useState("");
+  const clinicParam = clinic ? { clinic } : {};
   const [editing, setEditing] = useState<StockItem | null | undefined>(
     undefined,
   ); // null = new
@@ -87,18 +98,44 @@ export default function InventoryPage() {
   const [rules, setRules] = useState<StockItem | null>(null);
 
   const { data: summary } = useQuery({
-    queryKey: ["stock-summary"],
-    queryFn: query(InventoryRoutes.summary),
+    queryKey: ["stock-summary", clinic],
+    queryFn: query(InventoryRoutes.summary, { queryParams: clinicParam }),
   });
   const { data: items, isLoading } = useQuery({
-    queryKey: ["stock-items", debounced, filter],
+    queryKey: ["stock-items", debounced, filter, kind, floor, clinic],
     queryFn: query(InventoryRoutes.list, {
       queryParams: {
         search: debounced,
         ...(filter === "all" ? {} : { status: filter }),
+        ...(kind ? { tracking: kind } : {}),
+        ...(floor ? { floor } : {}),
+        ...clinicParam,
       },
     }),
   });
+  const { data: access } = useQuery({
+    queryKey: ["stock-access"],
+    queryFn: query(InventoryRoutes.access),
+  });
+  const { data: clinics } = useQuery({
+    queryKey: ["staff-clinics"],
+    queryFn: query(StaffRoutes.clinics, { queryParams: { limit: 100 } }),
+    enabled: admin,
+  });
+  const { data: divisions } = useQuery({
+    queryKey: ["divisions"],
+    queryFn: query(BoardRoutes.divisions),
+  });
+  const floors = floorsOf(divisions ?? []);
+  const categories = [
+    ...new Set((items ?? []).map((i) => i.category).filter(Boolean)),
+  ].sort();
+  // Who may add items: managers, or anyone with a grant (admins pick a clinic first)
+  const canCreate =
+    !!access &&
+    (access.manage || access.grants.length > 0) &&
+    (!admin || !!clinic);
+  const readOnly = !!access && !access.manage && access.grants.length === 0;
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["stock-items"] });
@@ -121,7 +158,10 @@ export default function InventoryPage() {
             body: req,
             silent: true,
           })
-        : callApi(InventoryRoutes.create, { body: req, silent: true }),
+        : callApi(InventoryRoutes.create, {
+            body: admin ? { ...req, clinic_id: clinic } : req,
+            silent: true,
+          }),
     onSuccess: () => {
       setEditing(undefined);
       refresh();
@@ -168,17 +208,47 @@ export default function InventoryPage() {
     <Page
       title={t("inventory")}
       options={
-        canWrite && (
-          <Button variant="primary" onClick={() => setEditing(null)}>
+        (canCreate || (admin && !clinic)) && (
+          <Button
+            variant="primary"
+            disabled={!canCreate}
+            title={canCreate ? undefined : t("choose_clinic_first")}
+            onClick={() => setEditing(null)}
+          >
             <Plus className="mr-2 size-4" aria-hidden />
             {t("new_item")}
           </Button>
         )
       }
     >
-      <p className="mb-4 max-w-3xl text-sm text-gray-600">
+      <p className="mb-3 max-w-3xl text-sm text-gray-600">
         {t("inventory_help_kinds")}
       </p>
+      <div className="mb-4 max-w-3xl">
+        <PerSessionHelp />
+      </div>
+      {readOnly && (
+        <p className="mb-4 max-w-3xl rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {t("stock_read_only")}
+        </p>
+      )}
+      {admin && (
+        <label className="mb-4 flex max-w-sm flex-col gap-1 text-sm font-medium text-gray-700">
+          {t("clinic")}
+          <select
+            value={clinic}
+            onChange={(e) => setClinic(e.target.value)}
+            className="h-10 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+          >
+            <option value="">{t("all_clinics")}</option>
+            {clinics?.results.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div
         className="mb-4 flex w-fit rounded-lg bg-gray-100 p-0.5"
         role="tablist"
@@ -199,8 +269,8 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {tab === "audit" && <InventoryAudit />}
-      {tab === "reorder" && <ReorderList />}
+      {tab === "audit" && <InventoryAudit clinic={clinic} />}
+      {tab === "reorder" && <ReorderList clinic={clinic} />}
       {tab === "stock" && (
         <>
           {!!summary?.open_expired && (
@@ -257,6 +327,37 @@ export default function InventoryPage() {
             </div>
           </div>
 
+          <FilterPanel>
+            <FilterChips
+              label={t("item_kind")}
+              allLabel={t("all")}
+              options={[
+                {
+                  value: "unit" as Tracking,
+                  label: t("item_kind_filter__unit"),
+                },
+                {
+                  value: "container" as Tracking,
+                  label: t("item_kind_filter__container"),
+                },
+              ]}
+              value={kind ? [kind] : []}
+              onChange={(v) => setKind(v.at(-1) ?? "")}
+            />
+            {floors.length > 0 && (
+              <FilterChips
+                label={t("floor")}
+                allLabel={t("all")}
+                options={floors.map((n) => ({
+                  value: n,
+                  label: t("floor_n", { n }),
+                }))}
+                value={floor ? [floor] : []}
+                onChange={(v) => setFloor(v.at(-1) ?? null)}
+              />
+            )}
+          </FilterPanel>
+
           {isLoading ? (
             <p className="text-sm text-gray-500">{t("loading")}</p>
           ) : !items?.length ? (
@@ -279,7 +380,6 @@ export default function InventoryPage() {
                       <ItemRow
                         key={it.id}
                         item={it}
-                        canWrite={canWrite}
                         manager={manager}
                         onMove={(kind) => setMoving({ item: it, kind })}
                         onHistory={() => setHistory(it)}
@@ -307,6 +407,8 @@ export default function InventoryPage() {
         open={editing !== undefined}
         item={editing ?? null}
         pending={save.isPending}
+        floors={floors}
+        categories={categories}
         onClose={() => setEditing(undefined)}
         onSave={(req) => save.mutate(req)}
       />
@@ -329,7 +431,6 @@ export default function InventoryPage() {
 
 function ItemRow({
   item: it,
-  canWrite,
   manager,
   onMove,
   onHistory,
@@ -338,7 +439,6 @@ function ItemRow({
   onRemove,
 }: {
   item: StockItem;
-  canWrite: boolean;
   manager: boolean;
   onMove: (kind: MovementKind) => void;
   onHistory: () => void;
@@ -348,6 +448,7 @@ function ItemRow({
 }) {
   const { t } = useTranslation();
   const container = it.tracking === "container";
+  const canWrite = it.can_change;
   const ruled = it.session_rules.filter((r) => r.quantity > 0).length;
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
@@ -357,6 +458,11 @@ function ItemRow({
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-600">
             {t(`item_kind__${it.tracking}`)}
           </span>
+          {it.floor ? (
+            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-normal text-sky-800">
+              {t("floor_n", { n: it.floor })}
+            </span>
+          ) : null}
           {(it.per_session > 0 || ruled > 0) && (
             <span
               className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-normal text-primary-700"
@@ -475,11 +581,13 @@ function ItemRow({
 }
 
 /** What to order and how much, to send to the supplier (CSV). */
-function ReorderList() {
+function ReorderList({ clinic }: { clinic: string }) {
   const { t } = useTranslation();
   const { data: items, isLoading } = useQuery({
-    queryKey: ["stock-reorder"],
-    queryFn: query(InventoryRoutes.reorder),
+    queryKey: ["stock-reorder", clinic],
+    queryFn: query(InventoryRoutes.reorder, {
+      queryParams: clinic ? { clinic } : {},
+    }),
   });
   const download = () => {
     const csv = reorderCsv(items ?? [], [

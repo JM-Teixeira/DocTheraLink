@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -17,6 +17,7 @@ import {
   formatDate,
 } from "@/Utils/dates";
 import { callApi } from "@/Utils/request/query";
+import { APP_VERSION } from "@/Utils/version";
 
 /** The person's own display preferences (today: how dates are shown). */
 export default function PreferencesTab({
@@ -28,6 +29,12 @@ export default function PreferencesTab({
   const { refetchUser } = useAuthContext();
   const current = dateFormatOf(userData.date_format);
   const today = new Date();
+
+  const { data: server } = useQuery({
+    queryKey: ["server-version"],
+    queryFn: async () =>
+      (await fetch("/api/v1/version/")).json() as Promise<{ version: string }>,
+  });
 
   const save = useMutation({
     mutationFn: (date_format: DateFormat) =>
@@ -85,6 +92,16 @@ export default function PreferencesTab({
           </button>
         ))}
       </div>
+
+      <h2 className="mt-8 text-base font-semibold text-gray-900">
+        {t("about_klyniva")}
+      </h2>
+      <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:w-fit">
+        <dt className="text-gray-600">{t("app_version")}</dt>
+        <dd className="font-mono text-gray-900">{APP_VERSION}</dd>
+        <dt className="text-gray-600">{t("server_version")}</dt>
+        <dd className="font-mono text-gray-900">{server?.version ?? "-"}</dd>
+      </dl>
     </section>
   );
 }

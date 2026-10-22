@@ -18,6 +18,23 @@ import (
 type fakeRepo struct {
 	items     map[string]Item
 	movements []Movement
+	grants    []Grant
+}
+
+func (f *fakeRepo) Grants(_ context.Context, clinicIDs []string, userID uint) ([]Grant, error) {
+	var out []Grant
+	for _, g := range f.grants {
+		if (clinicIDs == nil || slices.Contains(clinicIDs, g.ClinicID)) && (userID == 0 || g.UserID == userID) {
+			out = append(out, g)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) ReplaceGrants(_ context.Context, clinicID string, userID uint, grants []Grant) error {
+	f.grants = slices.DeleteFunc(f.grants, func(g Grant) bool { return g.ClinicID == clinicID && g.UserID == userID })
+	f.grants = append(f.grants, grants...)
+	return nil
 }
 
 func (f *fakeRepo) visible(clinicIDs []string, it Item) bool {
@@ -150,10 +167,124 @@ var (
 	admin       = Actor{ID: 9, Role: models.RoleStateAdmin}
 )
 
+// The physio of clinic A may change any of its stock (a grant for all
+// floors and categories); the read-only user has one too, which must not count.
 func newSvc() (*Service, *fakeRepo) {
-	repo := &fakeRepo{items: map[string]Item{}}
-	clinics := clinic.Static{physio.ID: clinicA, coordinator.ID: clinicA, readOnly.ID: clinicA, otherPhysio.ID: clinicB}
+	repo := &fakeRepo{items: map[string]Item{}, grants: []Grant{
+		{ClinicID: clinicA, UserID: physio.ID}, {ClinicID: clinicA, UserID: readOnly.ID},
+	}}
+	clinics := clinic.Static{physio.ID: clinicA, coordinator.ID: clinicA, readOnly.ID: clinicA, otherPhysio.ID: clinicB,
+		floorOne.ID: clinicA, hygiene.ID: clinicA, noGrant.ID: clinicA}
 	return NewService(repo, clinics), repo
+}
+
+var (
+	floorOne = Actor{ID: 11, Role: models.RolePhysioTherapist} // everything on floor 1
+	hygiene  = Actor{ID: 12, Role: models.RolePhysioTherapist} // "Higiene" on floors 2 and 3
+	noGrant  = Actor{ID: 13, Role: models.RolePhysioTherapist}
+)
+
+// The example of the clinic: three physios, one may change floor 1, one the
+// hygiene items of floors 2 and 3, the third nothing.
+func TestGrantsByFloorAndCategory(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newSvc()
+	if _, err := s.SetGrants(ctx, physio, floorOne.ID, GrantsRequest{}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("only managers give grants: %v", err)
+	}
+	if _, err := s.SetGrants(ctx, coordinator, floorOne.ID, GrantsRequest{Rules: []GrantRule{{Floors: []int{1}}}}); err != nil {
+		t.Fatal(err)
+	}
+	gs, err := s.SetGrants(ctx, coordinator, hygiene.ID, GrantsRequest{Rules: []GrantRule{{Floors: []int{3, 2, 3}, Categories: []string{" Higiene ", "higiene"}}}})
+	if err != nil || len(gs) != 1 || !slices.Equal(gs[0].Floors, []int{2, 3}) || len(gs[0].Categories) != 1 {
+		t.Fatalf("normalised grant: %+v %v", gs, err)
+	}
+	if _, err := s.SetGrants(ctx, coordinator, otherPhysio.ID, GrantsRequest{}); !errors.Is(err, ErrNotFound) {
+		t.Errorf("coordinator of another clinic: %v", err)
+	}
+
+	one, two := 1, 2
+	mk := func(name, cat string, floor *int) string {
+		it, err := s.Create(ctx, coordinator, ItemRequest{Name: name, Category: cat, Floor: floor, Quantity: 10})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return it.ID
+	}
+	gymGloves, soap2, soapAny := mk("Luvas piso 1", "EPI", &one), mk("Sabonete piso 2", "Higiene", &two), mk("Sabonete geral", "Higiene", nil)
+	use := func(a Actor, id string) error {
+		_, err := s.Move(ctx, a, id, MovementRequest{Kind: KindUse, Quantity: 1})
+		return err
+	}
+	cases := []struct {
+		who  string
+		a    Actor
+		item string
+		ok   bool
+	}{
+		{"floor 1 on floor 1", floorOne, gymGloves, true},
+		{"floor 1 on floor 2", floorOne, soap2, false},
+		{"floor 1 on a shared item", floorOne, soapAny, false},
+		{"hygiene 2-3 on floor 2 hygiene", hygiene, soap2, true},
+		{"hygiene 2-3 on floor 1 gloves", hygiene, gymGloves, false},
+		{"no grant", noGrant, gymGloves, false},
+		{"coordinator anywhere", coordinator, soapAny, true},
+		{"read-only even with a grant", readOnly, soapAny, false},
+	}
+	for _, c := range cases {
+		err := use(c.a, c.item)
+		if c.ok != (err == nil) || (!c.ok && !errors.Is(err, ErrForbidden)) {
+			t.Errorf("%s: %v", c.who, err)
+		}
+	}
+
+	// The list tells each viewer which items they may change
+	list, _ := s.List(ctx, hygiene, ListFilter{})
+	for _, it := range list {
+		if it.CanChange != (it.ID == soap2) {
+			t.Errorf("%s can_change = %v", it.Name, it.CanChange)
+		}
+	}
+	// Creating follows the same rule; moving an item out of reach is refused
+	three := 3
+	if _, err := s.Create(ctx, hygiene, ItemRequest{Name: "Toalhetes", Category: "Higiene", Floor: &three}); err != nil {
+		t.Errorf("hygiene on floor 3: %v", err)
+	}
+	if _, err := s.Create(ctx, hygiene, ItemRequest{Name: "Tape", Category: "Material", Floor: &three}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("another category: %v", err)
+	}
+	if _, err := s.Update(ctx, hygiene, soap2, ItemRequest{Name: "Sabonete piso 2", Category: "Higiene", Floor: &one}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("moving to floor 1: %v", err)
+	}
+	// Sessions still use stock whoever marks them attended
+	acc, _ := s.MyAccess(ctx, noGrant)
+	if acc.Manage || len(acc.Grants) != 0 {
+		t.Errorf("no access: %+v", acc)
+	}
+	// Removing all rules takes the permission away
+	if _, err := s.SetGrants(ctx, coordinator, floorOne.ID, GrantsRequest{}); err != nil || use(floorOne, gymGloves) == nil {
+		t.Errorf("grant removed: %v", err)
+	}
+}
+
+func TestAdminClinicFilter(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newSvc()
+	if _, err := s.Create(ctx, admin, ItemRequest{Name: "Gaze A", ClinicID: &clinicA}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Create(ctx, admin, ItemRequest{Name: "Gaze B", ClinicID: &clinicB}); err != nil {
+		t.Fatal(err)
+	}
+	if all, _ := s.List(ctx, admin, ListFilter{}); len(all) != 2 {
+		t.Errorf("admin sees every clinic: %d", len(all))
+	}
+	if onlyB, _ := s.List(ctx, admin, ListFilter{Clinic: clinicB}); len(onlyB) != 1 || onlyB[0].Name != "Gaze B" {
+		t.Errorf("clinic filter: %+v", onlyB)
+	}
+	if _, err := s.List(ctx, physio, ListFilter{Clinic: clinicB}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("staff cannot look at another clinic: %v", err)
+	}
 }
 
 func TestUnitItems(t *testing.T) {
@@ -243,7 +374,7 @@ func TestContainers(t *testing.T) {
 	if !list[0].OpenExpired {
 		t.Error("expired open container not flagged")
 	}
-	if sum, _ := s.Summary(ctx, physio); sum.OpenExpired != 1 {
+	if sum, _ := s.Summary(ctx, physio, ""); sum.OpenExpired != 1 {
 		t.Errorf("summary: %+v", sum)
 	}
 	if _, err := s.Update(ctx, physio, gel.ID, ItemRequest{Name: "Ultrasound gel", Tracking: TrackUnit}); !errors.As(err, &verr) {
@@ -314,7 +445,7 @@ func TestReorderAndPermissions(t *testing.T) {
 		}
 	}
 	tape, _ := s.Create(ctx, physio, ItemRequest{Name: "Tape", Quantity: 1, MinQuantity: 4, TargetQuantity: 20})
-	order, _ := s.Reorder(ctx, coordinator)
+	order, _ := s.Reorder(ctx, coordinator, "")
 	want := map[string]int{"Towels": 8, "Wipes": 10, "Tape": 19}
 	if len(order) != 3 {
 		t.Fatalf("reorder list: %+v", order)

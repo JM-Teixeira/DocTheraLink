@@ -208,8 +208,8 @@ test("holiday cover: patients move to the cover with a handover note", async ({ 
     }
     await dialog.getByLabel("Documento de passagem").fill("Plano geral para a semana.");
     await dialog.getByRole("button", { name: "Pré-visualizar" }).click();
-    await expect(dialog.getByText(/1 de 1 sessões passam/)).toBeVisible();
-    await dialog.getByLabel(patientName).fill(handover);
+    await expect(dialog.getByText("1 de 1 sessões mudam de fisioterapeuta")).toBeVisible();
+    await dialog.getByLabel(patientName, { exact: true }).fill(handover);
     await dialog.getByRole("button", { name: "Confirmar ausência" }).click();
     await expect(page.getByRole("dialog", { name: "Nova ausência" })).toHaveCount(0);
 

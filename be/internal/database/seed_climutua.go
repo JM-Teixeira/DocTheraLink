@@ -737,3 +737,39 @@ func climutuaNIF(r *rand.Rand) string {
 	}
 	return s
 }
+
+// seedStockAccess gives the demo users their stock permissions (once per
+// clinic) and puts some Climutua items on a floor:
+//   - demo clinic: the nurse and Sarah change everything, Tiago nothing;
+//   - Climutua: nursing everything, Inês floor 1, Mariana hygiene items on
+//     floors 2 and 3, the other physios nothing (read-only).
+func seedStockAccess() error {
+	var users []models.User
+	if err := DB.Select("id", "username").Where("username IN ?", []string{
+		"nurse", "physiotherapist", "cm.enfermagem", "cm.fisio1", "cm.fisio5",
+	}).Find(&users).Error; err != nil {
+		return err
+	}
+	id := map[string]uint{}
+	for _, u := range users {
+		id[u.Username] = u.ID
+	}
+	everything := []inventory.GrantRule{{}}
+	if err := inventory.SeedGrants(DB, DemoClinicID, map[uint][]inventory.GrantRule{
+		id["nurse"]: everything, id["physiotherapist"]: everything,
+	}); err != nil {
+		return err
+	}
+	for name, floor := range map[string]int{"Toucas de natação": 1, "Elétrodos para TENS": 2,
+		"Solução antisséptica": 2, "Toalhetes desinfetantes": 3} {
+		if err := DB.Model(&inventory.Item{}).Where("clinic_id = ? AND name = ? AND floor IS NULL", ClimutuaClinicID, name).
+			Update("floor", floor).Error; err != nil {
+			return err
+		}
+	}
+	return inventory.SeedGrants(DB, ClimutuaClinicID, map[uint][]inventory.GrantRule{
+		id["cm.enfermagem"]: everything,
+		id["cm.fisio1"]:     {{Floors: []int{1}}},
+		id["cm.fisio5"]:     {{Floors: []int{2, 3}, Categories: []string{"Higiene"}}},
+	})
+}

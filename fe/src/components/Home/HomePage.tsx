@@ -44,6 +44,7 @@ import {
   canCreateReferral,
   sumCounts,
 } from "@/components/Referral/referralUtils";
+import MissDialog, { statusLabel } from "@/components/TimeBoard/MissDialog";
 import PatientQuickView from "@/components/TimeBoard/PatientQuickView";
 import BoardRoutes from "@/components/TimeBoard/api";
 import {
@@ -433,16 +434,28 @@ function MyDay({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const day = myDay(board, userId);
+  const [missing, setMissing] = useState<{
+    id: string;
+    name: string;
+    justified?: boolean | null;
+    reason?: string;
+  } | null>(null);
   const nowHour = dayjs().hour();
   const status = useMutation({
-    mutationFn: (v: { id: string; status: AppointmentStatus }) =>
+    mutationFn: (v: {
+      id: string;
+      status: AppointmentStatus;
+      justified?: boolean;
+      reason?: string;
+    }) =>
       callApi(BoardRoutes.setStatus, {
         pathParams: { id: v.id },
-        body: { status: v.status },
+        body: { status: v.status, justified: v.justified, reason: v.reason },
         silent: true,
       }),
     onSuccess: (res) => {
       for (const w of res.warnings ?? []) Notification.Warn({ msg: w });
+      setMissing(null);
       queryClient.invalidateQueries({ queryKey: ["board"] });
     },
     onError: () => Notification.Error({ msg: t("board_save_failed") }),
@@ -520,7 +533,7 @@ function MyDay({
                         {a.credits}
                       </span>
                       <span className="w-20 text-right text-xs text-gray-500">
-                        {t(`appointment_status__${a.status}`)}
+                        {statusLabel(t, a)}
                       </span>
                       <Button
                         size="icon"
@@ -540,7 +553,12 @@ function MyDay({
                         variant="ghost"
                         aria-label={t("mark_missed")}
                         onClick={() =>
-                          status.mutate({ id: a.id, status: "missed" })
+                          setMissing({
+                            id: a.id,
+                            name: a.patient?.name ?? "",
+                            justified: a.miss_justified,
+                            reason: a.miss_reason,
+                          })
                         }
                       >
                         <UserX className="size-4 text-amber-600" aria-hidden />
@@ -555,6 +573,19 @@ function MyDay({
           ))}
         </ol>
       )}
+      <MissDialog
+        patientName={missing?.name ?? null}
+        initial={
+          missing
+            ? { justified: !!missing.justified, reason: missing.reason ?? "" }
+            : undefined
+        }
+        pending={status.isPending}
+        onClose={() => setMissing(null)}
+        onConfirm={(v) =>
+          missing && status.mutate({ id: missing.id, status: "missed", ...v })
+        }
+      />
     </Card>
   );
 }
@@ -628,10 +659,29 @@ function NeedsAttention({ pending }: { pending: number }) {
     queryFn: query(InventoryRoutes.list, { silent: true }),
     retry: false,
   });
+  const { data: misses } = useQuery({
+    queryKey: ["missed-flags"],
+    queryFn: query(BoardRoutes.missed, { silent: true }),
+    retry: false,
+  });
   const expired = items?.filter((i) => i.open_expired) ?? [];
+  const flagged = misses?.patients ?? [];
   return (
     <Card title={t("needs_attention")}>
       <ul className="flex flex-col gap-2 text-sm">
+        {flagged.map((m) => (
+          <AttentionRow
+            key={m.patient_id}
+            icon={UserX}
+            to={`/patients/${m.patient_id}`}
+            text={t("misses_flag_line", {
+              name: m.patient?.name ?? "",
+              count: m.unjustified,
+              days: misses?.window_days ?? 90,
+            })}
+            tone="danger"
+          />
+        ))}
         {pending > 0 && (
           <AttentionRow
             icon={Inbox}
@@ -661,7 +711,7 @@ function NeedsAttention({ pending }: { pending: number }) {
             tone={i.status === "out" ? "danger" : "warn"}
           />
         ))}
-        {!pending && !expired.length && !reorder?.length && (
+        {!pending && !expired.length && !reorder?.length && !flagged.length && (
           <li className="text-gray-500">{t("all_in_order")}</li>
         )}
       </ul>

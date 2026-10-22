@@ -52,6 +52,10 @@ same password `1234@1`:
 | `cm.enfermagem` | Teresa Gomes — enfermagem |
 | `cm.fisio7` | Rui Nogueira — **left the clinic** (kept on record; cannot sign in) |
 
+Stock permissions in Climutua: Teresa (nursing) changes everything, Inês the
+floor-1 stock, Mariana the hygiene items of floors 2 and 3; the other physios
+only look (the coordinator changes this from Pessoas → key button).
+
 Climutua has three floors (gym and hydrotherapy on 1, rooms and electrotherapy
 on 2, neuro rehab on 3) and
 a planned holiday: Inês Moreira is away next week, covered by João Ribeiro,

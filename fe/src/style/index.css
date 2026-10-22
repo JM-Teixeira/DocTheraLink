@@ -244,6 +244,19 @@ button:disabled:focus,
 
 @tailwind utilities;
 
+/* Time board: "Today" clicked - today's cell pulses twice */
+@keyframes today-ping {
+    0% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.55); }
+    70% { box-shadow: 0 0 0 12px rgba(13, 148, 136, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0); }
+}
+.today-flash {
+    animation: today-ping 0.9s ease-out 2;
+}
+@media (prefers-reduced-motion: reduce) {
+    .today-flash { animation: none; }
+}
+
 /* Native dropdowns: keep room for the arrow even when a px-* utility sets the
    padding. Utilities are !important here (tailwind `important: true`), so
    this is too; select:not() outranks a single class. */

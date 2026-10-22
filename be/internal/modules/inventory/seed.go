@@ -10,6 +10,24 @@ import (
 // demoContainers are the multi-use items of the demo clinic.
 var demoContainers = []string{"Hand sanitiser", "Disinfectant wipes", "Couch roll", "Ultrasound gel", "Massage oil"}
 
+// SeedGrants gives demo users their stock permissions, only while the
+// clinic has none yet (so changes made in the app are kept).
+func SeedGrants(db *gorm.DB, clinicID string, rules map[uint][]GrantRule) error {
+	var n int64
+	if err := db.Model(&Grant{}).Where("clinic_id = ?", clinicID).Count(&n).Error; err != nil || n > 0 {
+		return err
+	}
+	for userID, rs := range rules {
+		for _, r := range rs {
+			g := Grant{ClinicID: clinicID, UserID: userID, Floors: uniqueFloors(r.Floors), Categories: uniqueCategories(r.Categories)}
+			if err := db.Create(&g).Error; err != nil {
+				return fmt.Errorf("seed stock grant: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
 // SeedDemo stocks the demo clinic with typical physiotherapy consumables
 // (only when it has no items yet). Some start low so the alerts show.
 func SeedDemo(db *gorm.DB, clinicID string) error {

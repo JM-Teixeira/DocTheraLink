@@ -9,6 +9,8 @@ import {
   Board,
   Division,
   DivisionRequest,
+  MissCount,
+  MissReport,
   PatientHandover,
   RangeView,
   SeriesRequest,
@@ -23,6 +25,16 @@ import { PaginatedResponse } from "@/Utils/request/types";
 
 /** Time-board API (be/internal/modules/schedule/routes.go). */
 const BoardRoutes = {
+  missed: {
+    path: "/api/v1/schedule/missed/",
+    method: "GET",
+    TRes: Type<MissReport>(),
+  },
+  patientMisses: {
+    path: "/api/v1/schedule/missed/{patientId}/",
+    method: "GET",
+    TRes: Type<MissCount>(),
+  },
   board: {
     path: "/api/v1/schedule/board/",
     method: "GET",
@@ -130,7 +142,11 @@ const BoardRoutes = {
   setStatus: {
     path: "/api/v1/schedule/appointments/{id}/",
     method: "PATCH",
-    TBody: Type<{ status: AppointmentStatus }>(),
+    TBody: Type<{
+      status: AppointmentStatus;
+      justified?: boolean;
+      reason?: string;
+    }>(),
     TRes: Type<Appointment & { warnings: string[] }>(),
   },
   unbook: {

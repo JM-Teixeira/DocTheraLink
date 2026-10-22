@@ -136,8 +136,40 @@ func (f *fakeRepo) Book(_ context.Context, a *Appointment, capacity, limit int) 
 func (f *fakeRepo) UpdateAppointment(_ context.Context, id string, fields map[string]any) error {
 	a := f.appts[id]
 	a.Status = fields["status"].(string)
+	if j, ok := fields["miss_justified"].(bool); ok {
+		a.MissJustified = &j
+	} else {
+		a.MissJustified = nil
+	}
+	a.MissReason, _ = fields["miss_reason"].(string)
 	f.appts[id] = a
 	return nil
+}
+func (f *fakeRepo) MissedCounts(_ context.Context, cid string, from time.Time, patientID string) ([]MissCount, error) {
+	by := map[string]*MissCount{}
+	for _, a := range f.appts {
+		if a.ClinicID != cid || a.Status != StatusMissed || a.Date.Before(from) || (patientID != "" && a.PatientID != patientID) {
+			continue
+		}
+		c := by[a.PatientID]
+		if c == nil {
+			c = &MissCount{PatientID: a.PatientID}
+			by[a.PatientID] = c
+		}
+		if a.MissJustified != nil && *a.MissJustified {
+			c.Justified++
+		} else {
+			c.Unjustified++
+		}
+		if a.Date.After(c.Last) {
+			c.Last = a.Date
+		}
+	}
+	out := []MissCount{}
+	for _, c := range by {
+		out = append(out, *c)
+	}
+	return out, nil
 }
 func (f *fakeRepo) DeleteAppointment(_ context.Context, id string) error {
 	delete(f.appts, id)

@@ -8,10 +8,7 @@ import { cn } from "@/lib/utils";
 
 import DateInput from "@/components/Common/DateInput";
 import InventoryRoutes from "@/components/Inventory/api";
-import {
-  auditTotals,
-  movementLabel,
-} from "@/components/Inventory/inventoryUtils";
+import { movementLabel } from "@/components/Inventory/inventoryUtils";
 import { MovementKind } from "@/components/Inventory/types";
 
 import query from "@/Utils/request/query";
@@ -22,10 +19,10 @@ const KINDS: MovementKind[] = ["use", "open", "finish", "restock", "adjust"];
 
 /**
  * Audit of the clinic's stock (coordinators and admins): who used, opened,
- * restocked or counted what and when, with totals per person. Automatic use
- * by sessions on the time board is marked.
+ * restocked or counted what and when, as one log; filter by person, item or
+ * action. Automatic use by sessions on the time board is marked.
  */
-export default function InventoryAudit() {
+export default function InventoryAudit({ clinic = "" }: { clinic?: string }) {
   const { t } = useTranslation();
   const [from, setFrom] = useState(
     dayjs().subtract(30, "day").format("YYYY-MM-DD"),
@@ -36,16 +33,20 @@ export default function InventoryAudit() {
   const [kind, setKind] = useState("");
 
   const { data: items } = useQuery({
-    queryKey: ["stock-items", "", "all"],
-    queryFn: query(InventoryRoutes.list),
+    queryKey: ["stock-items", "", "all", clinic],
+    queryFn: query(InventoryRoutes.list, {
+      queryParams: clinic ? { clinic } : {},
+    }),
   });
   // Everyone who did something in the period (for the person filter)
   const { data: period } = useQuery({
-    queryKey: ["stock-audit", from, to],
-    queryFn: query(InventoryRoutes.audit, { queryParams: { from, to } }),
+    queryKey: ["stock-audit", from, to, clinic],
+    queryFn: query(InventoryRoutes.audit, {
+      queryParams: { from, to, ...(clinic && { clinic }) },
+    }),
   });
   const { data: moves, isLoading } = useQuery({
-    queryKey: ["stock-audit", from, to, user, item, kind],
+    queryKey: ["stock-audit", from, to, user, item, kind, clinic],
     queryFn: query(InventoryRoutes.audit, {
       queryParams: {
         from,
@@ -53,6 +54,7 @@ export default function InventoryAudit() {
         ...(user && { user }),
         ...(item && { item }),
         ...(kind && { kind }),
+        ...(clinic && { clinic }),
       },
     }),
   });
@@ -61,7 +63,6 @@ export default function InventoryAudit() {
       .filter((m) => m.user)
       .map((m) => [m.user!.id, `${m.user!.first_name} ${m.user!.last_name}`]),
   );
-  const totals = auditTotals(moves ?? []);
 
   return (
     <div className="flex flex-col gap-4">
@@ -121,38 +122,9 @@ export default function InventoryAudit() {
         </label>
       </div>
 
-      {!!totals.length && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {totals.map((p) => (
-            <section
-              key={p.name}
-              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-            >
-              <h3 className="mb-2 text-base font-semibold text-gray-900">
-                {p.name}
-              </h3>
-              <ul className="space-y-1 text-sm text-gray-700">
-                {[...p.items.values()].map((it) => (
-                  <li key={it.name} className="flex justify-between gap-2">
-                    <span className="truncate">{it.name}</span>
-                    <span className="shrink-0 text-gray-500">
-                      {[
-                        it.used > 0 &&
-                          t("n_used", { count: it.used, unit: it.unit }),
-                        it.opened > 0 && t("n_opened", { count: it.opened }),
-                        it.finished > 0 &&
-                          t("n_finished", { count: it.finished }),
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
-      )}
+      <p className="text-xs text-gray-500" aria-live="polite">
+        {t("n_movements", { count: moves?.length ?? 0 })}
+      </p>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="w-full text-sm">

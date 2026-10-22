@@ -152,6 +152,20 @@ func (h *Handler) DeleteAbsence(c *gin.Context) {
 	})
 }
 
+// MissedFlags handles GET /schedule/missed/ (patients who miss too often).
+func (h *Handler) MissedFlags(c *gin.Context) {
+	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
+		return h.svc.MissedFlags(c.Request.Context(), a)
+	})
+}
+
+// PatientMisses handles GET /schedule/missed/:patientId/
+func (h *Handler) PatientMisses(c *gin.Context) {
+	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {
+		return h.svc.PatientMisses(c.Request.Context(), a, c.Param("patientId"))
+	})
+}
+
 // Handover handles GET /schedule/handover/?patient=
 func (h *Handler) Handover(c *gin.Context) {
 	handle(c, http.StatusOK, false, func(a Actor, _ none) (any, error) {

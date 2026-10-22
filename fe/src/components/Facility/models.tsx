@@ -152,7 +152,10 @@ export type IUserFacilityRequest = {
   facility: string;
 };
 
-export type FacilityRequest = Omit<FacilityModel, "location" | "id" | "latitude" | "longitude"> & {
+export type FacilityRequest = Omit<
+  FacilityModel,
+  "location" | "id" | "latitude" | "longitude"
+> & {
   latitude?: number;
   longitude?: number;
 };

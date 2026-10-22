@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Search, UserRound, X } from "lucide-react";
+import { KeyRound, Plus, Search, UserRound, X } from "lucide-react";
 import { navigate } from "raviger";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 
 import { FilterChips, FilterPanel } from "@/components/Common/FilterChips";
 import Page from "@/components/Common/Page";
+import StockGrantsDialog from "@/components/Inventory/StockGrantsDialog";
+import InventoryRoutes from "@/components/Inventory/api";
+import { grantLines } from "@/components/Inventory/inventoryUtils";
 import StaffRoutes from "@/components/Staff/api";
 import {
   CLINIC_ROLES,
@@ -22,6 +25,8 @@ import {
   EMPLOYMENT_STATUSES,
   EmploymentStatus,
 } from "@/components/Staff/types";
+import BoardRoutes from "@/components/TimeBoard/api";
+import { floorsOf } from "@/components/TimeBoard/boardUtils";
 
 import useAuthUser from "@/hooks/useAuthUser";
 import useDateFormat from "@/hooks/useDateFormat";
@@ -42,9 +47,18 @@ export default function StaffList() {
   const { fmt, fmtTime } = useDateFormat();
   const user = useAuthUser();
   const admin = isAdmin(user);
+  const manager = canManageBoard(user);
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
-  const [clinic, setClinic] = useState("");
+  // The clinic page opens this list as /users?clinic=<id> (admins)
+  const [clinic, setClinic] = useState(() =>
+    admin
+      ? (new URLSearchParams(window.location.search).get("clinic") ?? "")
+      : "",
+  );
+  const [granting, setGranting] = useState<{ id: number; name: string } | null>(
+    null,
+  );
   const [status, setStatus] = useState<EmploymentStatus | "all">("active");
   const [page, setPage] = useState(0);
   const term = useDebouncedValue(search);
@@ -69,6 +83,37 @@ export default function StaffList() {
     queryFn: query(StaffRoutes.clinics, { queryParams: { limit: 100 } }),
     enabled: admin,
   });
+  // Stock permissions per person (coordinators and admins)
+  const { data: grants, refetch: refetchGrants } = useQuery({
+    queryKey: ["stock-grants", clinic],
+    queryFn: query(InventoryRoutes.grants, {
+      queryParams: clinic ? { clinic } : {},
+    }),
+    enabled: manager,
+  });
+  const { data: stock } = useQuery({
+    queryKey: ["stock-items", "", "all", clinic],
+    queryFn: query(InventoryRoutes.list, {
+      queryParams: clinic ? { clinic } : {},
+    }),
+    enabled: manager,
+  });
+  const { data: divisions } = useQuery({
+    queryKey: ["divisions"],
+    queryFn: query(BoardRoutes.divisions),
+    enabled: manager,
+  });
+  const categories = [
+    ...new Set((stock ?? []).map((i) => i.category).filter(Boolean)),
+  ].sort();
+  const grantsOf = (id: number) =>
+    (grants ?? []).filter((g) => g.user_id === id);
+  const grantLabels = {
+    allFloors: t("all_floors"),
+    floor: (n: number) => t("floor_n", { n }),
+    floors: (ns: string) => t("floors_n", { ns }),
+    everything: t("all_categories").toLowerCase(),
+  };
   const total = data?.count ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filtered = !!(term.trim() || role || clinic || status !== "active");
@@ -174,7 +219,7 @@ export default function StaffList() {
         </div>
       ) : data?.results?.length ? (
         <>
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="min-w-full divide-y divide-gray-100 text-sm">
               <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                 <tr>
@@ -189,6 +234,7 @@ export default function StaffList() {
                   <th className="hidden px-4 py-3 lg:table-cell">
                     {t("last_login")}
                   </th>
+                  {manager && <th className="px-4 py-3">{t("inventory")}</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -250,6 +296,52 @@ export default function StaffList() {
                       <td className="hidden px-4 py-3 text-gray-500 lg:table-cell">
                         {p.last_login ? fmtTime(p.last_login) : t("never")}
                       </td>
+                      {manager && (
+                        <td
+                          className="px-4 py-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600">
+                              {grantsOf(p.id).length
+                                ? grantLines(grantsOf(p.id), grantLabels).map(
+                                    (l) => (
+                                      <span key={l} className="block">
+                                        {l}
+                                      </span>
+                                    ),
+                                  )
+                                : [
+                                      "Coordinator",
+                                      "StateAdmin",
+                                      "DistrictAdmin",
+                                      "LocalBodyAdmin",
+                                    ].includes(p.user_type)
+                                  ? t("stock_access_all")
+                                  : t("stock_access_view_only")}
+                            </span>
+                            {st !== "left" &&
+                              ![
+                                "Coordinator",
+                                "StateAdmin",
+                                "DistrictAdmin",
+                                "LocalBodyAdmin",
+                              ].includes(p.user_type) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="ml-auto"
+                                  aria-label={t("stock_access_for", { name })}
+                                  onClick={() =>
+                                    setGranting({ id: p.id, name })
+                                  }
+                                >
+                                  <KeyRound className="size-3.5" aria-hidden />
+                                </Button>
+                              )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -288,6 +380,17 @@ export default function StaffList() {
           <p className="font-semibold text-gray-900">{t("no_people_found")}</p>
         </div>
       )}
+      <StockGrantsDialog
+        person={granting}
+        grants={granting ? grantsOf(granting.id) : []}
+        floors={floorsOf(divisions ?? [])}
+        categories={categories}
+        onClose={() => setGranting(null)}
+        onSaved={() => {
+          setGranting(null);
+          refetchGrants();
+        }}
+      />
     </Page>
   );
 }

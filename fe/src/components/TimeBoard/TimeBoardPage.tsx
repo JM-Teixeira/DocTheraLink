@@ -114,6 +114,9 @@ export default function TimeBoardPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [date, setDate] = useState(today());
+  // Bumped on every "Today" click: the views pulse today's cell
+  const [todayFlash, setTodayFlash] = useState(0);
+  const onToday = date === today();
   const [mode, setMode] = useState<Mode>("day");
   const [view, setView] = useState<DayView>("physio");
   const [filter, setFilterState] = useState<BoardFilter>(loadFilter);
@@ -239,12 +242,33 @@ export default function TimeBoardPage() {
           >
             <ChevronRight className="size-4" aria-hidden />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setDate(today())}>
+          <Button
+            variant={onToday && mode === "day" ? "outline" : "ghost"}
+            size="sm"
+            aria-pressed={onToday}
+            className={cn(onToday && "font-semibold text-primary-700")}
+            onClick={() => {
+              setDate(today());
+              setTodayFlash((n) => n + 1);
+            }}
+          >
             {t("today")}
           </Button>
         </div>
-        <span className="text-sm font-medium capitalize text-gray-700">
+        <span
+          className={cn(
+            "flex items-center gap-2 text-sm capitalize",
+            mode === "day" && onToday
+              ? "font-bold text-primary-800"
+              : "font-medium text-gray-700",
+          )}
+        >
           {periodLabel(mode, date)}
+          {mode === "day" && onToday && (
+            <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-semibold normal-case text-primary-800">
+              {t("today")}
+            </span>
+          )}
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
           <div
@@ -337,12 +361,20 @@ export default function TimeBoardPage() {
           />
         ))}
       {mode === "week" && (
-        <WeekView date={date} onOpenDay={openDay} physios={filter.physios} />
+        <WeekView
+          date={date}
+          onOpenDay={openDay}
+          physios={filter.physios}
+          flash={todayFlash}
+        />
       )}
-      {mode === "month" && <MonthView date={date} onOpenDay={openDay} />}
+      {mode === "month" && (
+        <MonthView date={date} onOpenDay={openDay} flash={todayFlash} />
+      )}
       {mode === "year" && (
         <YearView
           year={dayjs(date).year()}
+          flash={todayFlash}
           onOpenMonth={(d) => {
             setDate(d);
             setMode("month");

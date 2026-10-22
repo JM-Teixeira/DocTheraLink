@@ -37,6 +37,10 @@ type Repository interface {
 	// NetForAppointment sums the stock change per item recorded for an appointment.
 	NetForAppointment(ctx context.Context, appointmentID string) (map[string]int, error)
 	ReplaceRules(ctx context.Context, itemID string, rules []SessionRule) error
+	// Grants of the clinics (nil = all) for one user (0 = everyone).
+	Grants(ctx context.Context, clinicIDs []string, userID uint) ([]Grant, error)
+	// ReplaceGrants sets all the grants of a user in a clinic.
+	ReplaceGrants(ctx context.Context, clinicID string, userID uint, grants []Grant) error
 }
 
 // GormRepository implements Repository on PostgreSQL via GORM.
@@ -58,6 +62,28 @@ func inClinics(db *gorm.DB, clinicIDs []string) *gorm.DB {
 	return db.Where("clinic_id IN ?", clinicIDs)
 }
 
+func (g *GormRepository) Grants(ctx context.Context, clinicIDs []string, userID uint) ([]Grant, error) {
+	db := inClinics(g.db.WithContext(ctx).Model(&Grant{}), clinicIDs)
+	if userID != 0 {
+		db = db.Where("user_id = ?", userID)
+	}
+	var out []Grant
+	err := db.Order("user_id, created_at").Find(&out).Error
+	return out, err
+}
+
+func (g *GormRepository) ReplaceGrants(ctx context.Context, clinicID string, userID uint, grants []Grant) error {
+	return g.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("clinic_id = ? AND user_id = ?", clinicID, userID).Delete(&Grant{}).Error; err != nil {
+			return err
+		}
+		if len(grants) == 0 {
+			return nil
+		}
+		return tx.Create(&grants).Error
+	})
+}
+
 func (g *GormRepository) List(ctx context.Context, clinicIDs []string, f ListFilter) ([]Item, error) {
 	db := inClinics(g.db.WithContext(ctx).Model(&Item{}), clinicIDs).Preload("Rules").Where("archived = false")
 	if s := strings.TrimSpace(f.Search); s != "" {
@@ -65,6 +91,12 @@ func (g *GormRepository) List(ctx context.Context, clinicIDs []string, f ListFil
 	}
 	if f.Category != "" {
 		db = db.Where("category = ?", f.Category)
+	}
+	if f.Tracking != "" {
+		db = db.Where("tracking = ?", f.Tracking)
+	}
+	if f.Floor != nil {
+		db = db.Where("floor = ?", *f.Floor)
 	}
 	switch f.Status {
 	case "out":

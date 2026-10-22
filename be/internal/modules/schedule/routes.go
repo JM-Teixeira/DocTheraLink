@@ -42,5 +42,7 @@ func mount(g *gin.RouterGroup, h *Handler) {
 	g.POST("/absences/", h.CreateAbsence)
 	g.DELETE("/absences/:id/", h.DeleteAbsence)
 	g.GET("/handover/", h.Handover)
+	g.GET("/missed/", h.MissedFlags)
+	g.GET("/missed/:patientId/", h.PatientMisses)
 	g.DELETE("/series/:id/", h.CancelSeries)
 }

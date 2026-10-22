@@ -15,6 +15,7 @@ import {
   weekStart,
 } from "@/components/TimeBoard/boardUtils";
 import { DaySummary, Division, RangeView } from "@/components/TimeBoard/types";
+import useTodayFlash from "@/components/TimeBoard/useTodayFlash";
 
 import query from "@/Utils/request/query";
 
@@ -53,13 +54,17 @@ export function WeekView({
   date,
   onOpenDay,
   physios = [],
+  flash = 0,
 }: {
   date: string;
   onOpenDay: (d: string) => void;
   /** Only these physios (empty = all). */
   physios?: number[];
+  /** Changes when "Today" is clicked: pulse today's column. */
+  flash?: number;
 }) {
   const { t } = useTranslation();
+  const { ref: todayRef, flashing } = useTodayFlash<HTMLButtonElement>(flash);
   const start = weekStart(date);
   const days = weekDates(start);
   const { data: v } = useRange(days[0], days[6]);
@@ -78,10 +83,14 @@ export function WeekView({
               <th key={d} className="min-w-32 p-2 font-medium">
                 <button
                   type="button"
+                  ref={d === today() ? todayRef : undefined}
+                  aria-current={d === today() ? "date" : undefined}
                   onClick={() => onOpenDay(d)}
                   className={cn(
                     "rounded px-2 py-1 capitalize hover:bg-gray-100",
-                    d === today() && "bg-primary-50 text-primary-700",
+                    d === today() &&
+                      "bg-primary-50 font-bold text-primary-800 ring-2 ring-primary-500",
+                    d === today() && flashing && "today-flash",
                   )}
                 >
                   {dayjs(d).format("ddd D")}
@@ -177,11 +186,15 @@ export function WeekView({
 export function MonthView({
   date,
   onOpenDay,
+  flash = 0,
 }: {
   date: string;
   onOpenDay: (d: string) => void;
+  /** Changes when "Today" is clicked: pulse today's cell. */
+  flash?: number;
 }) {
   const { t } = useTranslation();
+  const { ref: todayRef, flashing } = useTodayFlash<HTMLButtonElement>(flash);
   const weeks = monthGrid(date);
   const { data: v } = useRange(weeks[0][0], weeks.at(-1)![6]);
   if (!v) return <Loading />;
@@ -209,10 +222,15 @@ export function MonthView({
               <button
                 key={d}
                 type="button"
+                ref={d === today() ? todayRef : undefined}
+                aria-current={d === today() ? "date" : undefined}
                 onClick={() => onOpenDay(d)}
                 className={cn(
                   "flex min-h-24 flex-col gap-1 p-2 text-left text-xs hover:bg-gray-50",
                   !inMonth && "bg-gray-50/60 text-gray-400",
+                  d === today() &&
+                    "relative z-10 bg-primary-50/60 ring-2 ring-inset ring-primary-500",
+                  d === today() && flashing && "today-flash",
                 )}
               >
                 <span
@@ -255,11 +273,16 @@ export function MonthView({
 export function YearView({
   year,
   onOpenMonth,
+  flash = 0,
 }: {
   year: number;
   onOpenMonth: (date: string) => void;
+  /** Changes when "Today" is clicked: pulse this month's row. */
+  flash?: number;
 }) {
   const { t } = useTranslation();
+  const { ref: monthRef, flashing } = useTodayFlash<HTMLTableRowElement>(flash);
+  const thisMonth = dayjs().year() === year ? dayjs().month() + 1 : 0;
   const { data } = useQuery({
     queryKey: ["board-year", year],
     queryFn: query(BoardRoutes.year, { queryParams: { year } }),
@@ -317,7 +340,16 @@ export function YearView({
             {data.months.map((m) => {
               const total = m.attended + m.missed + m.booked;
               return (
-                <tr key={m.month} className="hover:bg-gray-50">
+                <tr
+                  key={m.month}
+                  ref={m.month === thisMonth ? monthRef : undefined}
+                  aria-current={m.month === thisMonth ? "date" : undefined}
+                  className={cn(
+                    "hover:bg-gray-50",
+                    m.month === thisMonth && "bg-primary-50/60 font-semibold",
+                    m.month === thisMonth && flashing && "today-flash",
+                  )}
+                >
                   <td className="p-3">
                     <button
                       type="button"

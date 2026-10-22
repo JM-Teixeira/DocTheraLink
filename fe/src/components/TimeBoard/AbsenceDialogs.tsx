@@ -1,13 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import {
-  ArrowRight,
-  CircleCheck,
-  CircleX,
-  Plane,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { ArrowRight, Plane, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -24,9 +17,10 @@ import {
 } from "@/components/ui/dialog";
 
 import DateInput from "@/components/Common/DateInput";
+import AbsencePlanner from "@/components/TimeBoard/AbsencePlanner";
 import { apiError } from "@/components/TimeBoard/BoardDialogs";
 import BoardRoutes from "@/components/TimeBoard/api";
-import { addDays, formatHour, today } from "@/components/TimeBoard/boardUtils";
+import { addDays, today } from "@/components/TimeBoard/boardUtils";
 import { AbsenceReason, AbsenceResult } from "@/components/TimeBoard/types";
 
 import useDateFormat from "@/hooks/useDateFormat";
@@ -164,8 +158,9 @@ export function AbsencesDialog({
 }
 
 /**
- * New absence in two steps: who, when, cover → preview of where each
- * session goes and a handover note per patient → confirm.
+ * New absence in two steps: who, when, default cover → a plan of where each
+ * session goes (per patient: the cover, another physio working that hour,
+ * or stays) and a handover note per patient → confirm.
  */
 function NewAbsenceDialog({
   open,
@@ -187,16 +182,24 @@ function NewAbsenceDialog({
   const [handover, setHandover] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<AbsenceResult | null>(null);
+  // Per session: who takes it (0 = stays); sessions not listed go to the cover
+  const [assign, setAssign] = useState<Record<string, number>>({});
+  const [replan, setReplan] = useState(0);
   useEffect(() => {
     if (open) {
       setTherapist(0);
       setCover(0);
       setHandover("");
       setNotes({});
+      setAssign({});
       setPreview(null);
     }
   }, [open]);
-  useEffect(() => setPreview(null), [therapist, cover, from, to]);
+  useEffect(() => {
+    setPreview(null);
+    setAssign({});
+  }, [therapist, from, to]);
+  useEffect(() => setPreview(null), [cover]);
 
   const body = (dry: boolean) => ({
     therapist_id: therapist,
@@ -210,6 +213,12 @@ function NewAbsenceDialog({
       .map(([patient_id, note]) => ({ patient_id, note })),
     move_patients: true,
     dry_run: dry,
+    assignments: Object.entries(assign).map(
+      ([appointment_id, therapist_id]) => ({
+        appointment_id,
+        therapist_id,
+      }),
+    ),
   });
   const fail = (e: Error) => apiError(e, t("board_save_failed"));
   const check = useMutation({
@@ -230,12 +239,22 @@ function NewAbsenceDialog({
     },
     onError: fail,
   });
+  // A changed destination re-checks the whole plan (room left changes)
+  useEffect(() => {
+    if (replan) check.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replan]);
+  const choose = (appointmentId: string, therapistId: number) => {
+    if (therapistId < 0) return;
+    setAssign((a) => ({ ...a, [appointmentId]: therapistId }));
+    setReplan((n) => n + 1);
+  };
   const valid = therapist > 0 && from && to && to >= from;
   const moved = preview?.sessions.filter((s) => s.moved).length ?? 0;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>{t("new_absence")}</DialogTitle>
           <DialogDescription>{t("new_absence_help")}</DialogDescription>
@@ -322,33 +341,12 @@ function NewAbsenceDialog({
               {t("absence_preview", { moved, total: preview.sessions.length })}
             </p>
             {!!preview.sessions.length && (
-              <ul className="max-h-48 divide-y divide-gray-100 overflow-auto rounded-lg border border-gray-200 text-sm">
-                {preview.sessions.map((s) => (
-                  <li
-                    key={s.appointment_id}
-                    className="flex items-center gap-2 px-3 py-1.5"
-                  >
-                    {s.moved ? (
-                      <CircleCheck
-                        className="size-4 text-emerald-600"
-                        aria-hidden
-                      />
-                    ) : (
-                      <CircleX className="size-4 text-amber-600" aria-hidden />
-                    )}
-                    <span className="w-28 capitalize text-gray-600">
-                      {dayjs(s.date).format("ddd D MMM")}
-                    </span>
-                    <span className="w-12 font-mono">{formatHour(s.hour)}</span>
-                    <span className="flex-1 truncate">{s.patient_name}</span>
-                    <span className="text-xs text-gray-500">
-                      {s.moved
-                        ? t("moves_to_cover")
-                        : t(`skip_reason__${s.reason}`)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <AbsencePlanner
+                sessions={preview.sessions}
+                physios={physios}
+                absentId={therapist}
+                onAssign={choose}
+              />
             )}
             {!!preview.patients.length && (
               <div>

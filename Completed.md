@@ -5,6 +5,42 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Klyniva 0.6.0 (branch `feat/m4-patients`)
+
+### 22:00 · Stock permissions, per-patient holiday moves, misses, version (user request)
+- **Version** 0.6.0 (major.minor.patch, major 0 for now): shown in the
+  menu and in Profile → Preferências (app and server); `GET /api/v1/version/`;
+  `scripts/bump-version.sh` sets backend and frontend, a test checks they agree.
+- **Inventory permissions by floor × category**: items get a floor; the
+  coordinator (or admin) gives a person rules like "Higiene on floors 2
+  and 3" from the people list (key button). Only managers and people
+  whose rule covers an item may use/open/finish/restock/count/edit it;
+  others see the stock read-only. Sessions still use stock automatically.
+- **Inventory**: admins choose the clinic (they saw every clinic mixed);
+  filters single-use vs containers and by floor; floor badge; audit is now
+  just the log (no per-person cards); "How does per-session use work?"
+  explained step by step with an example.
+- **Holiday cover per patient**: the preview lists every session with
+  everyone working that hour and the room they have left (places,
+  credits, after the other moves); each patient can go to a different
+  physio or stay; a "who receives whom" summary. Confirmed: sessions move
+  from the absent physio to the chosen one at the same hour.
+- **Misses**: marking a session missed asks justified or not (+ reason);
+  3 unjustified misses in 90 days flag the patient on the coordinator's
+  home page; the patient pop-up shows the counts.
+- **Clinic → people** opens the people list filtered by clinic
+  (`/users?clinic=`; the old address redirects). **Clinics page** rebuilt
+  like the other lists (search + chips, no advanced-filter panel).
+- **Time board "today"**: bold with a badge in the day view only on the
+  current day; in week/month/year today is marked and "Hoje" pulses it.
+- Browser checks: notifications bell, letter print to PDF, phone screens,
+  accessibility scan (fixed: icon semantics, logo alt, sidebar toggle
+  name, breadcrumbs list, label/chip/profile contrast).
+- Tests: inventory grants and clinic filter, misses, per-patient absence
+  split (unit); e2e `TestStockAccessByFloorAndCategory`,
+  `TestInventoryClinicFilter`, `TestMissedSessionsFlag`, `TestVersion`;
+  browser `features.spec.ts` and `quality.spec.ts`.
+
 ## 2026-10-22 · Security review, date preference, tests (branch `feat/m4-patients`)
 
 ### 17:00 · Browser tests for the main clinic journeys (TODO §0)

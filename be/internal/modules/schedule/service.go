@@ -424,11 +424,26 @@ func (s *Service) SetStatus(ctx context.Context, a Actor, id string, req StatusR
 		return nil, ErrForbidden
 	}
 	res := &StatusResult{Appointment: *ap, Warnings: []string{}}
+	fields := missFields(req)
+	// Same status: only a missed session's justification can still change
 	if ap.Status == req.Status {
+		if req.Status == StatusMissed {
+			if err := s.repo.UpdateAppointment(ctx, id, fields); err != nil {
+				return nil, err
+			}
+			j, _ := fields["miss_justified"].(bool)
+			res.MissJustified, res.MissReason = &j, req.Reason
+		}
 		return res, nil
 	}
-	if err := s.repo.UpdateAppointment(ctx, id, map[string]any{"status": req.Status}); err != nil {
+	if err := s.repo.UpdateAppointment(ctx, id, fields); err != nil {
 		return nil, err
+	}
+	if req.Status == StatusMissed {
+		j, _ := fields["miss_justified"].(bool)
+		res.MissJustified, res.MissReason = &j, req.Reason
+	} else {
+		res.MissJustified, res.MissReason = nil, ""
 	}
 	switch {
 	case req.Status == StatusAttended:

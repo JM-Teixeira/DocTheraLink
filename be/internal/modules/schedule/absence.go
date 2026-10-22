@@ -3,6 +3,7 @@ package schedule
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -58,6 +59,24 @@ type AbsenceRequest struct {
 	Notes        []HandoverInput `json:"notes" binding:"dive"`
 	MovePatients bool            `json:"move_patients"`
 	DryRun       bool            `json:"dry_run"`
+	// Per session: who takes it (therapist 0 = stays with the absent
+	// physio). Sessions not listed go to the cover physio.
+	Assignments []Assignment `json:"assignments" binding:"max=1000,dive"`
+}
+
+// Assignment sends one session of the absent physio to a chosen physio.
+type Assignment struct {
+	AppointmentID string `json:"appointment_id" binding:"required,uuid"`
+	TherapistID   uint   `json:"therapist_id"`
+}
+
+// Candidate is a physio who works at a session's hour, with the room they
+// have left (after the moves already planned in this request).
+type Candidate struct {
+	TherapistID uint `json:"therapist_id"`
+	Places      int  `json:"places"`  // free patient places that hour
+	Credits     int  `json:"credits"` // free care credits that hour
+	Fits        bool `json:"fits"`    // this patient fits (places, credits, not busy)
 }
 
 // HandoverInput is the note left about one patient.
@@ -73,8 +92,12 @@ type MovedSession struct {
 	Hour          int    `json:"hour"`
 	PatientID     string `json:"patient_id"`
 	PatientName   string `json:"patient_name"`
+	Credits       int    `json:"credits"` // the patient's care level
 	Moved         bool   `json:"moved"`
-	Reason        string `json:"reason,omitempty"` // not_on_shift | full | over_credits | patient_busy | no_cover
+	To            uint   `json:"to,omitempty"`     // who takes it
+	Reason        string `json:"reason,omitempty"` // not_on_shift | full | over_credits | patient_busy | no_cover | kept
+	// Who could take it instead (on shift at that hour), for the coordinator to choose
+	Candidates []Candidate `json:"candidates"`
 }
 
 // AbsenceResult is the absence and the fate of each session in the period.
@@ -146,11 +169,30 @@ func (s *Service) CreateAbsence(ctx context.Context, a Actor, req AbsenceRequest
 			plan.exclude[ap.ID] = true
 		}
 	}
+	assigned := map[string]uint{}
+	for _, as := range req.Assignments {
+		if as.TherapistID != 0 {
+			if as.TherapistID == req.TherapistID {
+				return nil, &ValidationError{"assignments", "sessions cannot go to the absent physiotherapist"}
+			}
+			if ok, err := s.repo.IsTherapist(ctx, cid, as.TherapistID); err != nil || !ok {
+				return nil, firstErr(err, &ValidationError{"assignments", "is not a physiotherapist of this clinic"})
+			}
+		}
+		assigned[as.AppointmentID] = as.TherapistID
+	}
 	var moves []struct {
 		ap  Appointment
 		div *Division
 	}
-	for _, ap := range data.appts {
+	sorted := slices.Clone(data.appts)
+	slices.SortStableFunc(sorted, func(x, y Appointment) int {
+		if c := x.Date.Compare(y.Date); c != 0 {
+			return c
+		}
+		return x.Hour - y.Hour
+	})
+	for _, ap := range sorted {
 		if ap.TherapistID != req.TherapistID || ap.Status != StatusBooked {
 			continue
 		}
@@ -162,22 +204,29 @@ func (s *Service) CreateAbsence(ctx context.Context, a Actor, req AbsenceRequest
 				res.Patients = append(res.Patients, *ap.Patient)
 			}
 		}
-		ms := MovedSession{AppointmentID: ap.ID, Date: ap.Date.Format(dateLayout), Hour: ap.Hour, PatientID: ap.PatientID, PatientName: name}
+		ms := MovedSession{AppointmentID: ap.ID, Date: ap.Date.Format(dateLayout), Hour: ap.Hour, PatientID: ap.PatientID,
+			PatientName: name, Credits: ap.Credits}
+		plan.level = ap.Credits
+		// Everyone else working that hour, with their room left so far
+		ms.Candidates = s.candidates(&plan, data, ap, req.TherapistID)
+		to, chosen := assigned[ap.ID]
+		if !chosen && req.CoverID != nil {
+			to = *req.CoverID
+		}
 		switch {
-		case !req.MovePatients:
+		case !req.MovePatients || (chosen && to == 0):
 			ms.Reason = "kept"
-		case req.CoverID == nil:
+		case to == 0:
 			ms.Reason = "no_cover"
 		default:
-			plan.level = ap.Credits
-			reason, div := plan.problem(ap.Date, ap.Hour, *req.CoverID, ap.PatientID)
+			reason, div := plan.problem(ap.Date, ap.Hour, to, ap.PatientID)
 			if reason == "" {
-				ms.Moved = true
+				ms.Moved, ms.To = true, to
 				moves = append(moves, struct {
 					ap  Appointment
 					div *Division
 				}{ap, div})
-				plan.add(ap.Date, ap.Hour, *req.CoverID, ap.PatientID)
+				plan.add(ap.Date, ap.Hour, to, ap.PatientID)
 			} else {
 				ms.Reason = reason
 			}
@@ -204,7 +253,7 @@ func (s *Service) CreateAbsence(ctx context.Context, a Actor, req AbsenceRequest
 		}
 		mv := moves[0]
 		moves = moves[1:]
-		if err := s.repo.MoveAppointment(ctx, &mv.ap, *req.CoverID, mv.div.Capacity, creditLimit(mv.div)); err != nil {
+		if err := s.repo.MoveAppointment(ctx, &mv.ap, ms.To, mv.div.Capacity, creditLimit(mv.div)); err != nil {
 			if res.Sessions[i].Reason = skipReason(err); res.Sessions[i].Reason == "" {
 				return nil, err
 			}
@@ -217,6 +266,25 @@ func (s *Service) CreateAbsence(ctx context.Context, a Actor, req AbsenceRequest
 	}
 	res.Absence = ab
 	return res, nil
+}
+
+// candidates are the physios (not the absent one) on shift at the session's
+// hour, with the places and credits they have left; Fits says whether this
+// patient could go to them.
+func (s *Service) candidates(plan *planner, data *boardData, ap Appointment, absent uint) []Candidate {
+	out := []Candidate{}
+	for _, t := range data.therapists {
+		if t.ID == absent {
+			continue
+		}
+		places, credits, ok := plan.room(ap.Date, ap.Hour, t.ID)
+		if !ok {
+			continue
+		}
+		reason, _ := plan.problem(ap.Date, ap.Hour, t.ID, ap.PatientID)
+		out = append(out, Candidate{TherapistID: t.ID, Places: places, Credits: credits, Fits: reason == ""})
+	}
+	return out
 }
 
 // clearShifts deletes the physio's shifts in the period that hold no patients.

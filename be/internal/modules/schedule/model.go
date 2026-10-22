@@ -97,10 +97,13 @@ type Appointment struct {
 	ReferralID  *string         `json:"referral_id" gorm:"type:uuid"`
 	SeriesID    *string         `json:"series_id" gorm:"type:uuid;index"`
 	Status      string          `json:"status" gorm:"size:12;not null;default:booked"`
-	Notes       string          `json:"notes" gorm:"size:300"`
-	CreatedByID uint            `json:"created_by_id"`
-	CreatedAt   time.Time       `json:"created_date"`
-	UpdatedAt   time.Time       `json:"modified_date"`
+	// Missed sessions only: was the miss justified (ill, warned), and why
+	MissJustified *bool     `json:"miss_justified"`
+	MissReason    string    `json:"miss_reason" gorm:"size:200"`
+	Notes         string    `json:"notes" gorm:"size:300"`
+	CreatedByID   uint      `json:"created_by_id"`
+	CreatedAt     time.Time `json:"created_date"`
+	UpdatedAt     time.Time `json:"modified_date"`
 }
 
 // Models lists the tables for AutoMigrate.
@@ -197,6 +200,9 @@ type SkippedDate struct {
 // StatusRequest marks an appointment attended or missed (or booked again).
 type StatusRequest struct {
 	Status string `json:"status" binding:"required,oneof=booked attended missed"`
+	// Missed only: justified (default no) and an optional reason
+	Justified *bool  `json:"justified"`
+	Reason    string `json:"reason" binding:"max=200"`
 }
 
 // StatusResult is the updated appointment plus warnings (e.g. out of gloves).

@@ -18,6 +18,9 @@ func RegisterRoutes(protected *gin.RouterGroup, db *gorm.DB) *Service {
 // mount is the route table, shared with the handler tests.
 func mount(g *gin.RouterGroup, h *Handler) {
 	g.GET("/summary/", h.Summary)
+	g.GET("/access/", h.Access)
+	g.GET("/grants/", h.Grants)
+	g.PUT("/grants/:userId/", h.SetGrants)
 	g.GET("/audit/", h.Audit)
 	g.GET("/reorder/", h.Reorder)
 	g.GET("/items/", h.List)

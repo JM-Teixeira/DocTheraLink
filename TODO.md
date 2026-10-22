@@ -30,7 +30,8 @@ Open testing work:
 - [x] Browser E2E suite (Playwright, `e2e/browser`, `make e2e-browser`): login, people status filter, patient filters vs metrics, date preference, dropdown padding, no long dashes, clinic isolation, time board drill-down.
 - [x] Browser E2E of the referral journey (doctor refers → physio accepts, starts, writes a progress note the doctor reads, completes → discharge letter; other clinic and front desk locked out), and the browser suite runs in CI against the compose stack (report uploaded on failure).
 - [x] Browser E2E: patient registration with soft and blocking duplicates and NIF search; weekly plan from the board; holiday cover with a per-patient handover read by the cover physio; inventory use / open / finish.
-- [ ] P3 Browser E2E later: notifications bell, printing the letter (PDF), mobile viewport pass, accessibility scan (axe) of the main pages.
+- [x] Browser checks: notifications bell, letter to PDF, phone screens, axe accessibility scan (serious/critical) of 9 pages.
+- [ ] P3 Accessibility next: moderate axe findings; keyboard-only pass of the time board grid; screen-reader labels of the board cells.
 - [x] Access rules of the legacy user/facility/time-log handlers unit-tested (`api/handlers/access_test.go`) and covered by e2e (`TestNoPrivilegeEscalation`, `TestClinicIsolation`).
 - [ ] P2 HTTP-level tests (httptest + PostgreSQL) for the legacy user and facility handlers.
 - [ ] P1 Component tests for `ReferralDetail`, `ReferralList`, `CreateReferral` with a mocked API (role-dependent buttons, validation).
@@ -118,7 +119,10 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] Second demo clinic **Climutua** (PT-PT, 120 patients, realistic load) — see README.
 - [x] **Floors** and filters (floor / division / physio); physio drill-down with patient names per hour; decluttered cells with a legend.
 - [x] **Absences with cover**: patients move to the cover physio at the same hour (preview first), handover document + note per patient, cover reads the absent physio's referrals; absent physios can't be booked.
-- [ ] Absences next: partial days; move sessions to several cover physios; notify the cover physio.
+- [x] Holiday per patient: each session to a chosen physio (with the room each one has left at that hour), "who receives whom" summary.
+- [x] Misses: justified or not (+ reason); 3 unjustified in 90 days flag the patient to the coordinator.
+- [ ] Absences next: partial days; notify the physios who receive patients; only the default cover reads the referrals today - extend to everyone who received a patient.
+- [ ] Misses next: threshold and window per clinic; tell the doctor of the referral; list of misses on the patient page.
 - [ ] Next on the board: drag to move an appointment; reschedule a whole plan; waiting list; a physio's own "my day" view; print the day sheet.
 - [ ] Link board appointments to referrals (field exists) and book the whole series of N sessions at once; receptionists manage them.
 - [ ] Therapist availability from the timetable; room/section capacity; conflict checks.
@@ -141,9 +145,11 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] **Use vs open defined**: single-use items are *used*; containers (bottles, packs, rolls) are *opened* (who/when, sealed → in use) and *finished* when empty, with an optional "discard N days after opening" alert.
 - [x] Per-session use **per division** (e.g. swim caps only in the pool, 2 pairs of gloves in hydrotherapy).
 - [x] **Reorder list** with suggested quantities (up to a target level) and CSV export.
-- [ ] Inventory next: suppliers and order history; batch / expiry dates of sealed stock.
+- [x] Inventory permissions by floor × category (coordinators/admins give them from the people list); items have a floor; admins filter by clinic; single-use vs container and floor filters; audit as a plain log; per-session use explained.
+- [ ] Inventory next: suppliers and order history; batch / expiry dates of sealed stock; permissions for specific items (today: floors × categories).
 - [ ] Wire the existing clock in/out button and time-log history (`Users/ClockInOutButton`, `Users/TimeLogHistory` — built but never shown); time-tracking reports and exports.
 - [x] People list with simple filters; employment status (active / on leave / left — kept on record, no sign-in); skills and clinic tabs (`internal/modules/staff`).
+- [x] Clinic → people opens `/users?clinic=` (old address redirects); clinics page rebuilt with search + chips.
 - [ ] People next: edit/deactivate from the list; remove the old `ManageUsers`/`UserFilter`/`LinkedSkills*`/`LinkedFacilities*` screens; tests for the legacy `ListUsers` handler.
 - [ ] Organisations with several clinics (switch clinic, per-clinic admins) on top of `internal/clinic`.
 - [ ] Dashboards: referrals by status, waiting time to first session, therapist load, outcomes.

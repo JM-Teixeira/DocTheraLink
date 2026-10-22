@@ -3,6 +3,7 @@ package inventory
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,11 +33,15 @@ type Actor struct {
 }
 
 // Service holds the inventory rules:
-//   - everyone sees the stock of their own clinic (admins: every clinic);
-//   - any non-read-only member uses, opens, finishes, restocks, counts and
-//     adds items;
-//   - coordinators and admins remove items, set per-division session use
-//     and see the audit log.
+//   - everyone sees the stock of their own clinic (admins: every clinic,
+//     or one with the clinic filter);
+//   - coordinators and admins change any item; other people only the items
+//     their grants cover (floors × categories) - use, open, finish, restock,
+//     count, add and edit; without a grant the stock is read-only;
+//   - coordinators and admins remove items, set per-division session use,
+//     give grants and see the audit log;
+//   - sessions marked attended use their per-session items automatically,
+//     whoever marks them.
 type Service struct {
 	repo    Repository
 	clinics clinic.Resolver
@@ -63,20 +68,61 @@ func (s *Service) clinicsFor(ctx context.Context, a Actor) ([]string, error) {
 	return []string{*home}, nil
 }
 
-func canWrite(a Actor) bool { return auth.CanModifyResource(a.Role) }
-
 func canManage(a Actor) bool {
 	return auth.IsAdmin(a.Role) || a.Role == models.RoleCoordinator
 }
 
-func (s *Service) views(items []Item) []ItemView {
+// narrow applies an admin's clinic filter; staff may only name their own.
+func narrow(ids []string, want string) ([]string, error) {
+	switch {
+	case want == "":
+		return ids, nil
+	case ids == nil || slices.Contains(ids, want):
+		return []string{want}, nil
+	}
+	return nil, ErrForbidden
+}
+
+// access is what the actor may change: everything (managers), what their
+// grants cover, or nothing (read-only roles, no grant).
+func (s *Service) access(ctx context.Context, a Actor) (Access, error) {
+	switch {
+	case auth.IsReadOnlyUser(a.Role):
+		return Access{Grants: []Grant{}}, nil
+	case canManage(a):
+		return Access{Manage: true, Grants: []Grant{}}, nil
+	}
+	ids, err := s.clinicsFor(ctx, a)
+	if err != nil {
+		return Access{}, err
+	}
+	grants, err := s.repo.Grants(ctx, ids, a.ID)
+	if err != nil {
+		return Access{}, err
+	}
+	if grants == nil {
+		grants = []Grant{}
+	}
+	return Access{Grants: grants}, nil
+}
+
+// Allows reports whether an item on that floor and in that category may be changed.
+func (acc Access) Allows(floor *int, category string) bool {
+	return acc.Manage || slices.ContainsFunc(acc.Grants, func(g Grant) bool { return g.Covers(floor, category) })
+}
+
+func (s *Service) views(items []Item, acc Access) []ItemView {
 	now := s.now()
 	out := make([]ItemView, len(items))
 	for i, it := range items {
 		out[i] = view(it, now)
+		out[i].CanChange = acc.Allows(it.Floor, it.Category)
 	}
 	return out
 }
+
+// MyAccess is what the viewer may change (for the page's buttons).
+func (s *Service) MyAccess(ctx context.Context, a Actor) (Access, error) { return s.access(ctx, a) }
 
 // List returns the clinic's items, by category and name.
 func (s *Service) List(ctx context.Context, a Actor, f ListFilter) ([]ItemView, error) {
@@ -84,16 +130,23 @@ func (s *Service) List(ctx context.Context, a Actor, f ListFilter) ([]ItemView, 
 	if err != nil {
 		return nil, err
 	}
+	if ids, err = narrow(ids, f.Clinic); err != nil {
+		return nil, err
+	}
+	acc, err := s.access(ctx, a)
+	if err != nil {
+		return nil, err
+	}
 	items, err := s.repo.List(ctx, ids, f)
 	if err != nil {
 		return nil, err
 	}
-	return s.views(items), nil
+	return s.views(items, acc), nil
 }
 
 // Summary counts all items and those needing attention.
-func (s *Service) Summary(ctx context.Context, a Actor) (Summary, error) {
-	items, err := s.List(ctx, a, ListFilter{})
+func (s *Service) Summary(ctx context.Context, a Actor, clinicFilter string) (Summary, error) {
+	items, err := s.List(ctx, a, ListFilter{Clinic: clinicFilter})
 	if err != nil {
 		return Summary{}, err
 	}
@@ -114,8 +167,8 @@ func (s *Service) Summary(ctx context.Context, a Actor) (Summary, error) {
 
 // Reorder lists the items at or below their alert level with how many to
 // order to get back to their target.
-func (s *Service) Reorder(ctx context.Context, a Actor) ([]ItemView, error) {
-	items, err := s.List(ctx, a, ListFilter{Status: "attention"})
+func (s *Service) Reorder(ctx context.Context, a Actor, clinicFilter string) ([]ItemView, error) {
+	items, err := s.List(ctx, a, ListFilter{Status: "attention", Clinic: clinicFilter})
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +209,11 @@ func checkKind(req *ItemRequest) error {
 
 // Create adds an item to the actor's clinic with its opening stock.
 func (s *Service) Create(ctx context.Context, a Actor, req ItemRequest) (*ItemView, error) {
-	if !canWrite(a) {
+	acc, err := s.access(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	if !acc.Allows(req.Floor, req.Category) {
 		return nil, ErrForbidden
 	}
 	if err := checkKind(&req); err != nil {
@@ -170,6 +227,7 @@ func (s *Service) Create(ctx context.Context, a Actor, req ItemRequest) (*ItemVi
 		ClinicID: clinicID, Name: strings.TrimSpace(req.Name), Category: strings.TrimSpace(req.Category),
 		Unit: unitOr(req.Unit), Tracking: req.Tracking, Quantity: req.Quantity, MinQuantity: req.MinQuantity,
 		TargetQuantity: req.TargetQuantity, PerSession: req.PerSession, OpenLifeDays: req.OpenLifeDays,
+		Floor: req.Floor,
 	}
 	if err := s.checkName(ctx, clinicID, it.Name, ""); err != nil {
 		return nil, err
@@ -183,18 +241,24 @@ func (s *Service) Create(ctx context.Context, a Actor, req ItemRequest) (*ItemVi
 		return nil, err
 	}
 	v := view(*it, s.now())
+	v.CanChange = true
 	return &v, nil
 }
 
 // Update edits the item's settings (not its stock). The kind can only
-// change while no container is open.
+// change while no container is open. Moving it to another floor or
+// category needs a grant for both the old and the new place.
 func (s *Service) Update(ctx context.Context, a Actor, id string, req ItemRequest) (*ItemView, error) {
-	if !canWrite(a) {
-		return nil, ErrForbidden
+	acc, err := s.access(ctx, a)
+	if err != nil {
+		return nil, err
 	}
 	it, err := s.Get(ctx, a, id)
 	if err != nil {
 		return nil, err
+	}
+	if !acc.Allows(it.Floor, it.Category) || !acc.Allows(req.Floor, req.Category) {
+		return nil, ErrForbidden
 	}
 	if req.Tracking == "" {
 		req.Tracking = it.Tracking
@@ -212,7 +276,7 @@ func (s *Service) Update(ctx context.Context, a Actor, id string, req ItemReques
 	fields := map[string]any{
 		"name": name, "category": strings.TrimSpace(req.Category), "unit": unitOr(req.Unit),
 		"tracking": req.Tracking, "min_quantity": req.MinQuantity, "target_quantity": req.TargetQuantity,
-		"per_session": req.PerSession, "open_life_days": req.OpenLifeDays,
+		"per_session": req.PerSession, "open_life_days": req.OpenLifeDays, "floor": req.Floor,
 	}
 	if err := s.repo.Update(ctx, id, fields); err != nil {
 		return nil, err
@@ -226,6 +290,7 @@ func (s *Service) Update(ctx context.Context, a Actor, id string, req ItemReques
 		return nil, err
 	}
 	v := view(*it, s.now())
+	v.CanChange = true
 	return &v, nil
 }
 
@@ -258,6 +323,7 @@ func (s *Service) SetSessionRules(ctx context.Context, a Actor, id string, req S
 		return nil, err
 	}
 	v := view(*it, s.now())
+	v.CanChange = true
 	return &v, nil
 }
 
@@ -276,15 +342,19 @@ func (s *Service) Archive(ctx context.Context, a Actor, id string) error {
 // are used; containers are opened and finished; both are restocked and
 // counted.
 func (s *Service) Move(ctx context.Context, a Actor, id string, req MovementRequest) (*ItemView, error) {
-	if !canWrite(a) {
-		return nil, ErrForbidden
-	}
 	if req.Kind != KindAdjust && req.Quantity < 1 {
 		return nil, &ValidationError{"quantity", "must be at least 1"}
+	}
+	acc, err := s.access(ctx, a)
+	if err != nil {
+		return nil, err
 	}
 	it, err := s.Get(ctx, a, id)
 	if err != nil {
 		return nil, err
+	}
+	if !acc.Allows(it.Floor, it.Category) {
+		return nil, ErrForbidden
 	}
 	switch {
 	case req.Kind == KindUse && it.Tracking != TrackUnit:
@@ -300,6 +370,7 @@ func (s *Service) Move(ctx context.Context, a Actor, id string, req MovementRequ
 	}
 	updated.Rules = it.Rules
 	v := view(*updated, s.now())
+	v.CanChange = true
 	return &v, nil
 }
 
@@ -322,7 +393,88 @@ func (s *Service) Audit(ctx context.Context, a Actor, f AuditFilter) ([]Movement
 	if err != nil {
 		return nil, err
 	}
+	if ids, err = narrow(ids, f.Clinic); err != nil {
+		return nil, err
+	}
 	return s.repo.Audit(ctx, ids, f, 1000)
+}
+
+// Grants lists who may change which stock in the clinic(s) (managers).
+func (s *Service) Grants(ctx context.Context, a Actor, clinicFilter string) ([]Grant, error) {
+	if !canManage(a) {
+		return nil, ErrForbidden
+	}
+	ids, err := s.clinicsFor(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	if ids, err = narrow(ids, clinicFilter); err != nil {
+		return nil, err
+	}
+	out, err := s.repo.Grants(ctx, ids, 0)
+	if out == nil {
+		out = []Grant{}
+	}
+	return out, err
+}
+
+// SetGrants replaces what a person may change in their clinic's stock:
+// coordinators for people of their own clinic, admins for anyone.
+func (s *Service) SetGrants(ctx context.Context, a Actor, userID uint, req GrantsRequest) ([]Grant, error) {
+	if !canManage(a) {
+		return nil, ErrForbidden
+	}
+	home, err := s.clinics.HomeClinic(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if home == nil {
+		return nil, &ValidationError{"user", "works in no clinic"}
+	}
+	if !auth.IsAdmin(a.Role) {
+		mine, err := s.clinicsFor(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(mine, *home) {
+			return nil, ErrNotFound
+		}
+	}
+	grants := make([]Grant, 0, len(req.Rules))
+	for _, r := range req.Rules {
+		grants = append(grants, Grant{ClinicID: *home, UserID: userID, CreatedByID: a.ID,
+			Floors: uniqueFloors(r.Floors), Categories: uniqueCategories(r.Categories)})
+	}
+	if err := s.repo.ReplaceGrants(ctx, *home, userID, grants); err != nil {
+		return nil, err
+	}
+	out, err := s.repo.Grants(ctx, []string{*home}, userID)
+	if out == nil {
+		out = []Grant{}
+	}
+	return out, err
+}
+
+func uniqueFloors(in []int) []int {
+	out := []int{}
+	for _, f := range in {
+		if !slices.Contains(out, f) {
+			out = append(out, f)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func uniqueCategories(in []string) []string {
+	out := []string{}
+	for _, c := range in {
+		c = strings.TrimSpace(c)
+		if c != "" && !slices.ContainsFunc(out, func(x string) bool { return strings.EqualFold(x, c) }) {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // SessionAttended uses, once per appointment, what a session in the

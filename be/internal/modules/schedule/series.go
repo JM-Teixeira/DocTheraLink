@@ -177,6 +177,24 @@ func (p *planner) problem(d time.Time, hour int, therapistID uint, patientID str
 	return "", div
 }
 
+// room is a physio's free places and credits at an hour (ok = on shift and
+// not absent), counting what this plan already gave them.
+func (p *planner) room(d time.Time, hour int, therapistID uint) (places, credits int, ok bool) {
+	_, div := p.problem(d, hour, therapistID, "")
+	if div == nil || absentOn(p.data.absences, therapistID, d) {
+		return 0, 0, false
+	}
+	n, used := 0, 0
+	for _, ap := range p.data.appts {
+		if (p.exclude[ap.ID] && ap.ID != "") || !sameDate(ap.Date, d) || ap.Hour != hour || ap.TherapistID != therapistID {
+			continue
+		}
+		n++
+		used += ap.Credits
+	}
+	return max(div.Capacity-n, 0), max(creditLimit(div)-used, 0), true
+}
+
 func (p *planner) add(d time.Time, hour int, therapistID uint, patientID string) {
 	p.data.appts = append(p.data.appts, Appointment{Date: d, Hour: hour, TherapistID: therapistID,
 		PatientID: patientID, Credits: p.level})

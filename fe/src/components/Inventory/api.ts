@@ -1,7 +1,10 @@
 import {
+  GrantRule,
   ItemRequest,
   MovementRequest,
   SessionRule,
+  StockAccess,
+  StockGrant,
   StockItem,
   StockMovement,
   StockSummary,
@@ -11,6 +14,22 @@ import { Type } from "@/Utils/request/api";
 
 /** Inventory API (be/internal/modules/inventory/routes.go). */
 const InventoryRoutes = {
+  access: {
+    path: "/api/v1/inventory/access/",
+    method: "GET",
+    TRes: Type<StockAccess>(),
+  },
+  grants: {
+    path: "/api/v1/inventory/grants/",
+    method: "GET",
+    TRes: Type<StockGrant[]>(),
+  },
+  setGrants: {
+    path: "/api/v1/inventory/grants/{userId}/",
+    method: "PUT",
+    TBody: Type<{ rules: GrantRule[] }>(),
+    TRes: Type<StockGrant[]>(),
+  },
   summary: {
     path: "/api/v1/inventory/summary/",
     method: "GET",

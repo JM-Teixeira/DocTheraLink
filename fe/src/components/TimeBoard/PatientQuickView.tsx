@@ -72,6 +72,15 @@ export default function PatientQuickView({
     enabled: !!patientId,
     retry: false,
   });
+  const { data: misses } = useQuery({
+    queryKey: ["patient-misses", patientId],
+    queryFn: query(BoardRoutes.patientMisses, {
+      pathParams: { patientId: patientId ?? "" },
+      silent: true,
+    }),
+    enabled: !!patientId,
+    retry: false,
+  });
   const { data: referrals } = useQuery({
     queryKey: ["patient-referrals", patientId],
     queryFn: query(ReferralRoutes.list, {
@@ -122,6 +131,21 @@ export default function PatientQuickView({
         <p className="text-xs text-gray-500">
           {t(`care_level_help__${level}`)}
         </p>
+        {!!misses && misses.unjustified + misses.justified > 0 && (
+          <p
+            className={cn(
+              "rounded-lg px-3 py-2 text-sm",
+              misses.unjustified >= 3
+                ? "bg-rose-50 text-rose-800"
+                : "bg-amber-50 text-amber-900",
+            )}
+          >
+            {t("misses_summary", {
+              unjustified: misses.unjustified,
+              justified: misses.justified,
+            })}
+          </p>
+        )}
         {patient?.allergies && (
           <p className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
             <TriangleAlert className="size-4 shrink-0" aria-hidden />

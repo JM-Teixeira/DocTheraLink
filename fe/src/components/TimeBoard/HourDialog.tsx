@@ -16,6 +16,7 @@ import {
 
 import PatientIds from "@/components/Patient/PatientIds";
 import { apiError } from "@/components/TimeBoard/BoardDialogs";
+import MissDialog, { statusLabel } from "@/components/TimeBoard/MissDialog";
 import BoardRoutes from "@/components/TimeBoard/api";
 import {
   CARE_LEVEL_STYLES,
@@ -100,16 +101,29 @@ export default function HourDialog({
     },
     onError: fail,
   });
+  // The session being marked missed (asks whether it was justified)
+  const [missing, setMissing] = useState<{
+    id: string;
+    name: string;
+    justified?: boolean | null;
+    reason?: string;
+  } | null>(null);
   const status = useMutation({
-    mutationFn: (v: { id: string; status: AppointmentStatus }) =>
+    mutationFn: (v: {
+      id: string;
+      status: AppointmentStatus;
+      justified?: boolean;
+      reason?: string;
+    }) =>
       callApi(BoardRoutes.setStatus, {
         pathParams: { id: v.id },
-        body: { status: v.status },
+        body: { status: v.status, justified: v.justified, reason: v.reason },
         silent: true,
       }),
     onSuccess: (res) => {
       // e.g. "Gloves: not enough in stock" when the session used consumables
       for (const w of res.warnings ?? []) Notification.Warn({ msg: w });
+      setMissing(null);
       onChanged();
     },
     onError: fail,
@@ -191,7 +205,7 @@ export default function HourDialog({
                     ap.status === "booked" && "bg-gray-100 text-gray-700",
                   )}
                 >
-                  {t(`appointment_status__${ap.status}`)}
+                  {statusLabel(t, ap)}
                 </span>
                 <Button
                   size="icon"
@@ -207,7 +221,14 @@ export default function HourDialog({
                   size="icon"
                   variant="ghost"
                   aria-label={t("mark_missed")}
-                  onClick={() => status.mutate({ id: ap.id, status: "missed" })}
+                  onClick={() =>
+                    setMissing({
+                      id: ap.id,
+                      name: ap.patient?.name ?? "",
+                      justified: ap.miss_justified,
+                      reason: ap.miss_reason,
+                    })
+                  }
                 >
                   <UserX className="size-4 text-amber-600" aria-hidden />
                 </Button>
@@ -309,6 +330,19 @@ export default function HourDialog({
             </div>
           ))}
       </DialogContent>
+      <MissDialog
+        patientName={missing?.name ?? null}
+        initial={
+          missing
+            ? { justified: !!missing.justified, reason: missing.reason ?? "" }
+            : undefined
+        }
+        pending={status.isPending}
+        onClose={() => setMissing(null)}
+        onConfirm={(v) =>
+          missing && status.mutate({ id: missing.id, status: "missed", ...v })
+        }
+      />
     </Dialog>
   );
 }

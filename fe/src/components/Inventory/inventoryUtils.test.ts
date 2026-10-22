@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   actionsFor,
-  auditTotals,
   checkMovement,
+  grantLines,
   groupByCategory,
   movementLabel,
   reorderCsv,
@@ -24,6 +24,7 @@ const item = (
   quantity: 1,
   min_quantity: 0,
   per_session: 0,
+  can_change: true,
   session_rules: [],
   tracking: "unit",
   target_quantity: 0,
@@ -122,38 +123,27 @@ describe("inventory helpers", () => {
   });
 });
 
-describe("audit totals", () => {
-  const sarah = { id: 10, first_name: "Sarah", last_name: "Johnson" };
-  const move = (
-    itemId: string,
-    kind: StockMovement["kind"],
-    amount: number,
-  ): StockMovement => ({
-    id: Math.random().toString(),
-    item_id: itemId,
-    kind,
-    amount,
-    delta: kind === "restock" ? amount : kind === "finish" ? 0 : -amount,
-    quantity_after: 0,
-    in_use_after: 0,
-    note: "",
-    user: sarah,
-    item: { id: itemId, name: itemId, unit: "u", category: "" },
-    created_date: "",
-  });
-
-  it("sums use, openings and finishes per person and item, ignoring restocks", () => {
-    const totals = auditTotals([
-      move("Gloves", "use", 1),
-      move("Gloves", "use", 2),
-      move("Gel", "open", 1),
-      move("Gel", "finish", 1),
-      move("Gloves", "restock", 50),
-    ]);
-    expect(totals).toHaveLength(1);
-    expect([...totals[0].items.values()]).toEqual([
-      { name: "Gloves", unit: "u", used: 3, opened: 0, finished: 0 },
-      { name: "Gel", unit: "u", used: 0, opened: 1, finished: 1 },
+describe("grantLines", () => {
+  const labels = {
+    allFloors: "Todos os pisos",
+    floor: (n: number) => `Piso ${n}`,
+    floors: (ns: string) => `Pisos ${ns}`,
+    everything: "tudo",
+  };
+  it("describes each rule as floors · categories", () => {
+    expect(
+      grantLines(
+        [
+          { floors: [1], categories: [] },
+          { floors: [2, 3], categories: ["Higiene"] },
+          { floors: [], categories: [] },
+        ],
+        labels,
+      ),
+    ).toEqual([
+      "Piso 1 · tudo",
+      "Pisos 2, 3 · Higiene",
+      "Todos os pisos · tudo",
     ]);
   });
 });

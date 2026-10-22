@@ -43,6 +43,9 @@ export interface Appointment {
   series_id?: string | null;
   referral_id?: string | null;
   status: AppointmentStatus;
+  /** Missed sessions: justified (ill, warned) or not, and why. */
+  miss_justified?: boolean | null;
+  miss_reason?: string;
   notes: string;
 }
 
@@ -212,6 +215,8 @@ export interface AbsenceRequest {
   notes: { patient_id: string; note: string }[];
   move_patients: boolean;
   dry_run?: boolean;
+  /** Per session: who takes it (0 = stays). Others go to the cover. */
+  assignments?: { appointment_id: string; therapist_id: number }[];
 }
 
 export interface MovedSession {
@@ -220,8 +225,19 @@ export interface MovedSession {
   hour: number;
   patient_id: string;
   patient_name: string;
+  credits: number;
   moved: boolean;
+  to?: number; // who takes it
   reason?: string;
+  /** Physios working at that hour, with the room they have left. */
+  candidates: Candidate[];
+}
+
+export interface Candidate {
+  therapist_id: number;
+  places: number;
+  credits: number;
+  fits: boolean;
 }
 
 export interface AbsenceResult {
@@ -233,4 +249,26 @@ export interface AbsenceResult {
 export interface PatientHandover {
   absence: Absence;
   note: string;
+}
+
+/** How often a patient missed sessions in the window (90 days). */
+export interface MissCount {
+  patient_id: string;
+  patient?: { id: string; name: string; care_level: number };
+  unjustified: number;
+  justified: number;
+  last: string;
+}
+
+/** Patients with too many unjustified misses (coordinators). */
+export interface MissReport {
+  threshold: number;
+  window_days: number;
+  patients: MissCount[];
+}
+
+/** What to send when marking a session missed. */
+export interface MissInput {
+  justified: boolean;
+  reason: string;
 }

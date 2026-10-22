@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import PerSessionHelp from "@/components/Inventory/PerSessionHelp";
 import InventoryRoutes from "@/components/Inventory/api";
 import {
   checkMovement,
@@ -47,6 +48,7 @@ type ItemForm = {
   perSession: string;
   openLife: string;
   quantity: string;
+  floor: string; // "" = whole clinic
 };
 
 const EMPTY: ItemForm = {
@@ -59,6 +61,7 @@ const EMPTY: ItemForm = {
   perSession: "0",
   openLife: "0",
   quantity: "0",
+  floor: "",
 };
 
 /** Creates (item = null) or edits an item, including its kind. */
@@ -66,12 +69,17 @@ export function ItemDialog({
   open,
   item,
   pending,
+  floors,
+  categories,
   onClose,
   onSave,
 }: {
   open: boolean;
   item: StockItem | null;
   pending: boolean;
+  /** Floors of the clinic (from its divisions) and categories in use. */
+  floors: number[];
+  categories: string[];
   onClose: () => void;
   onSave: (req: ItemRequest) => void;
 }) {
@@ -91,6 +99,7 @@ export function ItemDialog({
             perSession: String(item.per_session),
             openLife: String(item.open_life_days),
             quantity: "0",
+            floor: item.floor ? String(item.floor) : "",
           }
         : EMPTY,
     );
@@ -120,6 +129,7 @@ export function ItemDialog({
               target_quantity: Number(form.target) || 0,
               per_session: container ? 0 : Number(form.perSession) || 0,
               open_life_days: container ? Number(form.openLife) || 0 : 0,
+              floor: form.floor ? Number(form.floor) : null,
               ...(item ? {} : { quantity: Number(form.quantity) }),
             });
           }}
@@ -190,9 +200,9 @@ export function ItemDialog({
                 className={fieldClass}
               />
               <datalist id="stock-categories">
-                <option value="PPE" />
-                <option value="Hygiene" />
-                <option value="Treatment" />
+                {categories.map((c) => (
+                  <option key={c} value={c} />
+                ))}
               </datalist>
             </label>
             <label className="text-sm font-medium text-gray-700">
@@ -202,6 +212,26 @@ export function ItemDialog({
                 onChange={set("unit")}
                 className={fieldClass}
               />
+            </label>
+            <label className="col-span-2 text-sm font-medium text-gray-700">
+              {t("floor")}
+              <select
+                value={form.floor}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, floor: e.target.value }))
+                }
+                className={fieldClass}
+              >
+                <option value="">{t("whole_clinic")}</option>
+                {floors.map((n) => (
+                  <option key={n} value={n}>
+                    {t("floor_n", { n })}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs font-normal text-gray-500">
+                {t("item_floor_help")}
+              </span>
             </label>
             <label className="text-sm font-medium text-gray-700">
               {t("alert_at_or_below")}
@@ -426,6 +456,7 @@ export function SessionRulesDialog({
             })}
           </DialogDescription>
         </DialogHeader>
+        <PerSessionHelp />
         <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
           {divisions?.map((d) => (
             <li

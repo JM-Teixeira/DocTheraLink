@@ -247,6 +247,9 @@ func SeedData(includeDemoUsers bool) error {
 	if err := seedClimutua(time.Now()); err != nil {
 		return fmt.Errorf("climutua demo: %w", err)
 	}
+	if err := seedStockAccess(); err != nil {
+		return fmt.Errorf("stock permissions: %w", err)
+	}
 	log.Println("Database seeding completed")
 	return nil
 }

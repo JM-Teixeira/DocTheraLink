@@ -2,6 +2,7 @@ package api
 
 import (
 	"log"
+	"net/http"
 
 	"klyniva/internal/api/handlers"
 	"klyniva/internal/auth"
@@ -18,6 +19,7 @@ import (
 	"klyniva/internal/modules/schedule"
 	"klyniva/internal/modules/staff"
 	"klyniva/internal/storage"
+	"klyniva/internal/version"
 
 	"github.com/gin-gonic/gin"
 )
@@ -35,6 +37,10 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	// Public routes (no authentication required)
 	public := router.Group("")
 	{
+		// Release number (shown in the app next to the frontend version)
+		public.GET("/version/", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"version": version.Version})
+		})
 		authRoutes := public.Group("/auth")
 		authRoutes.POST("/login/", authHandler.Login)
 		authRoutes.POST("/token/refresh/", authHandler.RefreshToken)

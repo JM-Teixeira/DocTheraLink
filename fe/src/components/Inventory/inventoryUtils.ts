@@ -72,41 +72,6 @@ export function movementLabel(
 }
 
 /**
- * Totals per person for the audit view: how much each one used, opened and
- * finished, per item ("Sarah: 12 pairs of gloves used, 2 bottles opened").
- */
-export function auditTotals(moves: StockMovement[]) {
-  type Line = {
-    name: string;
-    unit: string;
-    used: number;
-    opened: number;
-    finished: number;
-  };
-  const people = new Map<number, { name: string; items: Map<string, Line> }>();
-  for (const m of moves) {
-    if (!m.user || !["use", "open", "finish"].includes(m.kind)) continue;
-    const p = people.get(m.user.id) ?? {
-      name: `${m.user.first_name} ${m.user.last_name}`,
-      items: new Map(),
-    };
-    const it = p.items.get(m.item_id) ?? {
-      name: m.item?.name ?? "",
-      unit: m.item?.unit ?? "",
-      used: 0,
-      opened: 0,
-      finished: 0,
-    };
-    if (m.kind === "use") it.used += amountOf(m);
-    else if (m.kind === "open") it.opened += amountOf(m);
-    else it.finished += amountOf(m);
-    p.items.set(m.item_id, it);
-    people.set(m.user.id, p);
-  }
-  return [...people.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
  * Client check of a movement before sending (the API re-checks):
  * returns a translation key, or null when fine.
  */
@@ -139,4 +104,30 @@ export function reorderCsv(items: StockItem[], header: string[]) {
   ]
     .map((row) => row.map(cell).join(";"))
     .join("\n");
+}
+
+/**
+ * One line per grant, for the people list: "Piso 1 · tudo",
+ * "Pisos 2, 3 · Higiene", "Todos os pisos · tudo". Labels come translated.
+ */
+export function grantLines(
+  grants: { floors: number[]; categories: string[] }[],
+  labels: {
+    allFloors: string;
+    floor: (n: number) => string;
+    floors: (ns: string) => string;
+    everything: string;
+  },
+) {
+  return grants.map((g) => {
+    const where = !g.floors.length
+      ? labels.allFloors
+      : g.floors.length === 1
+        ? labels.floor(g.floors[0])
+        : labels.floors(g.floors.join(", "));
+    const what = g.categories.length
+      ? g.categories.join(", ")
+      : labels.everything;
+    return `${where} · ${what}`;
+  });
 }

@@ -40,7 +40,8 @@ be/                Go backend (Go module name: klyniva)
       attachment/  files on referrals; access follows the referral
       catalog/     embedded ICD-10 subset + referral templates (EN/PT, read-only)
       inventory/   clinic consumables: unit items (use) and containers (open/finish),
-                   per-division session use, reorder list, audit
+                   per-division session use, reorder list, audit; items have a
+                   floor; Grant = who may change which stock (floors × categories)
       schedule/    time board: divisions, shifts, appointments per physio-hour,
                    weekly plans (series), range/year stats; SessionHook → inventory;
                    divisions have a floor; absences with cover + handover notes
@@ -48,6 +49,8 @@ be/                Go backend (Go module name: klyniva)
       staff/       skills catalogue + user skills, home clinic, employment
                    status (active / on_leave / left → is_active false)
     api/handlers/access.go  who may see/change users and clinics (legacy handlers; pure, tested)
+    version/       release number (0.minor.patch; also fe/package.json, bump with
+                   scripts/bump-version.sh); public GET /api/v1/version/
     storage/       file Store interface (Local today, S3 later)
     mailer/        SMTP or log-only mailer (no patient data in e-mails)
     clinic/        which clinic a user works in (Resolver) — scope new data with it

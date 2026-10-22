@@ -15,7 +15,11 @@
 // routes, seed.
 package inventory
 
-import "time"
+import (
+	"slices"
+	"strings"
+	"time"
+)
 
 // Movement kinds.
 const (
@@ -40,6 +44,9 @@ type Item struct {
 	Category string `json:"category" gorm:"size:60"`
 	Unit     string `json:"unit" gorm:"size:30;not null;default:units"`
 	Tracking string `json:"tracking" gorm:"size:10;not null;default:unit"` // unit | container
+	// Floor where the item is kept (nil = shared by the whole clinic); with
+	// the category it decides who may change it (see Grant).
+	Floor *int `json:"floor"`
 
 	Quantity       int `json:"quantity" gorm:"not null;default:0"`        // sealed / available
 	MinQuantity    int `json:"min_quantity" gorm:"not null;default:0"`    // alert at or below this
@@ -104,6 +111,7 @@ type ItemView struct {
 	Status      string `json:"status"`
 	OpenExpired bool   `json:"open_expired"`
 	Reorder     int    `json:"reorder_quantity"`
+	CanChange   bool   `json:"can_change"` // the viewer may use/open/finish/restock/count/edit it
 }
 
 func view(i Item, now time.Time) ItemView {
@@ -164,7 +172,7 @@ type ItemName struct {
 func (ItemName) TableName() string { return "stock_items" }
 
 // Models lists the tables for AutoMigrate.
-func Models() []any { return []any{&Item{}, &Movement{}, &SessionRule{}} }
+func Models() []any { return []any{&Item{}, &Movement{}, &SessionRule{}, &Grant{}} }
 
 // ItemRequest creates or edits an item. Quantity only applies on create
 // (the opening stock); later changes go through movements.
@@ -178,6 +186,7 @@ type ItemRequest struct {
 	PerSession     int     `json:"per_session" binding:"min=0,max=100"`
 	OpenLifeDays   int     `json:"open_life_days" binding:"min=0,max=3650"`
 	Quantity       int     `json:"quantity" binding:"min=0,max=100000"`
+	Floor          *int    `json:"floor" binding:"omitempty,min=1,max=20"`
 	ClinicID       *string `json:"clinic_id" binding:"omitempty,uuid"` // admins only
 }
 
@@ -212,6 +221,9 @@ type ListFilter struct {
 	Search   string `form:"search"`
 	Category string `form:"category"`
 	Status   string `form:"status" binding:"omitempty,oneof=ok low out attention"` // attention = low or out
+	Tracking string `form:"tracking" binding:"omitempty,oneof=unit container"`
+	Floor    *int   `form:"floor"`
+	Clinic   string `form:"clinic" binding:"omitempty,uuid"` // admins: one clinic
 }
 
 // AuditFilter narrows the audit log of movements.
@@ -221,5 +233,53 @@ type AuditFilter struct {
 	Kind   string     `form:"kind" binding:"omitempty,oneof=restock use adjust open finish"`
 	From   *time.Time `form:"from" time_format:"2006-01-02"`
 	To     *time.Time `form:"to" time_format:"2006-01-02"`
-	Auto   *bool      `form:"auto"` // true: only automatic session use
+	Auto   *bool      `form:"auto"`                            // true: only automatic session use
+	Clinic string     `form:"clinic" binding:"omitempty,uuid"` // admins: one clinic
+}
+
+// Grant lets a person change the stock of some items: those on the given
+// floors and in the given categories (empty = all floors / all categories).
+// A person may have several, e.g. "Higiene on floors 2 and 3" plus
+// "everything on floor 1". Coordinators and admins need none.
+type Grant struct {
+	ID          string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	ClinicID    string    `json:"clinic_id" gorm:"type:uuid;not null;index"`
+	UserID      uint      `json:"user_id" gorm:"not null;index"`
+	Floors      []int     `json:"floors" gorm:"serializer:json;type:text"`
+	Categories  []string  `json:"categories" gorm:"serializer:json;type:text"`
+	CreatedByID uint      `json:"created_by_id"`
+	CreatedAt   time.Time `json:"created_date"`
+}
+
+func (Grant) TableName() string { return "stock_grants" }
+
+// Covers reports whether the grant allows changing an item on that floor and
+// in that category. Items without a floor need a grant for all floors.
+func (g Grant) Covers(floor *int, category string) bool {
+	if len(g.Floors) > 0 && (floor == nil || !slices.Contains(g.Floors, *floor)) {
+		return false
+	}
+	if len(g.Categories) == 0 {
+		return true
+	}
+	return slices.ContainsFunc(g.Categories, func(c string) bool {
+		return strings.EqualFold(strings.TrimSpace(c), strings.TrimSpace(category))
+	})
+}
+
+// GrantRule is one "floors × categories" rule of a permission.
+type GrantRule struct {
+	Floors     []int    `json:"floors" binding:"max=20,dive,min=1,max=20"`
+	Categories []string `json:"categories" binding:"max=30,dive,max=60"`
+}
+
+// GrantsRequest replaces all the rules of a person (empty = no permission).
+type GrantsRequest struct {
+	Rules []GrantRule `json:"rules" binding:"max=20,dive"`
+}
+
+// Access tells the UI what the viewer may do with the stock.
+type Access struct {
+	Manage bool    `json:"manage"` // coordinators and admins: everything
+	Grants []Grant `json:"grants"`
 }

@@ -10,12 +10,9 @@ import {
   StateModel,
   WardModel,
 } from "@/components/Facility/models";
-import {
-  DupPatientModel,
-} from "@/components/Facility/models";
+import { DupPatientModel } from "@/components/Facility/models";
 import { DailyRoundsModel, PatientModel } from "@/components/Patient/models";
-import {
-} from "@/components/Patient/models";
+import "@/components/Patient/models";
 import {
   SkillModel,
   SkillObjectModel,
@@ -398,7 +395,6 @@ const routes = {
     TRes: Type<PaginatedResponse<WardModel>>(),
   },
 
-
   //Profile
   checkUsername: {
     path: "/api/v1/users/{username}/check_availability/",
@@ -415,7 +411,6 @@ const routes = {
     path: "/api/v1/users/",
     method: "PUT",
   },
-
 
   // Assets endpoints
 
@@ -459,7 +454,6 @@ const routes = {
       TRes: Type<{ clocked_in: boolean; time_log: any | null }>(),
     },
   },
-
 } as const;
 
 export default routes;

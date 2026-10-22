@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 
 	"klyniva/internal/auth"
 	"klyniva/internal/models"
@@ -81,7 +82,7 @@ func (h *Handler) Summary(c *gin.Context) {
 	if !ok {
 		return
 	}
-	sum, err := h.svc.Summary(c.Request.Context(), a)
+	sum, err := h.svc.Summary(c.Request.Context(), a, c.Query("clinic"))
 	if err != nil {
 		writeError(c, err)
 		return
@@ -162,7 +163,7 @@ func (h *Handler) Reorder(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := h.svc.Reorder(c.Request.Context(), a)
+	items, err := h.svc.Reorder(c.Request.Context(), a, c.Query("clinic"))
 	if err != nil {
 		writeError(c, err)
 		return
@@ -189,6 +190,58 @@ func (h *Handler) SetSessionRules(c *gin.Context) {
 }
 
 // Audit handles GET /inventory/audit/?item=&user=&kind=&from=&to=&auto=
+// Access handles GET /inventory/access/: what the viewer may change.
+func (h *Handler) Access(c *gin.Context) {
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	acc, err := h.svc.MyAccess(c.Request.Context(), a)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, acc)
+}
+
+// Grants handles GET /inventory/grants/?clinic= (coordinators, admins).
+func (h *Handler) Grants(c *gin.Context) {
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	gs, err := h.svc.Grants(c.Request.Context(), a, c.Query("clinic"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gs)
+}
+
+// SetGrants handles PUT /inventory/grants/:userId/ {rules}.
+func (h *Handler) SetGrants(c *gin.Context) {
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	userID, err := strconv.ParseUint(c.Param("userId"), 10, 32)
+	if err != nil {
+		writeError(c, ErrNotFound)
+		return
+	}
+	var req GrantsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: err.Error()})
+		return
+	}
+	gs, err := h.svc.SetGrants(c.Request.Context(), a, uint(userID), req)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gs)
+}
+
 func (h *Handler) Audit(c *gin.Context) {
 	a, ok := actorFrom(c)
 	if !ok {

@@ -61,6 +61,44 @@ type Repository interface {
 	DeleteAbsence(ctx context.Context, clinicID, id string) error
 	// CoveredBy lists the physios a cover physio is covering on a date.
 	CoveredBy(ctx context.Context, coverID uint, at time.Time) ([]uint, error)
+	// MissedCounts counts missed sessions per patient since a date (one
+	// patient if patientID is set), with the patients' names.
+	MissedCounts(ctx context.Context, clinicID string, from time.Time, patientID string) ([]MissCount, error)
+}
+
+func (g *GormRepository) MissedCounts(ctx context.Context, clinicID string, from time.Time, patientID string) ([]MissCount, error) {
+	db := g.db.WithContext(ctx).Model(&Appointment{}).
+		Select(`patient_id,
+			COUNT(*) FILTER (WHERE miss_justified IS NOT TRUE) AS unjustified,
+			COUNT(*) FILTER (WHERE miss_justified) AS justified,
+			MAX(date) AS last`).
+		Where("clinic_id = ? AND status = ? AND date >= ?", clinicID, StatusMissed, from)
+	if patientID != "" {
+		db = db.Where("patient_id = ?", patientID)
+	}
+	var out []MissCount
+	if err := db.Group("patient_id").Scan(&out).Error; err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+	ids := make([]string, len(out))
+	for i, c := range out {
+		ids[i] = c.PatientID
+	}
+	var patients []PatientSummary
+	if err := g.db.WithContext(ctx).Where("id IN ?", ids).Find(&patients).Error; err != nil {
+		return nil, err
+	}
+	byID := map[string]*PatientSummary{}
+	for i := range patients {
+		byID[patients[i].ID] = &patients[i]
+	}
+	for i := range out {
+		out[i].Patient = byID[out[i].PatientID]
+	}
+	return out, nil
 }
 
 // GormRepository implements Repository on PostgreSQL via GORM.
