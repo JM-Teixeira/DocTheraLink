@@ -7,6 +7,16 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ## 2026-10-22 · Security review, date preference, tests (branch `feat/m4-patients`)
 
+### 15:30 · Referral journey in the browser, browser tests in CI (TODO §0)
+- `e2e/browser/tests/referral.spec.ts`: two browsers at once, the doctor
+  refers a new patient to a named physio; the physio accepts, starts,
+  writes a progress note that the doctor then reads, completes with an
+  outcome; the discharge letter shows patient and outcome; another
+  clinic's physio gets 404 and the front desk 403.
+- CI (`End-to-end (docker compose)` job) now runs the Playwright suite
+  after the API tests; the HTML report and traces are uploaded on failure.
+- 11 browser tests, 33/33 passing over three repeated runs locally.
+
 ### 14:00 · Security fixes, date format preference, browser e2e (user request)
 - **Security fixes** in legacy handlers (all were open to any signed-in
   user): creating users with any role (incl. admin), editing any account
