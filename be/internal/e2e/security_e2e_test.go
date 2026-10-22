@@ -17,12 +17,12 @@ func TestNoPrivilegeEscalation(t *testing.T) {
 	admin, _ := login(t, "stateadmin")
 
 	for name, body := range map[string]map[string]any{
-		"own role":       {"user_type": "StateAdmin"},
-		"own superuser":  {"is_superuser": true},
-		"own clinic":     {"home_facility": "6b1f3c1e-5a8e-4c1d-9a0e-000000000002"},
-		"own status":     {"employment_status": "active", "is_active": true},
-		"own password":   {"password": "hunter22hunter22"},
-		"own username":   {"username": "boss"},
+		"own role":      {"user_type": "StateAdmin"},
+		"own superuser": {"is_superuser": true},
+		"own clinic":    {"home_facility": "6b1f3c1e-5a8e-4c1d-9a0e-000000000002"},
+		"own status":    {"employment_status": "active", "is_active": true},
+		"own password":  {"password": "hunter22hunter22"},
+		"own username":  {"username": "boss"},
 	} {
 		expect(t, name, rec.call("PATCH", "/users/receptionist/", body, nil), 403)
 		expect(t, name+" (PUT)", rec.call("PUT", "/users/receptionist/", body, nil), 403)
