@@ -29,6 +29,7 @@ const SEGMENT_KEYS: Record<string, string> = {
   profile: "profile",
   skills: "skills",
   facilities: "USERMANAGEMENT_TAB__FACILITIES",
+  preferences: "USERMANAGEMENT_TAB__PREFERENCES",
   new: "new",
   edit: "edit",
   letter: "letter",

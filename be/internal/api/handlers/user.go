@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 
 	"klyniva/internal/auth"
 	"klyniva/internal/config"
@@ -48,9 +50,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 	}
 
 	// Set defaults
-	if params.Limit == 0 {
-		params.Limit = 20
-	}
+	params.Limit = pageLimit(params.Limit)
 
 	db := database.GetDB()
 	query := db.Model(&models.User{}).
@@ -76,10 +76,18 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 		query = query.Where("employment_status = ?", status)
 	}
 	// Staff see the people of their own clinic; admins everyone
-	if claims, err := auth.GetCurrentUserClaims(c); err == nil && !auth.IsAdmin(claims.UserType) {
+	// (without a clinic: only themselves — never everyone)
+	claims, err := auth.GetCurrentUserClaims(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "unauthorized", Message: "User not authenticated"})
+		return
+	}
+	if !auth.IsAdmin(claims.UserType) {
 		var me models.User
-		if err := db.Select("home_facility_id").First(&me, claims.UserID).Error; err == nil && me.HomeFacilityID != nil {
+		if err := db.Select("id", "home_facility_id").First(&me, claims.UserID).Error; err == nil && me.HomeFacilityID != nil {
 			query = query.Where("home_facility_id = ?", *me.HomeFacilityID)
+		} else {
+			query = query.Where("id = ?", claims.UserID)
 		}
 	}
 	query = query.Order("first_name, last_name")
@@ -183,6 +191,10 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 
 	var user models.User
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
 	if err := db.Preload("LocalBody").
 		Preload("District").
 		Preload("State").
@@ -203,6 +215,11 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 		})
 		return
 	}
+	// People of other clinics look like they don't exist
+	if !canSeeUser(a, &user) {
+		notFound(c, "User")
+		return
+	}
 
 	c.JSON(http.StatusOK, user)
 }
@@ -218,14 +235,37 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 // @Success 201 {object} models.User
 // @Failure 400 {object} models.ErrorResponse
 // @Router /users/ [post]
+// Only admins (any clinic, any role) and coordinators (their own clinic,
+// clinic roles) add people; the new account can never be a superuser.
 func (h *UserHandler) CreateUser(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	var req newUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
-			Message: "Invalid request body",
+			Message: "Invalid request body: " + err.Error(),
 		})
 		return
+	}
+	clinic, err := newUserClinic(a, &req)
+	if err != nil {
+		forbid(c)
+		return
+	}
+	user := models.User{
+		Username: strings.TrimSpace(req.Username), Email: strings.TrimSpace(req.Email),
+		FirstName: strings.TrimSpace(req.FirstName), LastName: strings.TrimSpace(req.LastName),
+		UserType: req.UserType, HomeFacilityID: clinic, PhoneNumber: req.PhoneNumber,
+		Qualification: req.Qualification, StateID: req.StateID, DistrictID: req.DistrictID,
+		LocalBodyID: req.LocalBodyID, IsActive: true, EmploymentStatus: "active", Password: req.Password,
+	}
+	if req.Gender != nil && *req.Gender != "" {
+		g := models.GenderType(*req.Gender)
+		user.Gender = &g
 	}
 
 	// Hash password
@@ -240,7 +280,6 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	user.Password = string(hashedPassword)
 
 	// Create user
-	db := database.GetDB()
 	if err := db.Create(&user).Error; err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
@@ -271,48 +310,9 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 // @Success 200 {object} models.User
 // @Failure 400 {object} models.ErrorResponse
 // @Router /users/{username}/ [put]
+// PUT follows the same field rules as PATCH (only the fields sent change).
 func (h *UserHandler) UpdateUser(c *gin.Context) {
-	username := c.Param("username")
-
-	var user models.User
-	db := database.GetDB()
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{
-			Error:   "not_found",
-			Message: "User not found",
-		})
-		return
-	}
-
-	var updateData models.User
-	if err := c.ShouldBindJSON(&updateData); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "bad_request",
-			Message: "Invalid request body",
-		})
-		return
-	}
-
-	// Don't allow password updates through this endpoint
-	updateData.Password = user.Password
-
-	// Update user
-	if err := db.Model(&user).Updates(updateData).Error; err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "bad_request",
-			Message: "Failed to update user",
-		})
-		return
-	}
-
-	// Load relationships
-	db.Preload("LocalBody").
-		Preload("District").
-		Preload("State").
-		Preload("HomeFacility").
-		First(&user, user.ID)
-
-	c.JSON(http.StatusOK, user)
+	h.PartialUpdateUser(c)
 }
 
 // PartialUpdateUser godoc
@@ -327,32 +327,46 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 // @Success 200 {object} models.User
 // @Failure 400 {object} models.ErrorResponse
 // @Router /users/{username}/ [patch]
+// The person edits their own profile; their clinic's coordinator (or an
+// admin) also their role. Password, status, clinic and flags have their
+// own endpoints and are refused here.
 func (h *UserHandler) PartialUpdateUser(c *gin.Context) {
 	username := c.Param("username")
 
 	var user models.User
 	db := database.GetDB()
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{
-			Error:   "not_found",
-			Message: "User not found",
-		})
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if err := db.Where("username = ?", username).First(&user).Error; err != nil || !canSeeUser(a, &user) {
+		notFound(c, "User")
 		return
 	}
 
-	var updateData map[string]interface{}
-	if err := c.ShouldBindJSON(&updateData); err != nil {
+	var body map[string]any
+	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
 			Message: "Invalid request body",
 		})
 		return
 	}
-
-	// Remove password from update data
-	delete(updateData, "password")
+	updateData, err := userUpdate(a, &user, body)
+	if errors.Is(err, errBadField) {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: "Invalid email"})
+		return
+	}
+	if err != nil {
+		forbid(c)
+		return
+	}
 
 	// Update user
+	if len(updateData) == 0 {
+		c.JSON(http.StatusOK, user)
+		return
+	}
 	if err := db.Model(&user).Updates(updateData).Error; err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
@@ -382,11 +396,21 @@ func (h *UserHandler) PartialUpdateUser(c *gin.Context) {
 // @Success 200 {object} models.SuccessResponse
 // @Failure 404 {object} models.ErrorResponse
 // @Router /users/{username}/ [delete]
+// Admins only, never themselves. People who leave should be marked "left"
+// instead (keeps their record and history).
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	username := c.Param("username")
 
 	db := database.GetDB()
-	result := db.Where("username = ?", username).Delete(&models.User{})
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !auth.IsAdmin(a.Role) {
+		forbid(c)
+		return
+	}
+	result := db.Where("username = ? AND id <> ?", username, a.ID).Delete(&models.User{})
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "internal_error",

@@ -62,7 +62,11 @@ func (h *Handler) Skills(c *gin.Context) {
 
 // UserSkills handles GET /users/:username/skill/
 func (h *Handler) UserSkills(c *gin.Context) {
-	skills, err := h.svc.UserSkills(c.Request.Context(), c.Param("username"))
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	skills, err := h.svc.UserSkills(c.Request.Context(), a, c.Param("username"))
 	if err != nil {
 		writeError(c, err)
 		return
@@ -106,7 +110,11 @@ func (h *Handler) RemoveSkill(c *gin.Context) {
 
 // Clinics handles GET /users/:username/get_facilities/
 func (h *Handler) Clinics(c *gin.Context) {
-	clinics, err := h.svc.Clinics(c.Request.Context(), c.Param("username"))
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	clinics, err := h.svc.Clinics(c.Request.Context(), a, c.Param("username"))
 	if err != nil {
 		writeError(c, err)
 		return
@@ -168,6 +176,25 @@ func (h *Handler) SetEmployment(c *gin.Context) {
 	c.JSON(http.StatusOK, u)
 }
 
+// SetPreferences handles PATCH /users/:username/preferences/ (self only).
+func (h *Handler) SetPreferences(c *gin.Context) {
+	a, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var req PreferencesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: err.Error()})
+		return
+	}
+	u, err := h.svc.SetPreferences(c.Request.Context(), a, c.Param("username"), req)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, u)
+}
+
 // RegisterRoutes wires the staff API onto the authenticated group (the
 // paths of the existing user pages).
 func RegisterRoutes(protected *gin.RouterGroup, svc *Service) {
@@ -186,4 +213,5 @@ func mount(g *gin.RouterGroup, h *Handler) {
 	users.DELETE("/delete_facility/", h.ClearClinic)
 	users.DELETE("/clear_home_facility/", h.ClearClinic)
 	users.PATCH("/employment/", h.SetEmployment)
+	users.PATCH("/preferences/", h.SetPreferences)
 }

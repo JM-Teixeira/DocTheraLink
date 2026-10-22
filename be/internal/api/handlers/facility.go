@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
+	"klyniva/internal/auth"
 	"klyniva/internal/config"
 	"klyniva/internal/database"
 	"klyniva/internal/models"
@@ -44,14 +46,24 @@ func (h *FacilityHandler) ListFacilities(c *gin.Context) {
 		return
 	}
 
-	if params.Limit == 0 {
-		params.Limit = 20
-	}
+	params.Limit = pageLimit(params.Limit)
 
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
 	query := db.Model(&models.Facility{}).
 		Preload("State").
 		Preload("District")
+	// Staff see their own clinic; admins all of them
+	if !auth.IsAdmin(a.Role) {
+		if a.Clinic == nil {
+			query = query.Where("1 = 0")
+		} else {
+			query = query.Where("id = ?", *a.Clinic)
+		}
+	}
 
 	if params.Search != "" {
 		query = query.Where("name ILIKE ?", "%"+params.Search+"%")
@@ -87,23 +99,25 @@ func (h *FacilityHandler) ListFacilities(c *gin.Context) {
 // @Param facility body models.FacilityRequest true "Facility data"
 // @Success 201 {object} models.Facility
 // @Router /facility/ [post]
+// Admins only.
 func (h *FacilityHandler) CreateFacility(c *gin.Context) {
+	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !auth.IsAdmin(a.Role) {
+		forbid(c)
+		return
+	}
 	var req models.FacilityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// Log the actual error for debugging
-		println("ERROR: Failed to bind JSON:", err.Error())
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
 			Message: "Invalid request body: " + err.Error(),
 		})
 		return
 	}
-
-	// Log what we received
-	println("DEBUG: Received facility request:")
-	println("  Name:", req.Name)
-	println("  FacilityType:", req.FacilityType)
-	println("  Address:", req.Address)
 
 	facility := models.Facility{
 		Name:              req.Name,
@@ -119,18 +133,14 @@ func (h *FacilityHandler) CreateFacility(c *gin.Context) {
 		Features:          req.Features,
 	}
 
-	db := database.GetDB()
 	if err := db.Create(&facility).Error; err != nil {
-		// Log the actual database error
-		println("ERROR: Failed to create facility in database:", err.Error())
+		log.Printf("create facility: %v", err)
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
-			Message: "Failed to create facility: " + err.Error(),
+			Message: "Failed to create facility",
 		})
 		return
 	}
-
-	println("SUCCESS: Facility created with ID:", facility.ID)
 
 	// Load relationships
 	db.Preload("State").
@@ -155,6 +165,14 @@ func (h *FacilityHandler) GetFacility(c *gin.Context) {
 
 	var facility models.Facility
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !canSeeClinic(a, id) {
+		notFound(c, "Facility")
+		return
+	}
 	if err := db.Preload("State").
 		Preload("District").
 		Where("id = ?", id).
@@ -192,6 +210,14 @@ func (h *FacilityHandler) UpdateFacility(c *gin.Context) {
 
 	var facility models.Facility
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !canManageClinic(a, id) {
+		forbid(c)
+		return
+	}
 	if err := db.Where("id = ?", id).First(&facility).Error; err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{
 			Error:   "not_found",
@@ -254,6 +280,14 @@ func (h *FacilityHandler) PartialUpdateFacility(c *gin.Context) {
 
 	var facility models.Facility
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !canManageClinic(a, id) {
+		forbid(c)
+		return
+	}
 	if err := db.Where("id = ?", id).First(&facility).Error; err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{
 			Error:   "not_found",
@@ -271,7 +305,8 @@ func (h *FacilityHandler) PartialUpdateFacility(c *gin.Context) {
 		return
 	}
 
-	if err := db.Model(&facility).Updates(updateData).Error; err != nil {
+	// Only known clinic fields (never ids, timestamps or soft-delete)
+	if err := db.Model(&facility).Updates(clinicUpdate(updateData)).Error; err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
 			Message: "Failed to update facility",
@@ -297,10 +332,19 @@ func (h *FacilityHandler) PartialUpdateFacility(c *gin.Context) {
 // @Param id path string true "Facility ID"
 // @Success 200 {object} models.SuccessResponse
 // @Router /facility/{id}/ [delete]
+// Admins only.
 func (h *FacilityHandler) DeleteFacility(c *gin.Context) {
 	id := c.Param("id")
 
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !auth.IsAdmin(a.Role) {
+		forbid(c)
+		return
+	}
 	result := db.Where("id = ?", id).Delete(&models.Facility{})
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
@@ -403,10 +447,17 @@ func (h *FacilityHandler) GetFacilityUsers(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: "Invalid query parameters"})
 		return
 	}
-	if params.Limit <= 0 || params.Limit > 100 {
-		params.Limit = 20
+	params.Limit = pageLimit(params.Limit)
+	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
 	}
-	query := database.GetDB().Model(&models.User{}).Where("home_facility_id = ? AND is_active", c.Param("id"))
+	if !canSeeClinic(a, c.Param("id")) {
+		notFound(c, "Facility")
+		return
+	}
+	query := db.Model(&models.User{}).Where("home_facility_id = ? AND is_active", c.Param("id"))
 	if u := strings.TrimSpace(c.Query("username")); u != "" {
 		query = query.Where("username ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ?", "%"+u+"%", "%"+u+"%", "%"+u+"%")
 	}

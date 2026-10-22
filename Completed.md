@@ -5,6 +5,32 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-22 · Security review, date preference, tests (branch `feat/m4-patients`)
+
+### 14:00 · Security fixes, date format preference, browser e2e (user request)
+- **Security fixes** in legacy handlers (all were open to any signed-in
+  user): creating users with any role (incl. admin), editing any account
+  incl. `user_type` / `is_superuser` (privilege escalation), deleting
+  users, creating/editing/deleting clinics, reading other clinics' people,
+  staff lists, skills and time logs. Now: admins manage everything;
+  coordinators add people to their own clinic with clinic roles only;
+  everyone edits their own profile fields; status, clinic, password and
+  flags only through their own endpoints; other clinics answer 404. Lists
+  capped at 100; no raw database errors or debug prints in responses.
+- "Add person" works again (`POST /users/add_user/` was never routed).
+- **Date format preference** (Profile → Preferências): dd/mm/aaaa,
+  mm/dd/aaaa, aaaa-mm-dd or "21 out 2026", shown and typed that way
+  everywhere (new `DateInput` with a calendar button replaces the browser
+  date fields, which always follow the browser's locale).
+- Dropdown arrows no longer overlap the text (global select padding).
+- No long dashes in the interface ("-" or "·"); Climutua is now
+  "Climutua · Medicina Física e Reabilitação".
+- Fix: a physio's hours on the board could come out of order (CI flake).
+- Tests: access policy unit tests; staff visibility and preferences; e2e
+  `TestNoPrivilegeEscalation`, `TestClinicIsolation`, `TestDatePreference`;
+  component tests for DateInput and FilterChips; new **browser e2e suite**
+  (Playwright, `make e2e-browser`); 120 frontend tests.
+
 ## 2026-10-21 — M4 patients (branch `feat/m4-patients`)
 
 ### 23:30 · Calmer time board, holiday cover, people & patient filters (user request)

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 
+import DateInput from "@/components/Common/DateInput";
 import { chipClass } from "@/components/Common/FilterChips";
 import { userChildProps } from "@/components/Common/UserColumns";
 import StaffRoutes from "@/components/Staff/api";
@@ -18,6 +19,7 @@ import {
 } from "@/components/Staff/types";
 
 import useAuthUser from "@/hooks/useAuthUser";
+import useDateFormat from "@/hooks/useDateFormat";
 
 import * as Notification from "@/Utils/Notifications";
 import query, { callApi } from "@/Utils/request/query";
@@ -36,6 +38,7 @@ export default function EmploymentTab({
   refetchUserData,
 }: userChildProps) {
   const { t } = useTranslation();
+  const { fmt } = useDateFormat();
   const me = useAuthUser();
   const admin = isAdmin(me);
   // Nobody changes their own status
@@ -100,7 +103,7 @@ export default function EmploymentTab({
               onChange={(e) => setClinic(e.target.value)}
               className={fieldClass}
             >
-              <option value="">—</option>
+              <option value="">-</option>
               {clinics?.results.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -139,7 +142,7 @@ export default function EmploymentTab({
           {userData.employment_since && (
             <span className="text-gray-500">
               {t("since_date", {
-                date: dayjs(userData.employment_since).format("D MMM YYYY"),
+                date: fmt(userData.employment_since),
               })}
             </span>
           )}
@@ -183,12 +186,7 @@ export default function EmploymentTab({
             </div>
             <label className="text-sm font-medium text-gray-700">
               {t("since")}
-              <input
-                type="date"
-                value={since}
-                onChange={(e) => setSince(e.target.value)}
-                className={fieldClass}
-              />
+              <DateInput value={since} onChange={setSince} className="mt-1" />
             </label>
             <label className="text-sm font-medium text-gray-700">
               {t("note")}

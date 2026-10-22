@@ -158,7 +158,7 @@ export default function HomePage() {
             <Stat
               icon={CalendarClock}
               label={t("next_session")}
-              value={next ? formatHour(next.hour) : "—"}
+              value={next ? formatHour(next.hour) : "-"}
               hint={
                 next
                   ? next.appointments.map((a) => a.patient?.name).join(", ")

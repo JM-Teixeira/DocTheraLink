@@ -42,7 +42,7 @@ export default function PatientMetrics({ stats }: { stats?: PatientStats }) {
         <p className="text-xs text-gray-500">{t("patients")}</p>
         <p className="text-2xl font-semibold text-gray-900">{total}</p>
         <p className="mt-1 text-xs text-gray-500">
-          {t("average_age")}: {total ? Math.round(stats.average_age) : "—"}
+          {t("average_age")}: {total ? Math.round(stats.average_age) : "-"}
         </p>
       </div>
 

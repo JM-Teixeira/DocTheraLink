@@ -53,6 +53,11 @@ type EmploymentRequest struct {
 	Note   string `json:"note" binding:"max=300"`
 }
 
+// PreferencesRequest changes how the app is shown to the person.
+type PreferencesRequest struct {
+	DateFormat string `json:"date_format" binding:"required,oneof=dmy mdy ymd long"`
+}
+
 // Service holds the staff rules.
 type Service struct {
 	repo Repository
@@ -86,12 +91,40 @@ func (s *Service) canEditSkills(ctx context.Context, a Actor, target *models.Use
 	return s.manages(ctx, a, target)
 }
 
+// canView: admins, the person themself and the people of the same clinic.
+func (s *Service) canView(ctx context.Context, a Actor, target *models.User) (bool, error) {
+	if auth.IsAdmin(a.Role) || target.ID == a.ID {
+		return true, nil
+	}
+	if target.HomeFacilityID == nil {
+		return false, nil
+	}
+	me, err := s.repo.UserByID(ctx, a.ID)
+	if err != nil {
+		return false, err
+	}
+	return me.HomeFacilityID != nil && *me.HomeFacilityID == *target.HomeFacilityID, nil
+}
+
+// visibleUser loads a user the actor may see; others look like they don't
+// exist (no hint that the username is taken).
+func (s *Service) visibleUser(ctx context.Context, a Actor, username string) (*models.User, error) {
+	u, err := s.repo.UserByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+	if ok, err := s.canView(ctx, a, u); err != nil || !ok {
+		return nil, firstErr(err, ErrNotFound)
+	}
+	return u, nil
+}
+
 // Skills lists the catalogue.
 func (s *Service) Skills(ctx context.Context) ([]models.Skill, error) { return s.repo.Skills(ctx) }
 
-// UserSkills lists a user's skills.
-func (s *Service) UserSkills(ctx context.Context, username string) ([]models.UserSkill, error) {
-	u, err := s.repo.UserByUsername(ctx, username)
+// UserSkills lists a user's skills (to people who may see that user).
+func (s *Service) UserSkills(ctx context.Context, a Actor, username string) ([]models.UserSkill, error) {
+	u, err := s.visibleUser(ctx, a, username)
 	if err != nil {
 		return nil, err
 	}
@@ -138,8 +171,8 @@ func (s *Service) RemoveSkill(ctx context.Context, a Actor, username, id string)
 }
 
 // Clinics lists the clinic a user works in (one today, see decision D2).
-func (s *Service) Clinics(ctx context.Context, username string) ([]models.Facility, error) {
-	u, err := s.repo.UserByUsername(ctx, username)
+func (s *Service) Clinics(ctx context.Context, a Actor, username string) ([]models.Facility, error) {
+	u, err := s.visibleUser(ctx, a, username)
 	if err != nil {
 		return nil, err
 	}
@@ -205,6 +238,26 @@ func (s *Service) SetEmployment(ctx context.Context, a Actor, username string, r
 		"employment_note": strings.TrimSpace(req.Note), "is_active": req.Status != StatusLeft,
 	}
 	if err := s.repo.UpdateUser(ctx, u.ID, fields); err != nil {
+		return nil, err
+	}
+	return s.repo.UserByID(ctx, u.ID)
+}
+
+// SetPreferences saves a person's own display preferences (nobody else's).
+func (s *Service) SetPreferences(ctx context.Context, a Actor, username string, req PreferencesRequest) (*models.User, error) {
+	u, err := s.repo.UserByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+	if u.ID != a.ID {
+		return nil, ErrForbidden
+	}
+	switch req.DateFormat {
+	case "dmy", "mdy", "ymd", "long":
+	default:
+		return nil, &ValidationError{"date_format", "must be dmy, mdy, ymd or long"}
+	}
+	if err := s.repo.UpdateUser(ctx, u.ID, map[string]any{"date_format": req.DateFormat}); err != nil {
 		return nil, err
 	}
 	return s.repo.UserByID(ctx, u.ID)

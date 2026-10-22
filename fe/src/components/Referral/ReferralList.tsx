@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 
+import DateInput from "@/components/Common/DateInput";
 import Page from "@/components/Common/Page";
 import ReferralCard from "@/components/Referral/ReferralCard";
 import ReferralHelp from "@/components/Referral/ReferralHelp";
@@ -188,21 +189,15 @@ export default function ReferralList() {
         )}
         <label className="flex items-center gap-1.5 text-sm text-gray-600">
           {t("from")}
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className={selectClass}
-          />
+          <DateInput value={from} onChange={setFrom} className="w-40" />
         </label>
         <label className="flex items-center gap-1.5 text-sm text-gray-600">
           {t("until")}
-          <input
-            type="date"
+          <DateInput
             value={to}
             min={from || undefined}
-            onChange={(e) => setTo(e.target.value)}
-            className={selectClass}
+            onChange={setTo}
+            className="w-40"
           />
         </label>
         {anyFilter && (

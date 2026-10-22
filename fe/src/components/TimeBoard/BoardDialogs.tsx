@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import DateInput from "@/components/Common/DateInput";
 import BoardRoutes from "@/components/TimeBoard/api";
 import {
   COLOR_NAMES,
@@ -142,7 +143,7 @@ export function ShiftDialog({
               }
               className={fieldClass}
             >
-              <option value="">—</option>
+              <option value="">-</option>
               {board.therapists.map((th) => (
                 <option key={th.id} value={th.id}>
                   {th.first_name} {th.last_name}
@@ -531,12 +532,7 @@ export function CopyDayDialog({
         </DialogHeader>
         <label className="text-sm font-medium text-gray-700">
           {t("copy_to")}
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className={fieldClass}
-          />
+          <DateInput value={to} onChange={setTo} className="mt-1" />
         </label>
         <DialogFooter className="gap-2">
           <Button type="button" variant="outline" onClick={onClose}>

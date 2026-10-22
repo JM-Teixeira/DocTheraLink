@@ -123,7 +123,7 @@ export function WeekView({
                                       : "bg-gray-100",
                                   )}
                                 >
-                                  {s.start_hour}–{s.end_hour} {div?.name}
+                                  {s.start_hour}-{s.end_hour} {div?.name}
                                 </span>
                               );
                             })}
@@ -137,7 +137,7 @@ export function WeekView({
                           />
                         </button>
                       ) : (
-                        <p className="p-1.5 text-xs text-gray-300">—</p>
+                        <p className="p-1.5 text-xs text-gray-300">-</p>
                       )}
                     </td>
                   );

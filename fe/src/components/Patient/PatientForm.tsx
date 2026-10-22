@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 
+import DateInput from "@/components/Common/DateInput";
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
 import DuplicatePatientsDialog from "@/components/Patient/DuplicatePatientsDialog";
@@ -154,10 +155,11 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
             id="date_of_birth"
             error={errors.date_of_birth}
           >
-            <input
-              {...fieldProps("date_of_birth")}
-              type="date"
-              className={inputClass}
+            <DateInput
+              id="date_of_birth"
+              value={form.date_of_birth}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={set("date_of_birth")}
             />
           </Field>
           <Field label={t("nationality")} id="nationality">

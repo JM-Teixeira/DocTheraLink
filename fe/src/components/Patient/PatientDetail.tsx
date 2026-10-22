@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import { Pencil, Phone, Stethoscope } from "lucide-react";
 import { navigate } from "raviger";
 import { ReactNode } from "react";
@@ -16,6 +15,7 @@ import ReferralRoutes from "@/components/Referral/api";
 import { canCreateReferral } from "@/components/Referral/referralUtils";
 
 import useAuthUser from "@/hooks/useAuthUser";
+import useDateFormat from "@/hooks/useDateFormat";
 
 import { ageFromDob, initials } from "@/Utils/person";
 import query from "@/Utils/request/query";
@@ -23,6 +23,7 @@ import { canSeeReferrals, canWritePatients } from "@/Utils/roles";
 
 export default function PatientDetail({ id }: { id: string }) {
   const { t } = useTranslation();
+  const { fmt } = useDateFormat();
   const user = useAuthUser();
   const { data: patient, isLoading, isError } = usePatient(id);
 
@@ -50,9 +51,7 @@ export default function PatientDetail({ id }: { id: string }) {
   const subtitle = [
     age !== null ? t("age_years", { age }) : null,
     patient.gender ? t(genderKey(patient.gender)) : null,
-    patient.date_of_birth
-      ? dayjs(patient.date_of_birth).format("D MMM YYYY")
-      : null,
+    patient.date_of_birth ? fmt(patient.date_of_birth) : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -194,7 +193,7 @@ function Item({
         {label}
       </dt>
       <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-900">
-        {value || "—"}
+        {value || "-"}
       </dd>
     </div>
   );

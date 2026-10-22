@@ -186,11 +186,13 @@ var (
 	ptAllergies  = []string{"Látex", "Penicilina", "Adesivos (fita de kinesio)", "AINE (ibuprofeno)"}
 	ptProgress   = []string{"Boa evolução: dor 3/10, amplitude a aumentar.", "Tolerou bem o aumento de carga; sem queixas no fim da sessão.", "Sessão com mais dor (5/10) após esforço no trabalho; carga ajustada.", "Melhoria clara da marcha; já sobe escadas com corrimão.", "Plano domiciliário revisto; cumpre os exercícios diariamente."}
 	ptQuestions  = []string{"Como está a tolerar o fortalecimento?", "Há sinais de melhoria na dor noturna?", "Considera necessário pedir nova ressonância?"}
-	ptReplies    = []string{"Bem — dor 2/10 no fim das sessões.", "Sim, dorme a noite toda há uma semana.", "Para já não; reavalio daqui a duas semanas."}
+	ptReplies    = []string{"Bem, dor 2/10 no fim das sessões.", "Sim, dorme a noite toda há uma semana.", "Para já não; reavalio daqui a duas semanas."}
 	ptOutcomes   = []string{"Objetivos atingidos: sem dor nas atividades diárias, alta com plano de exercícios domiciliário.", "Recuperou a amplitude completa e a força; regressou ao trabalho.", "Marcha independente sem auxiliares; alta com indicação de manter atividade física regular."}
 	ptDeclines   = []string{"Agenda completa nas próximas semanas; sugiro outro colega.", "Fora da minha área (necessita de fisioterapia uroginecológica)."}
 	climutuaRand = rand.New(rand.NewPCG(2026, 10))
 )
+
+const climutuaName = "Climutua · Medicina Física e Reabilitação"
 
 // seedClimutua creates the Climutua clinic once and keeps its weekly shifts
 // planned four weeks ahead on every start.
@@ -201,6 +203,10 @@ func seedClimutua(now time.Time) error {
 	}
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	if exists > 0 {
+		// Older databases have the name with a long dash
+		if err := DB.Model(&models.Facility{}).Where("id = ?", ClimutuaClinicID).Update("name", climutuaName).Error; err != nil {
+			return err
+		}
 		staff, divs, err := climutuaExisting()
 		if err != nil || len(divs) < len(climutuaDivisions) {
 			return err
@@ -218,7 +224,7 @@ func seedClimutua(now time.Time) error {
 
 func createClimutua(today time.Time) error {
 	pincode := "4050-180"
-	clinic := models.Facility{ID: ClimutuaClinicID, Name: "Climutua — Medicina Física e Reabilitação",
+	clinic := models.Facility{ID: ClimutuaClinicID, Name: climutuaName,
 		Address: "Rua de Cedofeita 312, 4050-180 Porto", Pincode: &pincode}
 	if err := DB.Create(&clinic).Error; err != nil {
 		return fmt.Errorf("climutua clinic: %w", err)
@@ -653,7 +659,7 @@ func climutuaHoliday(staff []uint, today time.Time) error {
 	}
 	notes := []string{
 		"Progredir para agachamento unipodal se sem dor; manter gelo no fim.",
-		"Ainda com dor noturna — privilegiar terapia manual, evitar carga acima da cabeça.",
+		"Ainda com dor noturna - privilegiar terapia manual, evitar carga acima da cabeça.",
 		"Cumpre bem o plano domiciliário; reavaliar amplitude na sexta.",
 	}
 	cover := staff[firstPhysio+3]

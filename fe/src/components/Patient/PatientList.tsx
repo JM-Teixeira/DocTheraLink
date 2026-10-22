@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import { Plus, Search, Users, X } from "lucide-react";
 import { navigate } from "raviger";
 import { useEffect, useState } from "react";
@@ -29,6 +28,7 @@ import {
 } from "@/components/TimeBoard/boardUtils";
 
 import useAuthUser from "@/hooks/useAuthUser";
+import useDateFormat from "@/hooks/useDateFormat";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 import { ageFromDob, initials } from "@/Utils/person";
@@ -44,6 +44,7 @@ const PAGE_SIZE = 20;
  */
 export default function PatientList() {
   const { t } = useTranslation();
+  const { fmt } = useDateFormat();
   const user = useAuthUser();
   const admin = isAdmin(user);
   const [filter, setFilter] = useState<PatientFilter>(NO_PATIENT_FILTER);
@@ -215,7 +216,7 @@ export default function PatientList() {
                         </a>
                       </td>
                       <td className="hidden px-4 py-3 text-gray-600 sm:table-cell">
-                        {age ?? "—"}
+                        {age ?? "-"}
                       </td>
                       <td className="px-4 py-3">
                         {p.care_level ? (
@@ -228,19 +229,17 @@ export default function PatientList() {
                             {p.care_level}
                           </span>
                         ) : (
-                          "—"
+                          "-"
                         )}
                       </td>
                       <td className="hidden px-4 py-3 text-gray-600 md:table-cell">
                         {t(genderKey(p.gender))}
                       </td>
                       <td className="hidden px-4 py-3 text-gray-600 md:table-cell">
-                        {p.phone_number || "—"}
+                        {p.phone_number || "-"}
                       </td>
                       <td className="hidden px-4 py-3 text-gray-500 lg:table-cell">
-                        {p.created_date
-                          ? dayjs(p.created_date).format("D MMM YYYY")
-                          : "—"}
+                        {p.created_date ? fmt(p.created_date) : "-"}
                       </td>
                     </tr>
                   );

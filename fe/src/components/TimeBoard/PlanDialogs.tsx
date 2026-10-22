@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import DateInput from "@/components/Common/DateInput";
 import PatientIds from "@/components/Patient/PatientIds";
 import { apiError } from "@/components/TimeBoard/BoardDialogs";
 import { PatientRef } from "@/components/TimeBoard/HourDialog";
@@ -28,6 +29,7 @@ import {
 } from "@/components/TimeBoard/boardUtils";
 import { SeriesResult } from "@/components/TimeBoard/types";
 
+import useDateFormat from "@/hooks/useDateFormat";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 import * as Notification from "@/Utils/Notifications";
@@ -210,7 +212,7 @@ export function SeriesDialog({
                 onChange={(e) => setTherapist(Number(e.target.value))}
                 className={fieldClass}
               >
-                <option value={0}>—</option>
+                <option value={0}>-</option>
                 {therapists.map((th) => (
                   <option key={th.id} value={th.id}>
                     {th.first_name} {th.last_name}
@@ -273,12 +275,7 @@ export function SeriesDialog({
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm font-medium text-gray-700">
               {t("starting")}
-              <input
-                type="date"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className={fieldClass}
-              />
+              <DateInput value={start} onChange={setStart} className="mt-1" />
             </label>
             <label className="text-sm font-medium text-gray-700">
               {t("number_of_sessions")}
@@ -318,7 +315,7 @@ export function SeriesDialog({
                   <ul className="max-h-32 overflow-auto text-xs text-gray-600">
                     {preview.skipped.map((s) => (
                       <li key={s.date}>
-                        {dayjs(s.date).format("ddd D MMM")} —{" "}
+                        {dayjs(s.date).format("ddd D MMM")} -{" "}
                         {t(`skip_reason__${s.reason}`)}
                       </li>
                     ))}
@@ -376,6 +373,7 @@ export function RepeatWeekDialog({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
+  const { fmt } = useDateFormat();
   const [weeks, setWeeks] = useState(4);
   const monday = weekStart(date);
   const repeat = useMutation({
@@ -397,7 +395,7 @@ export function RepeatWeekDialog({
           <DialogTitle>{t("repeat_week")}</DialogTitle>
           <DialogDescription>
             {t("repeat_week_help", {
-              date: dayjs(monday).format("D MMM YYYY"),
+              date: fmt(monday),
             })}
           </DialogDescription>
         </DialogHeader>

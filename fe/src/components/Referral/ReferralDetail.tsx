@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import {
   CalendarDays,
   ClipboardList,
@@ -34,6 +33,7 @@ import {
 import { Referral, ReferralAction } from "@/components/Referral/types";
 
 import useAuthUser from "@/hooks/useAuthUser";
+import useDateFormat from "@/hooks/useDateFormat";
 
 import * as Notification from "@/Utils/Notifications";
 import { callApi } from "@/Utils/request/query";
@@ -247,7 +247,7 @@ export default function ReferralDetail({ id }: { id: string }) {
                 )}
               </Detail>
               <Detail icon={CalendarDays} label={t("recommended_sessions")}>
-                {referral.recommended_sessions ?? "—"}
+                {referral.recommended_sessions ?? "-"}
               </Detail>
               <Detail icon={ClipboardList} label={t("referral_reason")} wide>
                 {referral.reason}
@@ -361,13 +361,14 @@ function Person({ label, name }: { label: string; name: string }) {
 }
 
 function Timestamp({ label, value }: { label: string; value: string }) {
+  const { fmtTime } = useDateFormat();
   return (
     <div>
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
         {label}
       </p>
       <time dateTime={value} className="mt-0.5 block text-gray-900">
-        {dayjs(value).format("D MMM YYYY, HH:mm")}
+        {fmtTime(value)}
       </time>
     </div>
   );

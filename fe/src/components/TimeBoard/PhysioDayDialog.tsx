@@ -109,7 +109,7 @@ export default function PhysioDayDialog({
                     onShift && "hover:opacity-80",
                   )}
                 >
-                  {formatHour(s.start_hour)}–{formatHour(s.end_hour)} ·{" "}
+                  {formatHour(s.start_hour)}-{formatHour(s.end_hour)} ·{" "}
                   {d?.name}
                 </button>
               );
@@ -121,7 +121,7 @@ export default function PhysioDayDialog({
           <p className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
             <Plane className="size-4" aria-hidden />
             {t(`absence_reason__${absence.reason}`)} ·{" "}
-            {dayjs(absence.from).format("D MMM")} –{" "}
+            {dayjs(absence.from).format("D MMM")} -{" "}
             {dayjs(absence.to).format("D MMM")}
             {absence.cover &&
               ` · ${t("covered_by", { name: `${absence.cover.first_name} ${absence.cover.last_name}` })}`}

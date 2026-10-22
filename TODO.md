@@ -27,8 +27,10 @@ done** until all of these exist and CI is green:
    module logic ≥ 80 % (the old patient-creation spec also set 80 %).
 
 Open testing work:
-- [ ] P1 Browser E2E for the referral journey (Playwright or Cypress) incl. screenshots — UI is only checked manually today.
-- [ ] P1 Tests for legacy handlers still in use: time log, timetable, users, facilities.
+- [x] Browser E2E suite (Playwright, `e2e/browser`, `make e2e-browser`): login, people status filter, patient filters vs metrics, date preference, dropdown padding, no long dashes, clinic isolation, time board drill-down.
+- [ ] P1 Browser E2E next: the referral journey end to end (create → accept → notes → complete → letter); run the suite in CI against the compose stack.
+- [x] Access rules of the legacy user/facility/time-log handlers unit-tested (`api/handlers/access_test.go`) and covered by e2e (`TestNoPrivilegeEscalation`, `TestClinicIsolation`).
+- [ ] P2 HTTP-level tests (httptest + PostgreSQL) for the legacy user and facility handlers.
 - [ ] P1 Component tests for `ReferralDetail`, `ReferralList`, `CreateReferral` with a mocked API (role-dependent buttons, validation).
 - [ ] P2 Coverage reporting in CI (Go `-coverprofile`, Vitest `--coverage`) with thresholds.
 - [ ] P2 Contract tests: generate OpenAPI from the backend and type-check the frontend API routes against it.
@@ -42,7 +44,8 @@ Open testing work:
 - [ ] **Login rate limiting / lockout** (`RATE_LIMIT_*` config exists, unused).
 - [ ] **Token storage**: move refresh token to an httpOnly cookie; revocation on logout/password change.
 - [ ] **Headers**: `Cache-Control: no-store` on API responses; tighten nginx CSP.
-- [ ] **Access-control review of legacy handlers** (users, facilities, timetable have little per-facility scoping, e.g. `GET /users/` lists everyone).
+- [x] **Access-control review of legacy handlers** (2026-10-22): user create/edit/delete, facility create/edit/delete, user and clinic reads, time logs, skills — see Completed.
+- [ ] Same review for the remaining legacy reads (`/getallfacilities/`, geography) and a password-change policy (length, reuse).
 - [ ] Encrypted backups; TLS to managed Postgres (`DB_SSLMODE=verify-full`).
 - [ ] Dependency & image scanning in CI (govulncheck, npm audit, Trivy). The IDE scan
       flags critical CVEs in the local `nginx:1.29-alpine` base image — pin a patched
@@ -88,6 +91,7 @@ Order (D5): **M1 → M4 → M3 → M2 → M5**. Each milestone ships with the te
 - [x] Re-assign / hand-over to another therapist; re-open a declined referral to another therapist.
 - [x] Filters & search on the referral list (patient, priority, date, therapist) and counts per status tab.
 - [x] ICD-10 code picker (curated physio subset, EN/PT, code or word search); 9 built-in referral templates.
+- [ ] **[proposed]** Referral thread: make *question* / *reply* / *progress* do something: a reply answers a specific question, open questions show a badge on the card and in the doctor's list until answered, progress notes form a session timeline (pain, goals) that can be filtered.
 - [ ] Later: clinic-defined templates stored in the database; optional full ICD-10 import (licensed data, PT edition).
 - [x] Printable referral / discharge letter (A4 page; browser print → PDF).
 

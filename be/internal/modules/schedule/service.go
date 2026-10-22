@@ -214,7 +214,7 @@ func (s *Service) SaveShift(ctx context.Context, a Actor, id string, req ShiftRe
 	}
 	for _, o := range day {
 		if o.ID != sh.ID && o.TherapistID == sh.TherapistID && o.StartHour < sh.EndHour && sh.StartHour < o.EndHour {
-			return nil, &ConflictError{fmt.Sprintf("overlaps another shift (%02d:00–%02d:00)", o.StartHour, o.EndHour)}
+			return nil, &ConflictError{fmt.Sprintf("overlaps another shift (%02d:00-%02d:00)", o.StartHour, o.EndHour)}
 		}
 	}
 	// Editing must not strand patients already booked in the old shift

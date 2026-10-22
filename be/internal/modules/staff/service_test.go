@@ -43,6 +43,8 @@ func (f *fakeRepo) UpdateUser(_ context.Context, id uint, fields map[string]any)
 			u.EmploymentStatus = v.(string)
 		case "is_active":
 			u.IsActive = v.(bool)
+		case "date_format":
+			u.DateFormat = v.(string)
 		case "home_facility_id":
 			u.HomeFacilityID = v.(*string)
 		}
@@ -149,7 +151,7 @@ func TestSkills(t *testing.T) {
 	if err := s.RemoveSkill(ctx, sarah, "sarah", hydro); err != nil {
 		t.Errorf("remove by skill id: %v", err)
 	}
-	if got, _ := s.UserSkills(ctx, "sarah"); len(got) != 0 {
+	if got, _ := s.UserSkills(ctx, sarah, "sarah"); len(got) != 0 {
 		t.Errorf("skills left: %d", len(got))
 	}
 }
@@ -185,7 +187,7 @@ func TestEmployment(t *testing.T) {
 func TestClinicLink(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newSvc()
-	if cl, _ := s.Clinics(ctx, "sarah"); len(cl) != 1 || cl[0].ID != clinicA {
+	if cl, _ := s.Clinics(ctx, sarah, "sarah"); len(cl) != 1 || cl[0].ID != clinicA {
 		t.Fatalf("linked clinic: %+v", cl)
 	}
 	if _, err := s.SetClinic(ctx, marta, "sarah", clinicB); !errors.Is(err, ErrForbidden) {
@@ -200,7 +202,47 @@ func TestClinicLink(t *testing.T) {
 	if _, err := s.SetClinic(ctx, adminUser, "sarah", ""); err != nil {
 		t.Fatal(err)
 	}
-	if cl, _ := s.Clinics(ctx, "sarah"); len(cl) != 0 {
+	if cl, _ := s.Clinics(ctx, sarah, "sarah"); len(cl) != 0 {
 		t.Errorf("cleared: %+v", cl)
+	}
+}
+
+// Skills and clinic are visible to the person, their clinic and admins;
+// to anyone else the user looks like it doesn't exist.
+func TestVisibility(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newSvc()
+	for name, a := range map[string]Actor{"self": sarah, "colleague": tiago, "coordinator": marta, "admin": adminUser} {
+		if _, err := s.UserSkills(ctx, a, "sarah"); err != nil {
+			t.Errorf("%s reads skills: %v", name, err)
+		}
+		if _, err := s.Clinics(ctx, a, "sarah"); err != nil {
+			t.Errorf("%s reads clinic: %v", name, err)
+		}
+	}
+	if _, err := s.UserSkills(ctx, farCoord, "sarah"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("other clinic reads skills: %v", err)
+	}
+	if _, err := s.Clinics(ctx, farCoord, "sarah"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("other clinic reads clinic: %v", err)
+	}
+}
+
+func TestPreferences(t *testing.T) {
+	ctx := context.Background()
+	s, repo := newSvc()
+	u, err := s.SetPreferences(ctx, sarah, "sarah", PreferencesRequest{DateFormat: "ymd"})
+	if err != nil || u.DateFormat != "ymd" {
+		t.Fatalf("own preference: %+v %v", u, err)
+	}
+	if _, err := s.SetPreferences(ctx, adminUser, "sarah", PreferencesRequest{DateFormat: "mdy"}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("even admins don't set someone else's preferences: %v", err)
+	}
+	var verr *ValidationError
+	if _, err := s.SetPreferences(ctx, sarah, "sarah", PreferencesRequest{DateFormat: "dd.mm"}); !errors.As(err, &verr) {
+		t.Errorf("unknown format: %v", err)
+	}
+	if repo.users[1].DateFormat != "ymd" {
+		t.Error("a rejected change must not be saved")
 	}
 }

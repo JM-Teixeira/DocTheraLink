@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 
+import DateInput from "@/components/Common/DateInput";
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
 import { AbsencesDialog } from "@/components/TimeBoard/AbsenceDialogs";
@@ -94,7 +95,7 @@ function periodLabel(mode: Mode, date: string) {
       return d.format("dddd, D MMMM YYYY");
     case "week": {
       const start = dayjs(weekStart(date));
-      return `${start.format("D MMM")} – ${start.add(6, "day").format("D MMM YYYY")}`;
+      return `${start.format("D MMM")} - ${start.add(6, "day").format("D MMM YYYY")}`;
     }
     case "month":
       return d.format("MMMM YYYY");
@@ -224,12 +225,11 @@ export default function TimeBoardPage() {
           >
             <ChevronLeft className="size-4" aria-hidden />
           </Button>
-          <input
-            type="date"
+          <DateInput
             aria-label={t("date")}
             value={date}
-            onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="h-9 rounded-lg border border-gray-300 px-2 text-sm"
+            onChange={(d) => d && setDate(d)}
+            className="w-40"
           />
           <Button
             size="icon"
@@ -509,7 +509,7 @@ function PhysioGrid({
             const absence = absenceOf(board.absences, th.id);
             const pct = utilisation(th);
             return (
-              <tr key={th.id} className={cn(absence && "bg-amber-50/40")}>
+              <tr key={th.id} data-physio-row className={cn(absence && "bg-amber-50/40")}>
                 <th className={nameCell}>
                   <button
                     type="button"

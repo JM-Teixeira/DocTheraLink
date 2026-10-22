@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import { Plus, Search, UserRound, X } from "lucide-react";
 import { navigate } from "raviger";
 import { useEffect, useState } from "react";
@@ -25,6 +24,7 @@ import {
 } from "@/components/Staff/types";
 
 import useAuthUser from "@/hooks/useAuthUser";
+import useDateFormat from "@/hooks/useDateFormat";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 import { initials } from "@/Utils/person";
@@ -39,6 +39,7 @@ const PAGE_SIZE = 20;
  */
 export default function StaffList() {
   const { t } = useTranslation();
+  const { fmt, fmtTime } = useDateFormat();
   const user = useAuthUser();
   const admin = isAdmin(user);
   const [search, setSearch] = useState("");
@@ -228,7 +229,7 @@ export default function StaffList() {
                       </td>
                       {admin && (
                         <td className="hidden px-4 py-3 text-gray-600 md:table-cell">
-                          {p.clinic_name || "—"}
+                          {p.clinic_name || "-"}
                         </td>
                       )}
                       <td className="px-4 py-3">
@@ -242,14 +243,12 @@ export default function StaffList() {
                         </span>
                         {st !== "active" && p.employment_since && (
                           <span className="ml-1 text-xs text-gray-500">
-                            {dayjs(p.employment_since).format("D MMM YYYY")}
+                            {fmt(p.employment_since)}
                           </span>
                         )}
                       </td>
                       <td className="hidden px-4 py-3 text-gray-500 lg:table-cell">
-                        {p.last_login
-                          ? dayjs(p.last_login).format("D MMM YYYY, HH:mm")
-                          : t("never")}
+                        {p.last_login ? fmtTime(p.last_login) : t("never")}
                       </td>
                     </tr>
                   );

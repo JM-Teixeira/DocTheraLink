@@ -7,6 +7,7 @@ import Page from "@/components/Common/Page";
 import { userChildProps } from "@/components/Common/UserColumns";
 import Error404 from "@/components/ErrorPages/404";
 import EmploymentTab from "@/components/Staff/EmploymentTab";
+import PreferencesTab from "@/components/Staff/PreferencesTab";
 import SkillsTab from "@/components/Staff/SkillsTab";
 import UserBanner from "@/components/Users/UserBanner";
 import UserSummaryTab from "@/components/Users/UserSummary";
@@ -16,9 +17,9 @@ import useAuthUser from "@/hooks/useAuthUser";
 
 import * as Notification from "@/Utils/Notifications";
 import { editUserPermissions } from "@/Utils/permissions";
-import { managesStaff } from "@/Utils/roles";
 import routes from "@/Utils/request/api";
 import useTanStackQueryInstead from "@/Utils/request/useQuery";
+import { managesStaff } from "@/Utils/roles";
 import { classNames, formatName, keysOf } from "@/Utils/utils";
 
 export interface UserHomeProps {
@@ -72,6 +73,7 @@ export default function UserHome(props: UserHomeProps) {
     PROFILE: tabChildProp;
     SKILLS: tabChildProp;
     FACILITIES: tabChildProp;
+    PREFERENCES: tabChildProp;
   } = {
     PROFILE: { body: UserSummaryTab },
     SKILLS: { body: SkillsTab },
@@ -80,6 +82,11 @@ export default function UserHome(props: UserHomeProps) {
       body: EmploymentTab,
       hidden: !editPermissions && !managesStaff(authUser, userData),
     },
+    // Own display preferences (date format)
+    PREFERENCES: {
+      body: PreferencesTab,
+      hidden: !loggedInUser,
+    },
   };
 
   const normalizedTab = tab.toUpperCase();
@@ -87,7 +94,7 @@ export default function UserHome(props: UserHomeProps) {
     Object.keys(TABS).includes(tab as keyof typeof TABS);
   const currentTab = isValidTab(normalizedTab) ? normalizedTab : undefined;
 
-  if (!currentTab) {
+  if (!currentTab || TABS[currentTab].hidden) {
     return <Error404 />;
   }
 

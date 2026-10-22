@@ -380,7 +380,7 @@ function ItemRow({
                 count: it.in_use,
                 date: dayjs(it.oldest_open_at).format("D MMM"),
               })}
-              {it.open_expired && ` — ${t("discard_now")}`}
+              {it.open_expired && ` · ${t("discard_now")}`}
             </span>
           )}
         </p>

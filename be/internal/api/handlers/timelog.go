@@ -265,6 +265,18 @@ func (h *TimeLogHandler) GetMyLogs(c *gin.Context) {
 func (h *TimeLogHandler) GetUserLogs(c *gin.Context) {
 	userID := c.Param("id")
 
+	// Own logs, or the logs of someone you manage
+	a, ok := currentActor(c, database.GetDB())
+	if !ok {
+		return
+	}
+	var target models.User
+	if err := database.GetDB().Select("id", "home_facility_id").First(&target, "id = ?", userID).Error; err != nil ||
+		(target.ID != a.ID && !managesUser(a, &target)) {
+		notFound(c, "User")
+		return
+	}
+
 	var params models.TimeLogQueryParams
 	if err := c.ShouldBindQuery(&params); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{

@@ -243,6 +243,13 @@ button:disabled:focus,
 }
 
 @tailwind utilities;
+
+/* Native dropdowns: keep room for the arrow even when a px-* utility sets the
+   padding. Utilities are !important here (tailwind `important: true`), so
+   this is too; select:not() outranks a single class. */
+select:not([multiple]):not([size]) {
+    padding-right: 2.25rem !important;
+}
 .multiselect-dropdown__search-dropdown {
     max-height: 20rem;
     overflow: auto;

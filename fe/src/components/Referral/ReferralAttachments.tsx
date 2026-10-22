@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import {
   Download,
   FileImage,
@@ -32,6 +31,8 @@ import {
 } from "@/components/Referral/referralUtils";
 import { Referral } from "@/components/Referral/types";
 
+import useDateFormat from "@/hooks/useDateFormat";
+
 import * as Notification from "@/Utils/Notifications";
 import query, { callApi } from "@/Utils/request/query";
 
@@ -44,6 +45,7 @@ export default function ReferralAttachments({
   user: CurrentUser;
 }) {
   const { t } = useTranslation();
+  const { fmt } = useDateFormat();
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -118,7 +120,7 @@ export default function ReferralAttachments({
                     {formatBytes(a.size)}
                     {a.uploader &&
                       ` · ${a.uploader.first_name} ${a.uploader.last_name}`}
-                    {` · ${dayjs(a.created_date).format("D MMM YYYY")}`}
+                    {` · ${fmt(a.created_date)}`}
                   </p>
                 </div>
                 <Button

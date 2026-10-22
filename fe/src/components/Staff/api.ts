@@ -7,6 +7,7 @@ import {
 } from "@/components/Staff/types";
 import { UserModel } from "@/components/Users/models";
 
+import { DateFormat } from "@/Utils/dates";
 import { Type } from "@/Utils/request/api";
 import { PaginatedResponse } from "@/Utils/request/types";
 
@@ -47,6 +48,12 @@ const StaffRoutes = {
     path: "/api/v1/users/{username}/add_facility/",
     method: "PUT",
     TBody: Type<{ facility: string }>(),
+    TRes: Type<UserModel>(),
+  },
+  setPreferences: {
+    path: "/api/v1/users/{username}/preferences/",
+    method: "PATCH",
+    TBody: Type<{ date_format: DateFormat }>(),
     TRes: Type<UserModel>(),
   },
   setEmployment: {

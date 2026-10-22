@@ -47,6 +47,7 @@ be/                Go backend (Go module name: klyniva)
                    (CoveredBy → referral.WithCovers lets the cover read referrals)
       staff/       skills catalogue + user skills, home clinic, employment
                    status (active / on_leave / left → is_active false)
+    api/handlers/access.go  who may see/change users and clinics (legacy handlers; pure, tested)
     storage/       file Store interface (Local today, S3 later)
     mailer/        SMTP or log-only mailer (no patient data in e-mails)
     clinic/        which clinic a user works in (Resolver) — scope new data with it
@@ -168,6 +169,7 @@ make e2e-compose             # e2e API journeys against the compose stack
 make k8s-up                  # local Kubernetes (k3d) → http://localhost:8088
 make k8s-start               # after a reboot (or scripts/start-klyniva.cmd on Windows)
 make k8s-e2e                 # same e2e journeys against the cluster
+make e2e-browser             # Playwright browser journeys (e2e/browser) against the cluster
 make k8s-deploy | k8s-status | k8s-down
 ```
 The local cluster's kubeconfig is `~/.kube/klyniva.yaml` (context

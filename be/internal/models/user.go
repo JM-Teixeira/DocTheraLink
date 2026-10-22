@@ -72,6 +72,9 @@ type User struct {
 	EmploymentSince  *time.Time `json:"employment_since" gorm:"type:date"`
 	EmploymentNote   string     `json:"employment_note" gorm:"size:300"`
 
+	// How the person wants dates shown: dmy, mdy, ymd or long ("" = dmy).
+	DateFormat string `json:"date_format" gorm:"size:8"`
+
 	// Relationships
 	LocalBody    *LocalBody  `json:"local_body_object" gorm:"foreignKey:LocalBodyID"`
 	District     *District   `json:"district_object" gorm:"foreignKey:DistrictID"`

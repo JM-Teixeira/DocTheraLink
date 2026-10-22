@@ -23,10 +23,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import DateInput from "@/components/Common/DateInput";
 import { apiError } from "@/components/TimeBoard/BoardDialogs";
 import BoardRoutes from "@/components/TimeBoard/api";
 import { addDays, formatHour, today } from "@/components/TimeBoard/boardUtils";
 import { AbsenceReason, AbsenceResult } from "@/components/TimeBoard/types";
+
+import useDateFormat from "@/hooks/useDateFormat";
 
 import * as Notification from "@/Utils/Notifications";
 import query, { callApi } from "@/Utils/request/query";
@@ -52,6 +55,7 @@ export function AbsencesDialog({
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
+  const { fmt } = useDateFormat();
   const [creating, setCreating] = useState(false);
   const from = today();
   const { data: absences, refetch } = useQuery({
@@ -95,8 +99,7 @@ export function AbsencesDialog({
                     </span>
                     <span className="text-gray-600">
                       {t(`absence_reason__${a.reason}`)} ·{" "}
-                      {dayjs(a.from).format("D MMM")} –{" "}
-                      {dayjs(a.to).format("D MMM YYYY")}
+                      {dayjs(a.from).format("D MMM")} - {fmt(a.to)}
                     </span>
                     {a.cover && (
                       <span className="flex items-center gap-1 text-gray-600">
@@ -245,7 +248,7 @@ function NewAbsenceDialog({
               onChange={(e) => setTherapist(Number(e.target.value))}
               className={fieldClass}
             >
-              <option value={0}>—</option>
+              <option value={0}>-</option>
               {physios.map((p) => (
                 <option key={p.id} value={p.id}>
                   {fullName(p)}
@@ -272,21 +275,11 @@ function NewAbsenceDialog({
           </label>
           <label className="text-sm font-medium text-gray-700">
             {t("from")}
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className={fieldClass}
-            />
+            <DateInput value={from} onChange={setFrom} className="mt-1" />
           </label>
           <label className="text-sm font-medium text-gray-700">
             {t("until")}
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className={fieldClass}
-            />
+            <DateInput value={to} onChange={setTo} className="mt-1" />
           </label>
           <fieldset className="sm:col-span-2">
             <legend className="text-sm font-medium text-gray-700">

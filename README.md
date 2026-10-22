@@ -52,7 +52,8 @@ same password `1234@1`:
 | `cm.enfermagem` | Teresa Gomes — enfermagem |
 | `cm.fisio7` | Rui Nogueira — **left the clinic** (kept on record; cannot sign in) |
 
-Climutua has three floors (gym on floor 1, rooms on 2, hydrotherapy on 3) and
+Climutua has three floors (gym and hydrotherapy on 1, rooms and electrotherapy
+on 2, neuro rehab on 3) and
 a planned holiday: Inês Moreira is away next week, covered by João Ribeiro,
 with handover notes per patient (time board → *Ausências*).
 
@@ -98,6 +99,7 @@ make test                 # Go unit tests + Vitest
 make test-be-integration  # PostgreSQL integration tests (Docker required)
 make check                # everything CI runs except image builds
 make e2e-compose          # end-to-end API journeys against the running compose stack
+make e2e-browser          # browser journeys (Playwright) against the local cluster
 ```
 
 Every change needs tests — see the testing policy at the top of [TODO.md](TODO.md).

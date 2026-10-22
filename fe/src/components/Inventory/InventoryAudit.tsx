@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 
+import DateInput from "@/components/Common/DateInput";
 import InventoryRoutes from "@/components/Inventory/api";
 import {
   auditTotals,
@@ -67,21 +68,11 @@ export default function InventoryAudit() {
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-3 text-sm shadow-sm">
         <label className="flex flex-col gap-1 text-xs text-gray-600">
           {t("from")}
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className={fieldClass}
-          />
+          <DateInput value={from} onChange={setFrom} className="w-40" />
         </label>
         <label className="flex flex-col gap-1 text-xs text-gray-600">
           {t("until")}
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className={fieldClass}
-          />
+          <DateInput value={to} onChange={setTo} className="w-40" />
         </label>
         <label className="flex flex-col gap-1 text-xs text-gray-600">
           {t("person")}
@@ -195,7 +186,7 @@ export default function InventoryAudit() {
                     {dayjs(m.created_date).format("D MMM, HH:mm")}
                   </td>
                   <td className="p-3">
-                    {m.user ? `${m.user.first_name} ${m.user.last_name}` : "—"}
+                    {m.user ? `${m.user.first_name} ${m.user.last_name}` : "-"}
                   </td>
                   <td className="p-3">{m.item?.name}</td>
                   <td className="p-3">

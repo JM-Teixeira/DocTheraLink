@@ -1,5 +1,4 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import { Package, PackageOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -29,6 +28,8 @@ import {
 } from "@/components/Inventory/types";
 import BoardRoutes from "@/components/TimeBoard/api";
 import { DIVISION_COLORS } from "@/components/TimeBoard/boardUtils";
+
+import useDateFormat from "@/hooks/useDateFormat";
 
 import * as Notification from "@/Utils/Notifications";
 import query, { callApi } from "@/Utils/request/query";
@@ -480,6 +481,7 @@ export function HistoryDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const { fmtTime } = useDateFormat();
   const { data: moves, isLoading } = useQuery({
     queryKey: ["stock-history", item?.id],
     queryFn: query(InventoryRoutes.history, {
@@ -529,7 +531,7 @@ export function HistoryDialog({
                     {m.user
                       ? `${m.user.first_name} ${m.user.last_name} · `
                       : ""}
-                    {dayjs(m.created_date).format("D MMM YYYY, HH:mm")}
+                    {fmtTime(m.created_date)}
                   </p>
                 </div>
                 <span className="text-xs text-gray-500">

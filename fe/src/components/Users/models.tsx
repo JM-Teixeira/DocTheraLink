@@ -57,6 +57,7 @@ export type UserModel = UserBareMinimum & {
   employment_status?: "active" | "on_leave" | "left";
   employment_since?: string | null;
   employment_note?: string;
+  date_format?: "dmy" | "mdy" | "ymd" | "long" | "";
 };
 
 export type UserBaseModel = {

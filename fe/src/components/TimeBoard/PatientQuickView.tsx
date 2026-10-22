@@ -30,6 +30,7 @@ import BoardRoutes from "@/components/TimeBoard/api";
 import { CARE_LEVEL_STYLES } from "@/components/TimeBoard/boardUtils";
 
 import useAuthUser from "@/hooks/useAuthUser";
+import useDateFormat from "@/hooks/useDateFormat";
 
 import query from "@/Utils/request/query";
 
@@ -53,6 +54,7 @@ export default function PatientQuickView({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const { fmt } = useDateFormat();
   const user = useAuthUser();
   const { data: patient } = useQuery({
     queryKey: ["patient", patientId],
@@ -106,7 +108,7 @@ export default function PatientQuickView({
               {age !== null ? t("age_years", { age }) : t("age_unknown")}
             </span>
             {patient?.date_of_birth && (
-              <span>{dayjs(patient.date_of_birth).format("D MMM YYYY")}</span>
+              <span>{fmt(patient.date_of_birth)}</span>
             )}
             {patient?.phone_number && (
               <span className="flex items-center gap-1">
@@ -139,7 +141,7 @@ export default function PatientQuickView({
               })}
             </h3>
             <p className="text-xs text-amber-800">
-              {dayjs(h.absence.from).format("D MMM")} –{" "}
+              {dayjs(h.absence.from).format("D MMM")} -{" "}
               {dayjs(h.absence.to).format("D MMM")}
               {h.absence.cover &&
                 ` · ${t("covered_by", { name: `${h.absence.cover.first_name} ${h.absence.cover.last_name}` })}`}

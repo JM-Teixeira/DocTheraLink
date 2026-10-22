@@ -27,8 +27,8 @@ describe("notification helpers", () => {
     expect(
       notificationText({ ...base, actor_name: "", patient_name: "" }).params,
     ).toEqual({
-      actor: "—",
-      patient: "—",
+      actor: "-",
+      patient: "-",
     });
   });
 

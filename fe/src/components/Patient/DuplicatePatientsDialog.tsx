@@ -1,4 +1,3 @@
-import dayjs from "dayjs";
 import { TriangleAlert, UserRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -13,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 
 import { PossibleDuplicate } from "@/components/Patient/patientFormUtils";
+
+import useDateFormat from "@/hooks/useDateFormat";
 
 /**
  * Shown when the backend answers 409 duplicate_patient. Same NIF / SNS number
@@ -37,6 +38,7 @@ export default function DuplicatePatientsDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const { fmt } = useDateFormat();
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg">
@@ -64,9 +66,7 @@ export default function DuplicatePatientsDialog({
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-gray-900">{m.name}</p>
                 <p className="text-xs text-gray-500">
-                  {m.date_of_birth
-                    ? dayjs(m.date_of_birth).format("D MMM YYYY")
-                    : t("age_unknown")}
+                  {m.date_of_birth ? fmt(m.date_of_birth) : t("age_unknown")}
                   {m.phone_number && ` · ${m.phone_number}`}
                 </p>
                 <p
