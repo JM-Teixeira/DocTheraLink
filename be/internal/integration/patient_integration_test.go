@@ -56,8 +56,8 @@ func TestPatientVisibility(t *testing.T) {
 	db := database.GetDB()
 	svc := patient.NewService(patient.NewGormRepository(db), clinic.NewGormResolver(db), nil)
 
-	doctor := userID(t, "doctor")
-	nurse := userID(t, "nurse")
+	doctor := userID(t, "de.john.smith")
+	nurse := userID(t, "de.mary.williams")
 	asPatientActor := func(a referral.Actor) patient.Actor { return patient.Actor{ID: a.ID, Role: a.Role} }
 
 	otherClinic := models.Facility{Name: "Other Clinic"}
@@ -134,7 +134,7 @@ func TestPatientDuplicatesOnPostgres(t *testing.T) {
 	ctx := context.Background()
 	db := database.GetDB()
 	svc := patient.NewService(patient.NewGormRepository(db), clinic.NewGormResolver(db), nil)
-	nurse := userID(t, "nurse")
+	nurse := userID(t, "de.mary.williams")
 	as := patient.Actor{ID: nurse.ID, Role: nurse.Role}
 	s := func(v string) *string { return &v }
 

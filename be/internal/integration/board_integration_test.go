@@ -23,7 +23,7 @@ func TestInventoryOnPostgres(t *testing.T) {
 	ctx := context.Background()
 	db := database.GetDB()
 	svc := inventory.NewService(inventory.NewGormRepository(db), clinic.NewGormResolver(db))
-	nurse := userID(t, "nurse")
+	nurse := userID(t, "de.mary.williams")
 	as := inventory.Actor{ID: nurse.ID, Role: nurse.Role}
 
 	seeded, err := svc.List(ctx, as, inventory.ListFilter{Status: "attention"})
@@ -72,9 +72,9 @@ func TestTimeBoardOnPostgres(t *testing.T) {
 	ctx := context.Background()
 	db := database.GetDB()
 	svc := schedule.NewService(schedule.NewGormRepository(db), clinic.NewGormResolver(db))
-	coord := userID(t, "coordinator")
+	coord := userID(t, "de.marta.ribeiro")
 	coordinator := schedule.Actor{ID: coord.ID, Role: coord.Role}
-	sarah := userID(t, "physiotherapist")
+	sarah := userID(t, "de.sarah.johnson")
 
 	// A Sunday far away: no seeded shifts
 	date := "2031-06-01"
@@ -186,7 +186,7 @@ func TestTimeBoardOnPostgres(t *testing.T) {
 	if gym.CreditLimit != schedule.DefaultCreditLimit {
 		t.Fatalf("gym credit limit: %+v", gym)
 	}
-	tiago := userID(t, "physiotherapist2")
+	tiago := userID(t, "de.tiago.martins")
 	if _, err := svc.SaveShift(ctx, coordinator, "", schedule.ShiftRequest{
 		Date: date, StartHour: 14, EndHour: 16, TherapistID: tiago.ID, DivisionID: gym.ID,
 	}); err != nil {
