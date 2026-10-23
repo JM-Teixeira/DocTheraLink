@@ -67,7 +67,21 @@ func TestNoPrivilegeEscalation(t *testing.T) {
 	}
 	expect(t, "front desk gets no suggestions", rec.call("GET", "/users/username_suggestion/?first_name=A&last_name=B", nil, nil), 403)
 	anon := &client{t: t, base: baseURL(t)}
-	expect(t, "new user signs in", anon.call("POST", "/auth/login/", map[string]string{"username": username, "password": "Seguro#2026"}, nil), 200)
+	var tokens map[string]any
+	expect(t, "new user signs in", anon.call("POST", "/auth/login/", map[string]string{"username": username, "password": "Seguro#2026"}, &tokens), 200)
+	// First sign-in: only "who am I" and the password change work
+	newbie := &client{t: t, base: baseURL(t), token: tokens["access"].(string)}
+	var who map[string]any
+	expect(t, "who am I", newbie.call("GET", "/users/getcurrentuser/", nil, &who), 200)
+	if who["must_change_password"] != true {
+		t.Errorf("a new account must change its password: %v", who["must_change_password"])
+	}
+	expect(t, "blocked until the password changes", newbie.call("GET", "/patient/", nil, nil), 403)
+	change := map[string]any{"username": username, "old_password": "Seguro#2026", "new_password": "Seguro#2026"}
+	expect(t, "same password refused", newbie.call("PUT", "/password_change/", change, nil), 400)
+	change["new_password"] = "Proprio#2026"
+	expect(t, "own password", newbie.call("PUT", "/password_change/", change, nil), 200)
+	expect(t, "now the app opens", newbie.call("GET", "/patient/", nil, nil), 200)
 	expect(t, "coordinator deletes", coord.call("DELETE", "/users/"+username+"/", nil, nil), 403)
 	expect(t, "admin deletes", admin.call("DELETE", "/users/"+username+"/", nil, nil), 200)
 	expect(t, "admin cannot delete themself", admin.call("DELETE", "/users/admin.user/", nil, nil), 404)

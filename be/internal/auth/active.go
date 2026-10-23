@@ -1,55 +1,69 @@
 package auth
 
 import (
+	"strings"
 	"sync"
 	"time"
 )
 
-// ActiveChecker reports whether a user may still use the API (not left,
-// not deactivated). Set by the server at start; nil means no check (tests).
-var ActiveChecker func(userID uint) (bool, error)
+// AccountState is what the API checks on every request besides the token.
+type AccountState struct {
+	Active             bool // false: left or deactivated, the token no longer works
+	MustChangePassword bool // first sign-in: only the password change is allowed
+}
 
-// activeCacheTTL bounds how long a deactivated user keeps access with a
-// token issued before: at most this long after the change.
-const activeCacheTTL = 30 * time.Second
+// AccountChecker reads a user's AccountState. Set by the server at start;
+// nil means no check (tests).
+var AccountChecker func(userID uint) (AccountState, error)
 
-type activeEntry struct {
-	active bool
-	until  time.Time
+// accountCacheTTL bounds how long a change takes to reach a token issued
+// before it: at most this long (ForgetAccount makes it immediate).
+const accountCacheTTL = 30 * time.Second
+
+type accountEntry struct {
+	state AccountState
+	until time.Time
 }
 
 var (
-	activeMu    sync.Mutex
-	activeCache = map[uint]activeEntry{}
-	nowFunc     = time.Now
+	accountMu    sync.Mutex
+	accountCache = map[uint]accountEntry{}
+	nowFunc      = time.Now
 )
 
-// userActive asks ActiveChecker, remembering answers for activeCacheTTL.
+// accountState asks AccountChecker, remembering answers for accountCacheTTL.
 // A failed check lets the request through (the database being down fails
 // the request anyway) rather than signing everyone out.
-func userActive(id uint) bool {
-	if ActiveChecker == nil {
-		return true
+func accountState(id uint) AccountState {
+	if AccountChecker == nil {
+		return AccountState{Active: true}
 	}
-	activeMu.Lock()
-	e, ok := activeCache[id]
-	activeMu.Unlock()
+	accountMu.Lock()
+	e, ok := accountCache[id]
+	accountMu.Unlock()
 	if ok && nowFunc().Before(e.until) {
-		return e.active
+		return e.state
 	}
-	active, err := ActiveChecker(id)
+	state, err := AccountChecker(id)
 	if err != nil {
-		return true
+		return AccountState{Active: true}
 	}
-	activeMu.Lock()
-	activeCache[id] = activeEntry{active: active, until: nowFunc().Add(activeCacheTTL)}
-	activeMu.Unlock()
-	return active
+	accountMu.Lock()
+	accountCache[id] = accountEntry{state: state, until: nowFunc().Add(accountCacheTTL)}
+	accountMu.Unlock()
+	return state
 }
 
-// ForgetActive drops the cached answer for a user (call after changing their status).
-func ForgetActive(id uint) {
-	activeMu.Lock()
-	delete(activeCache, id)
-	activeMu.Unlock()
+// ForgetAccount drops the cached state of a user (call after changing their
+// status or password).
+func ForgetAccount(id uint) {
+	accountMu.Lock()
+	delete(accountCache, id)
+	accountMu.Unlock()
+}
+
+// allowedBeforePasswordChange: what a person who must change their password
+// may still call (who am I, change it).
+func allowedBeforePasswordChange(path string) bool {
+	return strings.HasSuffix(path, "/users/getcurrentuser/") || strings.HasSuffix(path, "/password_change/")
 }

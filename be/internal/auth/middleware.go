@@ -63,11 +63,22 @@ func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 			return
 		}
 
-		// Someone who left (or was deactivated) loses access within activeCacheTTL
-		if !userActive(payload.UserID) {
+		// Someone who left (or was deactivated) loses access within accountCacheTTL
+		state := accountState(payload.UserID)
+		if !state.Active {
 			ctx.JSON(http.StatusUnauthorized, models.ErrorResponse{
 				Error:   "account_inactive",
 				Message: "This account is no longer active",
+			})
+			ctx.Abort()
+			return
+		}
+
+		// First sign-in: nothing but the password change until it is done
+		if state.MustChangePassword && !allowedBeforePasswordChange(ctx.Request.URL.Path) {
+			ctx.JSON(http.StatusForbidden, models.ErrorResponse{
+				Error:   "password_change_required",
+				Message: "Change your password before using the app",
 			})
 			ctx.Abort()
 			return

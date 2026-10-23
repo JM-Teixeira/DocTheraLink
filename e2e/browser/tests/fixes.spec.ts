@@ -78,10 +78,11 @@ test("the ? next to the title explains the page in a pop-up", async ({ page, req
   await page.keyboard.press("Escape");
   await expect(page.getByText("Como funciona o uso por sessão?")).toHaveCount(0);
 
-  // Referrals: the "how it works" box is the only help and covers the page
+  // Referrals: the same "?" by the title; its pop-up has the four steps
   await page.goto("/referrals");
-  await expect(page.getByRole("button", { name: /^Ajuda:/ })).toHaveCount(0);
-  await expect(page.getByText(/Nesta página:/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Ajuda:/ })).toHaveCount(1);
+  await page.getByRole("button", { name: /^Ajuda:/ }).click();
+  await expect(page.getByRole("dialog").getByText("O fisioterapeuta aceita")).toBeVisible();
 });
 
 test("an admin views the app as a physio of Climutua, read-only, and comes back", async ({ page, request }) => {
@@ -134,4 +135,32 @@ test("an admin chooses which clinic's time board to see", async ({ page, request
   await clinic.selectOption({ label: "Klyniva Demo Clinic" });
   await expect(page.getByText("Sarah Johnson").first()).toBeVisible();
   await expect(page.getByText("Inês Moreira")).toHaveCount(0);
+});
+
+test("a new account chooses its own password at the first sign-in", async ({ page, request }) => {
+  const coordTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "cm.ana.ferreira", password: PASSWORD } })).json()).access;
+  const tag = stamp().replace(/\d/g, (d) => "abcdefghij"[Number(d)]);
+  const res = await api(request, coordTok, "POST", "/users/add_user/", {
+    first_name: "Novo", last_name: `Primeiro${tag}`, email: `novo.${tag}@example.test`,
+    user_type: "Nurse", password: "Dada#2026",
+  });
+  const username = (await res.json()).username as string;
+  const adminTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "admin.user", password: PASSWORD } })).json()).access;
+  try {
+    const login = await (await request.post("/api/v1/auth/login/", { data: { username, password: "Dada#2026" } })).json();
+    await page.addInitScript(([a, r]) => {
+      localStorage.setItem("care_access_token", a);
+      localStorage.setItem("care_refresh_token", r);
+      localStorage.setItem("i18nextLng", "pt");
+    }, [login.access, login.refresh]);
+    await page.goto("/patients");
+    await expect(page.getByRole("heading", { name: "Escolha a sua palavra-passe" })).toBeVisible();
+    await page.getByLabel("Palavra-passe atual").fill("Dada#2026");
+    await page.getByLabel("Nova palavra-passe").fill("Minha#2026");
+    await page.getByLabel(/^Confirmar palavra-passe/i).fill("Minha#2026");
+    await page.getByRole("button", { name: "Guardar e continuar" }).click();
+    await expect(page.getByRole("heading", { name: "Utentes" })).toBeVisible();
+  } finally {
+    await api(request, adminTok, "DELETE", `/users/${username}/`);
+  }
 });

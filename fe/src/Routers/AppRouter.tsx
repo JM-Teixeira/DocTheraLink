@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import IconIndex from "@/CAREUI/icons/Index";
 
+import ForcePasswordChange from "@/components/Auth/ForcePasswordChange";
 import {
   DesktopSidebar,
   MobileSidebar,
@@ -16,6 +17,7 @@ import SessionExpired from "@/components/ErrorPages/SessionExpired";
 import HomePage from "@/components/Home/HomePage";
 
 import useApplySettings from "@/hooks/useApplySettings";
+import useAuthUser from "@/hooks/useAuthUser";
 import { usePluginRoutes } from "@/hooks/useCareApps";
 
 import { BLACKLISTED_PATHS } from "@/common/constants";
@@ -59,6 +61,7 @@ const Routes: AppRoutes = {
 };
 
 export default function AppRouter() {
+  const user = useAuthUser();
   const pluginRoutes = usePluginRoutes();
 
   let routes = Routes;
@@ -101,6 +104,9 @@ export default function AppRouter() {
       shrinked ? "true" : "false",
     );
   }, [shrinked]);
+
+  // First sign-in: choose a password before anything else
+  if (user.must_change_password) return <ForcePasswordChange />;
 
   return (
     <SidebarShrinkContext.Provider value={{ shrinked, setShrinked }}>

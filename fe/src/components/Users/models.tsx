@@ -58,6 +58,8 @@ export type UserModel = UserBareMinimum & {
   employment_since?: string | null;
   employment_note?: string;
   date_format?: "dmy" | "mdy" | "ymd" | "long" | "";
+  /** First sign-in of an account made by someone else */
+  must_change_password?: boolean;
   /** Settings page ("" = default) */
   theme?: string;
   text_size?: string;

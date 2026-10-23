@@ -18,14 +18,14 @@ describe("settings", () => {
 
   it("follows the computer for the system theme", () => {
     expect(appearanceClasses("system", "normal", true)).toEqual({
-      dark: true,
+      "theme-dark": true,
       "text-large": false,
     });
     expect(appearanceClasses("system", "large", false)).toEqual({
-      dark: false,
+      "theme-dark": false,
       "text-large": true,
     });
-    expect(appearanceClasses("dark", "normal", false).dark).toBe(true);
+    expect(appearanceClasses("dark", "normal", false)["theme-dark"]).toBe(true);
   });
 
   it("only goes to known start pages", () => {

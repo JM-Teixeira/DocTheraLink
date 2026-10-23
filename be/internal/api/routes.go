@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -24,6 +25,7 @@ import (
 	"klyniva/internal/version"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // SetupRoutes configures all API routes under /api/v1.
@@ -105,11 +107,14 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 
 	db := database.GetDB()
 
-	// Tokens of people who left or were deactivated stop working (auth.ActiveChecker)
-	auth.ActiveChecker = func(id uint) (bool, error) {
-		var active []bool
-		err := db.Model(&models.User{}).Where("id = ?", id).Pluck("is_active", &active).Error
-		return len(active) == 1 && active[0], err
+	// Every request: the account is still active, and has its own password
+	auth.AccountChecker = func(id uint) (auth.AccountState, error) {
+		var u models.User
+		err := db.Select("is_active", "must_change_password").Take(&u, id).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return auth.AccountState{}, nil // deleted account
+		}
+		return auth.AccountState{Active: u.IsActive, MustChangePassword: u.MustChangePassword}, err
 	}
 
 	// Patients (module)

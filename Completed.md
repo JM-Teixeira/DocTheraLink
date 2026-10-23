@@ -5,6 +5,21 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-23 · Klyniva 0.18.0 (branch `feat/m4-patients`)
+
+### Dark mode rebuilt, own password at first sign-in, one help button
+- Dark mode inverts the whole page and turns the colours back (green stays
+  green, contrast kept); pictures keep their colours. The class is
+  `theme-dark`, so the components' own `dark:` styles never mix in. Checked
+  on screenshots of referrals, patients, board and inventory.
+- Accounts made by an admin or coordinator must choose their own password
+  at the first sign-in (`must_change_password`). The server refuses every
+  other call until then (only "who am I" and the password change work);
+  the new password needs 8 characters and must differ from the given one.
+- Referrals use the same "?" by the title as every page; its pop-up has
+  the four-step explanation.
+- Removed 13 leftover test people from the local Climutua data.
+
 ## 2026-10-23 · Klyniva 0.17.2 (branch `feat/m4-patients`)
 
 ### Review fixes

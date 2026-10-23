@@ -76,6 +76,9 @@ type User struct {
 
 	// How the person wants dates shown: dmy, mdy, ymd or long ("" = dmy).
 	DateFormat string `json:"date_format" gorm:"size:8"`
+	// Set for accounts made by someone else: the person picks their own
+	// password at the first sign-in before using anything else
+	MustChangePassword bool `json:"must_change_password" gorm:"not null;default:false"`
 	// Settings page: theme light/dark/system, text size normal/large, the
 	// page opened after sign-in and the language ("" = defaults)
 	Theme     string `json:"theme" gorm:"size:8"`

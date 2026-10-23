@@ -44,7 +44,9 @@ export default function useApplySettings() {
       appearanceClasses(theme, textSize, systemDark),
     ))
       root.classList.toggle(cls, on);
-    root.style.colorScheme = root.classList.contains("dark") ? "dark" : "light";
+    root.style.colorScheme = root.classList.contains("theme-dark")
+      ? "dark"
+      : "light";
   }, [theme, textSize, systemDark]);
 
   useEffect(() => {

@@ -12,12 +12,10 @@ test("settings: dark theme, large text and the start page", async ({ page, reque
     await page.goto("/settings");
     const appearance = page.getByRole("region", { name: "Aparência" });
     await appearance.getByRole("radio", { name: "Escuro" }).click();
-    await expect(page.locator("html")).toHaveClass(/dark/);
-    // the page itself turns dark, not just the class (Tailwind runs with important)
-    const bg = await page.locator("#pages").evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(bg).toBe("rgb(15, 23, 42)");
-    const card = await appearance.evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(card).toBe("rgb(30, 41, 59)");
+    await expect(page.locator("html")).toHaveClass(/theme-dark/);
+    // the whole page is inverted (colours turned back), pictures are not
+    const filter = await page.evaluate(() => getComputedStyle(document.documentElement).filter);
+    expect(filter).toContain("invert(0.9)");
     await appearance.getByRole("radio", { name: "Grande" }).click();
     await expect(page.locator("html")).toHaveClass(/text-large/);
     await page.getByRole("region", { name: "Página inicial" }).getByRole("radio", { name: "Quadro horário" }).click();
@@ -28,7 +26,7 @@ test("settings: dark theme, large text and the start page", async ({ page, reque
     await signIn(fresh, request, "cm.pedro.almeida");
     await fresh.goto("/");
     await expect(fresh).toHaveURL(/\/time-board$/);
-    await expect(fresh.locator("html")).toHaveClass(/dark/);
+    await expect(fresh.locator("html")).toHaveClass(/theme-dark/);
     await fresh.close();
   } finally {
     await api(request, token, "PATCH", "/users/cm.pedro.almeida/preferences/", reset);

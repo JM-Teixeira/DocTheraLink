@@ -287,6 +287,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		UserType: req.UserType, HomeFacilityID: clinic, PhoneNumber: req.PhoneNumber,
 		Qualification: req.Qualification, StateID: req.StateID, DistrictID: req.DistrictID,
 		LocalBodyID: req.LocalBodyID, IsActive: true, EmploymentStatus: "active", Password: req.Password,
+		MustChangePassword: true, // they choose their own at the first sign-in
 	}
 	if req.Gender != nil && *req.Gender != "" {
 		g := models.GenderType(*req.Gender)

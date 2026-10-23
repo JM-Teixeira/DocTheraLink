@@ -1201,5 +1201,11 @@
   "n_with_free_slot_one": "1 utente em espera tem vaga disponível",
   "n_with_free_slot_other": "{{count}} utentes em espera têm vaga disponível",
   "n_with_free_slot_zero": "{{count}} utentes em espera têm vaga disponível",
-  "referral_help_page": "Nesta página: os fisioterapeutas veem as novas referenciações para aceitar e as que tratam; os médicos veem as que escreveram. Filtre por estado, prioridade, fisioterapeuta ou perguntas à espera da sua resposta. Abra uma referenciação para ver o plano de tratamento, as mensagens e os ficheiros."
+  "referral_help_page": "Nesta página: os fisioterapeutas veem as novas referenciações para aceitar e as que tratam; os médicos veem as que escreveram. Filtre por estado, prioridade, fisioterapeuta ou perguntas à espera da sua resposta. Abra uma referenciação para ver o plano de tratamento, as mensagens e os ficheiros.",
+  "choose_your_password": "Escolha a sua palavra-passe",
+  "choose_your_password_help": "A sua conta ({{username}}) foi criada por outra pessoa. Antes de usar o Klyniva, troque a palavra-passe que recebeu por uma que só você conhece.",
+  "password_must_differ": "A nova palavra-passe tem de ser diferente.",
+  "current_password_wrong": "A palavra-passe que recebeu não está correta.",
+  "password_change_failed": "Não foi possível alterar a palavra-passe.",
+  "save_new_password": "Guardar e continuar"
 }

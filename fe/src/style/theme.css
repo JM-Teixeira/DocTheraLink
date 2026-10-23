@@ -1,114 +1,39 @@
 /*
  * Dark theme and large text (Settings page, hooks/useApplySettings.ts).
  *
- * The pages use Tailwind's light grey/white utilities; under html.dark the
- * common ones are remapped here, so no page needs its own dark classes.
- * Add a utility here when a new light colour shows up in dark mode.
- * Tailwind runs with important: true, so every rule here is !important too.
+ * Dark: the whole page is inverted and its colours turned back
+ * (invert + hue-rotate 180deg), so light greys become dark greys while
+ * green stays green, red stays red, and every text keeps its contrast.
+ * Doing it once here means no page, badge or chart needs dark classes of
+ * its own. Photos and pictures are inverted back so they look normal.
+ *
+ * The class is "theme-dark" (not Tailwind's "dark"), so the dark: variants
+ * built into some components never mix with this.
  */
 
 html.text-large {
   font-size: 112.5% !important; /* every rem-based size grows */
 }
 
-html.dark body,
-html.dark .bg-gray-50,
-html.dark .bg-gray-100,
-html.dark #pages {
-  background-color: #0f172a !important;
-}
-html.dark .bg-white,
-html.dark .login-hero-form {
-  background-color: #1e293b !important;
-}
-html.dark .bg-gray-200,
-html.dark .hover\:bg-gray-50:hover,
-html.dark .hover\:bg-gray-100:hover,
-html.dark .hover\:bg-gray-200:hover {
-  background-color: #334155 !important;
+html.theme-dark {
+  background-color: #fff; /* becomes the dark background once inverted */
+  filter: invert(0.9) hue-rotate(180deg);
 }
 
-html.dark,
-html.dark body,
-html.dark .text-black,
-html.dark .text-gray-900 {
-  color: #f1f5f9 !important;
-}
-html.dark .text-gray-800 {
-  color: #e2e8f0 !important;
-}
-html.dark .text-gray-700 {
-  color: #cbd5e1 !important;
-}
-html.dark .text-gray-600,
-html.dark .text-gray-500 {
-  color: #94a3b8 !important;
+/* Pictures keep their real colours */
+html.theme-dark img,
+html.theme-dark video,
+html.theme-dark canvas,
+html.theme-dark picture,
+html.theme-dark [data-keep-colors] {
+  filter: invert(1) hue-rotate(180deg);
 }
 
-html.dark .border-gray-100,
-html.dark .border-gray-200,
-html.dark .divide-gray-100 > * + *,
-html.dark .border-gray-300 {
-  border-color: #334155 !important;
-}
-html.dark .ring-gray-200,
-html.dark .ring-gray-300 {
-  --tw-ring-color: #475569 !important;
-}
-
-html.dark input:not([type="checkbox"]):not([type="radio"]),
-html.dark select,
-html.dark textarea {
-  background-color: #0f172a !important;
-  color: #f1f5f9 !important;
-  border-color: #475569 !important;
-}
-html.dark input::placeholder,
-html.dark textarea::placeholder {
-  color: #64748b !important;
-}
-
-/* Light tints used for chips and callouts: same hue, dark background */
-html.dark .bg-primary-50 {
-  background-color: rgb(16 185 129 / 0.12) !important;
-}
-html.dark .bg-amber-50 {
-  background-color: rgb(245 158 11 / 0.12) !important;
-}
-html.dark .bg-rose-50 {
-  background-color: rgb(244 63 94 / 0.12) !important;
-}
-html.dark .bg-emerald-50 {
-  background-color: rgb(16 185 129 / 0.12) !important;
-}
-html.dark .text-primary-700,
-html.dark .text-primary-800,
-html.dark .text-primary-900 {
-  color: #6ee7b7 !important;
-}
-html.dark .text-amber-900,
-html.dark .text-amber-800 {
-  color: #fcd34d !important;
-}
-html.dark .text-rose-700,
-html.dark .text-rose-800 {
-  color: #fda4af !important;
-}
-
-/* App shell and the older screens use the "secondary" greys */
-html.dark .bg-secondary-50,
-html.dark .bg-secondary-100 {
-  background-color: #0f172a !important;
-}
-html.dark .bg-secondary-200 {
-  background-color: #334155 !important;
-}
-html.dark .text-secondary-900,
-html.dark .text-secondary-800,
-html.dark .text-secondary-700 {
-  color: #e2e8f0 !important;
-}
-html.dark .text-secondary-600,
-html.dark .text-secondary-500 {
-  color: #94a3b8 !important;
+/* Shadows would turn into glows: keep them subtle */
+html.theme-dark .shadow,
+html.theme-dark .shadow-sm,
+html.theme-dark .shadow-md,
+html.theme-dark .shadow-lg,
+html.theme-dark .shadow-xl {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06) !important;
 }

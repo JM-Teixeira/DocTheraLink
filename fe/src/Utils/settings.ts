@@ -34,7 +34,8 @@ export function appearanceClasses(
   systemDark: boolean,
 ) {
   return {
-    dark: isDark(theme, systemDark),
+    // not Tailwind's "dark": see style/theme.css
+    "theme-dark": isDark(theme, systemDark),
     "text-large": textSize === "large",
   };
 }
