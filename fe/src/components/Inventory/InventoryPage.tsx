@@ -205,6 +205,7 @@ export default function InventoryPage() {
   return (
     <Page
       help="inventory"
+      helpExtra={<PerSessionHelp open />}
       title={t("inventory")}
       options={
         canCreate && (
@@ -215,9 +216,6 @@ export default function InventoryPage() {
         )
       }
     >
-      <div className="mb-4 max-w-3xl">
-        <PerSessionHelp />
-      </div>
       {readOnly && (
         <p className="mb-4 max-w-3xl rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
           {t("stock_read_only")}

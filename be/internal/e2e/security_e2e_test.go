@@ -15,7 +15,7 @@ import (
 func TestNoPrivilegeEscalation(t *testing.T) {
 	rec, _ := login(t, "de.rita.lopes")
 	coord, _ := login(t, "de.marta.ribeiro")
-	admin, _ := login(t, "paula.neves")
+	admin, _ := login(t, "admin.user")
 
 	for name, body := range map[string]map[string]any{
 		"own role":      {"user_type": "StateAdmin"},
@@ -70,7 +70,7 @@ func TestNoPrivilegeEscalation(t *testing.T) {
 	expect(t, "new user signs in", anon.call("POST", "/auth/login/", map[string]string{"username": username, "password": "Seguro#2026"}, nil), 200)
 	expect(t, "coordinator deletes", coord.call("DELETE", "/users/"+username+"/", nil, nil), 403)
 	expect(t, "admin deletes", admin.call("DELETE", "/users/"+username+"/", nil, nil), 200)
-	expect(t, "admin cannot delete themself", admin.call("DELETE", "/users/paula.neves/", nil, nil), 404)
+	expect(t, "admin cannot delete themself", admin.call("DELETE", "/users/admin.user/", nil, nil), 404)
 }
 
 // TestClinicIsolation: people, clinics, skills and time logs of another
@@ -131,7 +131,7 @@ func TestDatePreference(t *testing.T) {
 // TestClinicCodes: a new clinic needs a free 2-4 letter code; once set it
 // cannot change (usernames use it).
 func TestClinicCodes(t *testing.T) {
-	admin, _ := login(t, "paula.neves")
+	admin, _ := login(t, "admin.user")
 	coord, _ := login(t, "cm.ana.ferreira")
 	clinic := func(code string) map[string]any {
 		return map[string]any{"name": "Clínica E2E " + code, "facility_type": 1, "address": "Rua X", "code": code}

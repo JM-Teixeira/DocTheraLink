@@ -17,7 +17,8 @@ const (
 // (internal/usernames, 0.12) to the standard ones. Databases seeded by older
 // versions are renamed in place, so nothing is duplicated.
 var renamedUsers = map[string]string{
-	"stateadmin":          "paula.neves",
+	"stateadmin":          "admin.user",
+	"paula.neves":         "admin.user", // 0.12 to 0.17
 	"districtadmin":       "jorge.matos",
 	"facilitycoordinator": "luis.pereira",
 	"doctor":              "de.john.smith",

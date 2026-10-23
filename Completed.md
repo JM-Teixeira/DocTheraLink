@@ -5,6 +5,24 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-23 · Klyniva 0.17.2 (branch `feat/m4-patients`)
+
+### Review fixes
+- The treatment plan also shows in the patient pop-up of the time board.
+- Dark mode now darkens the pages: Tailwind runs with `important: true`, so
+  the dark rules (`style/theme.css`) are `!important` too; a browser test
+  checks the real colours.
+- The demo administrator is `admin.user` ("Administrador", no personal
+  name); older databases are renamed in place.
+- The "?" sits next to the page title.
+- One help per page: inventory's per-session example is inside its "?";
+  referrals keep only the "how it works" box, which now also explains the
+  page.
+- Admins choose which clinic's time board to see ("Clínica" on the board;
+  sent as `X-Clinic`, honoured only for admins, full rights on that clinic).
+- Tests clean up the people they add, and look people up instead of
+  relying on the first page.
+
 ## 2026-10-22 · Klyniva 0.17.1 (branch `feat/m4-patients`)
 
 ### Clean-up, documentation, hosting plan (batch 3, part H)

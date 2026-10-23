@@ -81,6 +81,8 @@ test("stock permissions: the coordinator gives Pedro floor 2, Pedro can then res
 
     // The coordinator adds "floor 2, every category" from the people list
     await page.goto("/users");
+    // other tests add people; find Pedro rather than rely on the first page
+    await page.getByLabel("Pesquisar pessoas").fill("Pedro Almeida");
     await page.getByRole("button", { name: "Permissões de inventário · Pedro Almeida" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Adicionar regra" }).click();
@@ -115,9 +117,9 @@ test("inventory filters: single-use vs containers, and by floor", async ({ page,
   await page.getByRole("group", { name: "Piso" }).getByRole("button", { name: "Piso 1", exact: true }).click();
   await expect(page.locator("li", { hasText: "Toucas de natação" })).toBeVisible();
   await expect(page.locator("li", { hasText: "Elétrodos para TENS" })).toHaveCount(0);
-  // The explanation of per-session use opens
-  await page.getByText("Como funciona o uso por sessão?").first().click();
-  await expect(page.getByText(/retira essa quantidade do stock sozinho/).first()).toBeVisible();
+  // The explanation of per-session use is in the page help
+  await page.getByRole("button", { name: "Ajuda: Inventário" }).click();
+  await expect(page.getByRole("dialog").getByText(/retira essa quantidade do stock sozinho/).first()).toBeVisible();
 });
 
 test("a missed session is justified or not, and the label says which", async ({ page, request }) => {
@@ -144,7 +146,7 @@ test("a missed session is justified or not, and the label says which", async ({ 
 });
 
 test("a clinic's people open as the people list filtered by clinic", async ({ page, request }) => {
-  await signIn(page, request, "paula.neves");
+  await signIn(page, request, "admin.user");
   await page.goto("/facility");
   await page.locator("a[href=\"/users?clinic=6b1f3c1e-5a8e-4c1d-9a0e-000000000002\"]").click();
   await expect(page).toHaveURL(/\/users\?clinic=6b1f3c1e-5a8e-4c1d-9a0e-000000000002$/);
@@ -157,7 +159,7 @@ test("a clinic's people open as the people list filtered by clinic", async ({ pa
 });
 
 test("clinics page: search and chips instead of advanced filters", async ({ page, request }) => {
-  await signIn(page, request, "paula.neves");
+  await signIn(page, request, "admin.user");
   await page.goto("/facility");
   await expect(page.getByRole("button", { name: /Filtros avançados|Advanced filters/ })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Pesquisar clínicas" }).fill("cedofeita");

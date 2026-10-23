@@ -21,6 +21,8 @@ interface PageProps extends PageTitleProps {
   hideTitleOnPage?: boolean;
   /** Topic of the "?" help pop-up next to the title (locale help__<topic>) */
   help?: string;
+  /** More help content shown in the same pop-up (e.g. a worked example) */
+  helpExtra?: React.ReactNode;
 }
 
 export default function Page(props: PageProps) {
@@ -56,12 +58,14 @@ export default function Page(props: PageProps) {
           onBackClick={props.onBackClick}
           isInsidePage={true}
           hideTitleOnPage={props.hideTitleOnPage}
+          titleAddon={
+            props.help && (
+              <PageHelp topic={props.help} title={props.title}>
+                {props.helpExtra}
+              </PageHelp>
+            )
+          }
         />
-        {props.help && (
-          <div className="md:mr-auto md:-ml-4">
-            <PageHelp topic={props.help} title={props.title} />
-          </div>
-        )}
         {props.options}
       </div>
       {props.children}

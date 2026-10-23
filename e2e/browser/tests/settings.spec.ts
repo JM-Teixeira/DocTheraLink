@@ -13,6 +13,11 @@ test("settings: dark theme, large text and the start page", async ({ page, reque
     const appearance = page.getByRole("region", { name: "Aparência" });
     await appearance.getByRole("radio", { name: "Escuro" }).click();
     await expect(page.locator("html")).toHaveClass(/dark/);
+    // the page itself turns dark, not just the class (Tailwind runs with important)
+    const bg = await page.locator("#pages").evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(bg).toBe("rgb(15, 23, 42)");
+    const card = await appearance.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(card).toBe("rgb(30, 41, 59)");
     await appearance.getByRole("radio", { name: "Grande" }).click();
     await expect(page.locator("html")).toHaveClass(/text-large/);
     await page.getByRole("region", { name: "Página inicial" }).getByRole("radio", { name: "Quadro horário" }).click();
@@ -44,7 +49,7 @@ test("suggestions: a physio sends one, the admin answers, the physio sees it", a
   await expect(mine.getByText("Nova", { exact: true })).toBeVisible();
 
   const admin = await browser.newPage();
-  await signIn(admin, request, "paula.neves");
+  await signIn(admin, request, "admin.user");
   await admin.goto("/suggestions");
   const item = admin.getByRole("listitem").filter({ hasText: text });
   await item.getByLabel("Resposta").fill("Boa ideia, fica planeada.");

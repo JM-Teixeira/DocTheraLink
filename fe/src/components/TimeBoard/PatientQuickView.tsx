@@ -23,6 +23,7 @@ import {
 
 import ReferralNotes from "@/components/Referral/ReferralNotes";
 import ReferralStatusBadge from "@/components/Referral/ReferralStatusBadge";
+import TreatmentPlanCard from "@/components/Referral/TreatmentPlan";
 import ReferralRoutes from "@/components/Referral/api";
 import { ageFromDob, fullName } from "@/components/Referral/referralUtils";
 import { Referral } from "@/components/Referral/types";
@@ -178,6 +179,13 @@ export default function PatientQuickView({
             )}
           </section>
         ))}
+
+        {/* What to do in the session: the plan of each open referral */}
+        {referrals?.results
+          .filter((r) => r.status === "accepted" || r.status === "in_progress")
+          .map((r) => (
+            <TreatmentPlanCard key={r.id} referralId={r.id} compact />
+          ))}
 
         {referral && (
           <section className="rounded-xl border border-gray-200 p-4">

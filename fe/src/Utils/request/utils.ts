@@ -5,6 +5,7 @@ import { LocalStorageKeys } from "@/common/constants";
 import * as Notification from "@/Utils/Notifications";
 import { QueryParams, RequestOptions } from "@/Utils/request/types";
 import { viewAsHeaders } from "@/Utils/viewAs";
+import { workingClinicHeaders } from "@/Utils/workingClinic";
 
 export function makeUrl(
   path: string,
@@ -63,9 +64,13 @@ export function makeHeaders(noAuth: boolean, additionalHeaders?: HeadersInit) {
   if (authorizationHeader && !noAuth) {
     headers.append("Authorization", authorizationHeader);
   }
-  // An admin viewing the app as a clinic role (read-only)
+  // An admin viewing the app as a clinic role (read-only), or working on one clinic
   if (!noAuth)
-    for (const [k, v] of Object.entries(viewAsHeaders())) headers.set(k, v);
+    for (const [k, v] of Object.entries({
+      ...workingClinicHeaders(),
+      ...viewAsHeaders(),
+    }))
+      headers.set(k, v);
 
   return headers;
 }

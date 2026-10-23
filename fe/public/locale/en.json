@@ -1828,6 +1828,7 @@
   "referral_create_failed": "Could not create the referral.",
   "referral_created": "Referral sent",
   "referral_help_intro": "A referral is how a doctor hands a patient over to physiotherapy, and how both sides follow the treatment until it ends.",
+  "referral_help_page": "On this page: physios see new referrals to accept and the ones they treat; doctors see the ones they wrote. Filter by status, priority, physio, or the questions waiting for your answer. Open a referral for its treatment plan, messages and files.",
   "referral_help_step__accept": "Physio accepts",
   "referral_help_step__accept_text": "It appears in the physiotherapists' inbox (with a notification). One accepts it, declines it, or it is handed over.",
   "referral_help_step__close": "Discharge",

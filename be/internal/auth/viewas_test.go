@@ -48,6 +48,29 @@ func TestViewAs(t *testing.T) {
 		t.Errorf("clinic override: %v", home)
 	}
 
+	// An admin working on a clinic: full rights, that clinic
+	gin.SetMode(gin.TestMode)
+	w2 := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(w2)
+	c2.Request = httptest.NewRequest(http.MethodPost, "/x", nil)
+	c2.Request.Header.Set(WorkingClinicHeader, viewClinic)
+	claims = admin()
+	if !applyViewAs(c2, claims) || claims.UserType != models.RoleStateAdmin {
+		t.Fatal("working clinic must not change the role or block writes")
+	}
+	if home, _ := clinic.NewGormResolver(nil).HomeClinic(c2.Request.Context(), 1); home == nil || *home != viewClinic {
+		t.Errorf("working clinic: %v", home)
+	}
+	// Ignored for everyone else
+	c3, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c3.Request = httptest.NewRequest(http.MethodGet, "/x", nil)
+	c3.Request.Header.Set(WorkingClinicHeader, viewClinic)
+	before := c3.Request.Context()
+	applyViewAs(c3, &models.TokenClaims{UserID: 7, UserType: models.RolePhysioTherapist})
+	if c3.Request.Context() != before {
+		t.Error("a physio cannot pick another clinic")
+	}
+
 	// Read-only, admins only, known roles only
 	cases := []struct {
 		method, role, clinic string

@@ -11,7 +11,7 @@ import (
 // author sees the answer.
 func TestSuggestions(t *testing.T) {
 	nurse, _ := login(t, "cm.teresa.gomes")
-	admin, _ := login(t, "paula.neves")
+	admin, _ := login(t, "admin.user")
 	text := "Sugestão e2e " + time.Now().Format("150405.000")
 	var s map[string]any
 	expect(t, "send", nurse.call("POST", "/suggestions/", map[string]any{"kind": "idea", "text": text}, &s), 201)

@@ -70,7 +70,7 @@ schedules, sessions, stock):
 `de.sarah.johnson` and `de.tiago.martins` (physios), `de.rita.lopes` (front
 desk), `de.marta.ribeiro` (coordinator), `de.mary.williams`, `de.nuno.dias`.
 
-**Administrator:** `paula.neves` (all clinics; user menu → "Ver como…" to see
+**Administrator:** `admin.user` (all clinics; user menu → "Ver como…" to see
 the app as any role).
 
 ### Use it from other laptops on the same network

@@ -14,7 +14,7 @@ import {
   Settings2,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
@@ -32,6 +32,7 @@ import {
 import DateInput from "@/components/Common/DateInput";
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
+import StaffRoutes from "@/components/Staff/api";
 import { AbsencesDialog } from "@/components/TimeBoard/AbsenceDialogs";
 import {
   CopyDayDialog,
@@ -80,7 +81,11 @@ import {
   Shift,
 } from "@/components/TimeBoard/types";
 
+import useAuthUser from "@/hooks/useAuthUser";
+
 import query, { callApi } from "@/Utils/request/query";
+import { isAdmin } from "@/Utils/roles";
+import { getWorkingClinic, setWorkingClinic } from "@/Utils/workingClinic";
 
 type Mode = "day" | "week" | "month" | "year";
 type DayView = "physio" | "division";
@@ -125,6 +130,24 @@ function periodLabel(mode: Mode, date: string) {
 export default function TimeBoardPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  // Admins belong to no clinic: they choose which clinic's board to see
+  const admin = isAdmin(useAuthUser());
+  const [workingClinic, setClinicState] = useState(getWorkingClinic);
+  const { data: clinics } = useQuery({
+    queryKey: ["staff-clinics"],
+    queryFn: query(StaffRoutes.clinics, { queryParams: { limit: 100 } }),
+    enabled: admin,
+  });
+  const chooseClinic = (id: string) => {
+    setWorkingClinic(id);
+    setClinicState(id);
+    queryClient.invalidateQueries(); // every answer was for the old clinic
+  };
+  useEffect(() => {
+    if (admin && !workingClinic && clinics?.results[0])
+      chooseClinic(clinics.results[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [admin, workingClinic, clinics]);
   const [date, setDate] = useState(today());
   // Bumped on every "Today" click: the views pulse today's cell
   const [todayFlash, setTodayFlash] = useState(0);
@@ -275,6 +298,20 @@ export default function TimeBoardPage() {
     >
       {/* Period navigation and mode */}
       <div className="mb-3 flex flex-wrap items-center gap-3">
+        {admin && (
+          <select
+            aria-label={t("clinic")}
+            value={workingClinic}
+            onChange={(e) => chooseClinic(e.target.value)}
+            className="h-9 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+          >
+            {clinics?.results.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="flex items-center gap-1">
           <Button
             size="icon"

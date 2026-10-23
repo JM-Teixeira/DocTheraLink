@@ -15,9 +15,12 @@ import (
 // the request then runs with that role and clinic, and only reads: anything
 // that changes data is refused, so looking around can never act as someone.
 const (
-	ViewAsRoleHeader   = "X-View-As-Role"
-	ViewAsClinicHeader = "X-View-As-Clinic"
-	viewAsContextKey   = "view_as"
+	// WorkingClinicHeader: the clinic an admin works on (the time board of
+	// that clinic); admins have no clinic of their own.
+	WorkingClinicHeader = "X-Clinic"
+	ViewAsRoleHeader    = "X-View-As-Role"
+	ViewAsClinicHeader  = "X-View-As-Clinic"
+	viewAsContextKey    = "view_as"
 )
 
 // ViewAsRoles are the roles an admin may view as.
@@ -38,6 +41,10 @@ type ViewAs struct {
 func applyViewAs(ctx *gin.Context, claims *models.TokenClaims) bool {
 	role := models.UserRole(ctx.GetHeader(ViewAsRoleHeader))
 	if role == "" {
+		// An admin working on one clinic (full rights, just that clinic)
+		if id := ctx.GetHeader(WorkingClinicHeader); id != "" && IsAdmin(claims.UserType) && uuid.Validate(id) == nil {
+			ctx.Request = ctx.Request.WithContext(clinic.WithViewAs(ctx.Request.Context(), claims.UserID, id))
+		}
 		return true
 	}
 	refuse := func(status int, code, msg string) bool {

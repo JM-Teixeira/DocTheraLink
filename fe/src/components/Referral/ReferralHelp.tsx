@@ -71,6 +71,10 @@ export default function ReferralHelp() {
               </li>
             ))}
           </ol>
+          {/* What the list itself offers (the only help on this page) */}
+          <p className="mt-3 text-sm text-gray-700">
+            {t("referral_help_page")}
+          </p>
         </div>
       )}
     </section>

@@ -187,7 +187,7 @@ The local cluster's kubeconfig is `~/.kube/klyniva.yaml` (context
 cloud clusters — never run kubectl against those from this project.
 Demo users (only when `SEED_DEMO_USERS=true`, never in release) follow the
 username standard `<clinic code>.<first>.<last>` (internal/usernames): demo
-clinic `de.*`, Climutua `cm.*`, admins `paula.neves`, `jorge.matos`,
+clinic `de.*`, Climutua `cm.*`, admins `admin.user`, `jorge.matos`,
 `luis.pereira`; password `1234@1`. Old names are renamed in place on seed
 (database/usernames_seed.go).
 

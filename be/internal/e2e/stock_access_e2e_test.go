@@ -72,7 +72,7 @@ func TestStockAccessByFloorAndCategory(t *testing.T) {
 
 // TestInventoryClinicFilter: admins look at one clinic at a time if they want.
 func TestInventoryClinicFilter(t *testing.T) {
-	admin, _ := login(t, "paula.neves")
+	admin, _ := login(t, "admin.user")
 	physio, _ := login(t, "de.sarah.johnson")
 	const climutua = "6b1f3c1e-5a8e-4c1d-9a0e-000000000002"
 	var all, one []map[string]any

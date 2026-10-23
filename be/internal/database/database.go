@@ -282,7 +282,8 @@ func seedDemoClinic() error {
 		inClinic              bool
 	}
 	users := []demoUser{
-		{"paula.neves", "Paula", "Neves", models.RoleStateAdmin, false},
+		// The organisation admin is an account, not a person (no name)
+		{"admin.user", "Administrador", "", models.RoleStateAdmin, false},
 		{"jorge.matos", "Jorge", "Matos", models.RoleDistrictAdmin, false},
 		{"luis.pereira", "Luís", "Pereira", models.RoleLocalBodyAdmin, false},
 		{"de.john.smith", "John", "Smith", models.RoleDoctor, true},

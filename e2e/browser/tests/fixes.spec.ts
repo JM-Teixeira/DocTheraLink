@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-import { signIn } from "./helpers";
+import { PASSWORD, api, signIn } from "./helpers";
 
 // Fixes from the 2026-10-22 review: admin stock items, login layout, spacing.
 
 const stamp = () => Date.now().toString().slice(-7);
 
 test("a state admin adds a stock item by choosing the clinic in the dialog", async ({ page, request }) => {
-  await signIn(page, request, "paula.neves");
+  await signIn(page, request, "admin.user");
   await page.goto("/inventory");
   await page.getByRole("button", { name: "Novo artigo" }).click();
   const dialog = page.getByRole("dialog");
@@ -37,7 +37,7 @@ test("the login title stays at the same height in Portuguese and English", async
 });
 
 test("page headers keep a gap above the first card (clinics)", async ({ page, request }) => {
-  await signIn(page, request, "paula.neves");
+  await signIn(page, request, "admin.user");
   await page.goto("/facility");
   const button = await page.getByRole("button", { name: "Nova clínica" }).boundingBox();
   const search = await page.getByPlaceholder("Nome ou morada").boundingBox();
@@ -59,6 +59,9 @@ test("the coordinator adds a person; the username follows the clinic standard", 
   await page.getByLabel(/^Confirmar palavra-passe/i).fill("Seguro#2026");
   await page.getByRole("button", { name: "Adicionar pessoa", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/users/cm\.joao\.${last.toLowerCase()}$`));
+  // leave Climutua as it was (only admins delete people)
+  const adminTok = (await (await request.post("/api/v1/auth/login/", { data: { username: "admin.user", password: PASSWORD } })).json()).access;
+  await api(request, adminTok, "DELETE", `/users/cm.joao.${last.toLowerCase()}/`);
 });
 
 test("the ? next to the title explains the page in a pop-up", async ({ page, request }) => {
@@ -70,10 +73,19 @@ test("the ? next to the title explains the page in a pop-up", async ({ page, req
   await expect(help.getByRole("heading", { name: "Inventário" })).toBeVisible();
   await expect(help.getByRole("listitem").first()).toBeVisible();
   await expect(help.getByText(/descartáveis/)).toBeVisible();
+  // one help per page: the per-session example lives inside it
+  await expect(help.getByText("Como funciona o uso por sessão?")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("Como funciona o uso por sessão?")).toHaveCount(0);
+
+  // Referrals: the "how it works" box is the only help and covers the page
+  await page.goto("/referrals");
+  await expect(page.getByRole("button", { name: /^Ajuda:/ })).toHaveCount(0);
+  await expect(page.getByText(/Nesta página:/)).toBeVisible();
 });
 
 test("an admin views the app as a physio of Climutua, read-only, and comes back", async ({ page, request }) => {
-  await signIn(page, request, "paula.neves");
+  await signIn(page, request, "admin.user");
   await page.goto("/");
   await expect(page.getByRole("link", { name: "Sugestões" })).toBeVisible(); // admin menu
   await page.locator("#user-profile-name").click();
@@ -111,4 +123,15 @@ test("people: who can change gloves on floor 1, and the work history at a glance
   const history = page.getByRole("list", { name: "Situação profissional" });
   await expect(history.getByText(/^Entrou a /)).toBeVisible();
   await expect(history.getByText("Saiu a 31/07/2026")).toBeVisible();
+});
+
+test("an admin chooses which clinic's time board to see", async ({ page, request }) => {
+  await signIn(page, request, "admin.user");
+  await page.goto("/time-board");
+  const clinic = page.getByLabel("Clínica", { exact: true });
+  await clinic.selectOption({ label: "Climutua · Medicina Física e Reabilitação" });
+  await expect(page.getByText("Inês Moreira").first()).toBeVisible();
+  await clinic.selectOption({ label: "Klyniva Demo Clinic" });
+  await expect(page.getByText("Sarah Johnson").first()).toBeVisible();
+  await expect(page.getByText("Inês Moreira")).toHaveCount(0);
 });

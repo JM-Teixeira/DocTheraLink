@@ -119,7 +119,7 @@ print_access() {
     de.sarah.johnson  Sarah Johnson (physio)
     de.rita.lopes     Rita Lopes (front desk)
     de.marta.ribeiro  Marta Ribeiro (coordinator)
-    paula.neves       administrator (all clinics)
+    admin.user       administrator (all clinics)
     cm.ana.ferreira   Climutua coordinator (more in README.md)
 
 INFO

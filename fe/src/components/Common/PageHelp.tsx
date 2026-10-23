@@ -39,9 +39,12 @@ export function helpBlocks(text: string) {
 export default function PageHelp({
   topic,
   title,
+  children,
 }: {
   topic: string;
   title: string;
+  /** Extra help after the text (one pop-up per page) */
+  children?: React.ReactNode;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -74,6 +77,7 @@ export default function PageHelp({
                 </ul>
               ),
             )}
+            {children}
           </div>
         </DialogContent>
       </Dialog>
