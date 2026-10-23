@@ -27,6 +27,9 @@ func NewGormResolver(db *gorm.DB) *GormResolver { return &GormResolver{db: db} }
 
 // HomeClinic returns the user's home clinic, or nil if unset/unknown user.
 func (g *GormResolver) HomeClinic(ctx context.Context, userID uint) (*string, error) {
+	if c, ok := viewAsClinic(ctx, userID); ok {
+		return c, nil
+	}
 	var row struct{ HomeFacilityID *string }
 	err := g.db.WithContext(ctx).Table("users").Select("home_facility_id").
 		Where("id = ?", userID).Take(&row).Error

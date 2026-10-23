@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Inbox, Plus, Search } from "lucide-react";
+import { CircleHelp, Inbox, Plus, Search, X } from "lucide-react";
 import { navigate } from "raviger";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,15 +8,20 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 
+import DateInput from "@/components/Common/DateInput";
+import { chipClass } from "@/components/Common/FilterChips";
 import Page from "@/components/Common/Page";
 import ReferralCard from "@/components/Referral/ReferralCard";
+import ReferralHelp from "@/components/Referral/ReferralHelp";
 import ReferralRoutes from "@/components/Referral/api";
 import {
   canCreateReferral,
+  isDoctor,
   isTherapist,
   sumCounts,
 } from "@/components/Referral/referralUtils";
 import { ReferralPriority, ReferralStatus } from "@/components/Referral/types";
+import StaffRoutes from "@/components/Staff/api";
 
 import useAuthUser from "@/hooks/useAuthUser";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
@@ -24,6 +29,8 @@ import useDebouncedValue from "@/hooks/useDebouncedValue";
 import query from "@/Utils/request/query";
 
 const PAGE_SIZE = 24;
+const selectClass =
+  "h-10 rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500";
 
 // "" means all statuses
 const FILTERS: Array<ReferralStatus | ""> = [
@@ -47,16 +54,46 @@ export default function ReferralList() {
   const [priority, setPriority] = useState<ReferralPriority | "">("");
   const [search, setSearch] = useState("");
   const term = useDebouncedValue(search.trim());
+  const [doctor, setDoctor] = useState("");
+  const [therapist, setTherapist] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  // Only referrals with questions waiting for me
+  const [waiting, setWaiting] = useState(false);
   const [page, setPage] = useState(0);
 
   // Any filter change goes back to the first page
-  useEffect(() => setPage(0), [status, priority, term]);
+  useEffect(
+    () => setPage(0),
+    [status, priority, term, doctor, therapist, from, to, waiting],
+  );
 
   // Shared by the list and the per-status counts
   const filters = {
     search: term || undefined,
     priority: priority || undefined,
+    doctor: doctor || undefined,
+    therapist: therapist || undefined,
+    from: from || undefined,
+    to: to || undefined,
+    open_questions: waiting || undefined,
   };
+  const anyFilter = Object.values(filters).some(Boolean);
+
+  // A doctor already sees only their referrals, a physio only their inbox
+  const pickDoctor = !isDoctor(user);
+  const pickTherapist = !isTherapist(user);
+  const people = (role: string, enabled: boolean) => ({
+    queryKey: ["staff", "by-role", role],
+    queryFn: query(StaffRoutes.list, {
+      queryParams: { user_type: role, limit: 100 },
+    }),
+    enabled,
+  });
+  const { data: doctors } = useQuery(people("Doctor", pickDoctor));
+  const { data: therapists } = useQuery(
+    people("PhysioTherapist", pickTherapist),
+  );
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["referrals", status, filters, page],
@@ -80,6 +117,8 @@ export default function ReferralList() {
 
   return (
     <Page
+      help="referrals"
+      helpExtra={<ReferralHelp />}
       title={isTherapist(user) ? t("referral_inbox") : t("referrals")}
       hideBack
       options={
@@ -123,6 +162,76 @@ export default function ReferralList() {
           <option value="urgent">{t("referral_priority__urgent")}</option>
           <option value="routine">{t("referral_priority__routine")}</option>
         </select>
+        {pickDoctor && (
+          <select
+            aria-label={t("referring_doctor")}
+            value={doctor}
+            onChange={(e) => setDoctor(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">{t("all_doctors")}</option>
+            {doctors?.results.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.first_name} {d.last_name}
+              </option>
+            ))}
+          </select>
+        )}
+        {pickTherapist && (
+          <select
+            aria-label={t("physiotherapist")}
+            value={therapist}
+            onChange={(e) => setTherapist(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">{t("all_physios")}</option>
+            {therapists?.results.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.first_name} {d.last_name}
+              </option>
+            ))}
+          </select>
+        )}
+        <label className="flex items-center gap-1.5 text-sm text-gray-600">
+          {t("from")}
+          <DateInput value={from} onChange={setFrom} className="w-40" />
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-gray-600">
+          {t("until")}
+          <DateInput
+            value={to}
+            min={from || undefined}
+            onChange={setTo}
+            className="w-40"
+          />
+        </label>
+        <button
+          type="button"
+          aria-pressed={waiting}
+          onClick={() => setWaiting((w) => !w)}
+          className={chipClass(waiting)}
+        >
+          <CircleHelp className="size-3.5" aria-hidden />
+          {t("questions_for_me")}
+        </button>
+        {anyFilter && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setPriority("");
+              setDoctor("");
+              setTherapist("");
+              setFrom("");
+              setTo("");
+              setWaiting(false);
+            }}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"
+          >
+            <X className="size-3.5" aria-hidden />
+            {t("clear_filters")}
+          </button>
+        )}
       </div>
 
       {/* Status filter chips with counts */}
@@ -149,7 +258,9 @@ export default function ReferralList() {
               <span
                 className={cn(
                   "ml-1.5 rounded-full px-1.5 text-xs tabular-nums",
-                  status === f ? "bg-white/20" : "bg-gray-100 text-gray-600",
+                  status === f
+                    ? "bg-white text-primary-700"
+                    : "bg-gray-100 text-gray-600",
                 )}
               >
                 {f ? (counts[f] ?? 0) : sumCounts(counts)}

@@ -1,4 +1,6 @@
-type QueryParamValue = string | number | boolean | null | undefined;
+type QueryParamScalar = string | number | boolean | null | undefined;
+// Arrays repeat the key: { care_level: [1, 2] } → care_level=1&care_level=2
+type QueryParamValue = QueryParamScalar | (string | number)[];
 
 export type QueryParams = Record<string, QueryParamValue>;
 
@@ -45,6 +47,17 @@ export interface APICallOptions<TBody = unknown> {
 }
 
 type HTTPErrorCause = Record<string, unknown> | undefined;
+
+/** The request never got an answer (offline, server unreachable). */
+export class NetworkError extends Error {
+  silent: boolean;
+
+  constructor(silent = false) {
+    super("Network Error");
+    this.name = "NetworkError";
+    this.silent = silent;
+  }
+}
 
 export class HTTPError extends Error {
   status: number;

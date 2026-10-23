@@ -233,6 +233,14 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
+	if len(req.NewPassword) < 8 || req.NewPassword == req.OldPassword {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "bad_request",
+			Message: "The new password needs at least 8 characters and must differ from the old one",
+		})
+		return
+	}
+
 	// Hash new password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), h.config.Security.BcryptCost)
 	if err != nil {
@@ -243,9 +251,10 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	// Update password
-	user.Password = string(hashedPassword)
-	if err := db.Save(&user).Error; err != nil {
+	// Update password (and the first-sign-in duty is done)
+	if err := db.Model(&user).Updates(map[string]any{
+		"password": string(hashedPassword), "must_change_password": false,
+	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "internal_error",
 			Message: "Failed to update password",
@@ -253,6 +262,7 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
+	auth.ForgetAccount(user.ID) // the app opens at once
 	c.JSON(http.StatusOK, models.SuccessResponse{
 		Message: "Password updated successfully",
 	})

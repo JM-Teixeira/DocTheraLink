@@ -15,9 +15,7 @@ import (
 	"strings"
 	"unicode"
 
-	"golang.org/x/text/runes"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
+	"klyniva/internal/textutil"
 )
 
 //go:embed icd10.json templates.json
@@ -101,7 +99,7 @@ func Load() (*Catalog, error) {
 		}
 		seen[k.Code] = true
 		c.keys = append(c.keys, codeKey(k.Code))
-		c.words = append(c.words, strings.FieldsFunc(fold(k.EN+" "+k.PT), notAlnum))
+		c.words = append(c.words, strings.FieldsFunc(textutil.Fold(k.EN+" "+k.PT), notAlnum))
 	}
 
 	keys := map[string]bool{}
@@ -149,7 +147,7 @@ func Lang(tag string) string {
 // "low back", "ombro"). Results come in the requested language, best match
 // first: exact code, code prefix, word prefixes, then substrings.
 func (c *Catalog) Search(query, lang string, limit int) []ICDResult {
-	q := fold(strings.TrimSpace(query))
+	q := textutil.Fold(strings.TrimSpace(query))
 	qKey := codeKey(query)
 	terms := strings.FieldsFunc(q, notAlnum)
 
@@ -225,16 +223,6 @@ func codeKey(s string) string {
 		return ""
 	}
 	return k
-}
-
-// fold lower-cases and strips accents ("Fasceíte" → "fasceite").
-func fold(s string) string {
-	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-	out, _, err := transform.String(t, s)
-	if err != nil {
-		out = s
-	}
-	return strings.ToLower(out)
 }
 
 func notAlnum(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }

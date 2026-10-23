@@ -342,3 +342,49 @@ func (h *Handler) reasonAction(c *gin.Context,
 	}
 	c.JSON(http.StatusOK, r)
 }
+
+// GetPlan godoc
+// @Summary Treatment plan of a referral (current, versions, may the viewer edit)
+// @Tags referrals
+// @Security BearerAuth
+// @Param id path string true "Referral ID"
+// @Success 200 {object} PlanView
+// @Router /referrals/{id}/plan/ [get]
+func (h *Handler) GetPlan(c *gin.Context) {
+	actor, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	v, err := h.svc.Plan(c.Request.Context(), actor, c.Param("id"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, v)
+}
+
+// SavePlan godoc
+// @Summary Save a new version of the treatment plan
+// @Tags referrals
+// @Security BearerAuth
+// @Param id path string true "Referral ID"
+// @Param plan body PlanRequest true "Steps"
+// @Success 200 {object} PlanView
+// @Router /referrals/{id}/plan/ [put]
+func (h *Handler) SavePlan(c *gin.Context) {
+	actor, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var req PlanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: err.Error()})
+		return
+	}
+	v, err := h.svc.SavePlan(c.Request.Context(), actor, c.Param("id"), req)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, v)
+}

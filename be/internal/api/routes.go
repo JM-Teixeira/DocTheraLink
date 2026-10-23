@@ -1,7 +1,9 @@
 package api
 
 import (
+	"errors"
 	"log"
+	"net/http"
 
 	"klyniva/internal/api/handlers"
 	"klyniva/internal/auth"
@@ -11,12 +13,19 @@ import (
 	"klyniva/internal/models"
 	"klyniva/internal/modules/attachment"
 	"klyniva/internal/modules/catalog"
+	"klyniva/internal/modules/feedback"
+	"klyniva/internal/modules/inventory"
 	"klyniva/internal/modules/notification"
 	"klyniva/internal/modules/patient"
 	"klyniva/internal/modules/referral"
+	"klyniva/internal/modules/schedule"
+	"klyniva/internal/modules/staff"
+	"klyniva/internal/modules/timeline"
 	"klyniva/internal/storage"
+	"klyniva/internal/version"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // SetupRoutes configures all API routes under /api/v1.
@@ -28,11 +37,14 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	facilityHandler := handlers.NewFacilityHandler(cfg)
 	patientHandler := handlers.NewPatientHandler(cfg)
 	timeLogHandler := handlers.NewTimeLogHandler(cfg)
-	timetableHandler := handlers.NewTimetableHandler(cfg)
 
 	// Public routes (no authentication required)
 	public := router.Group("")
 	{
+		// Release number (shown in the app next to the frontend version)
+		public.GET("/version/", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"version": version.Version})
+		})
 		authRoutes := public.Group("/auth")
 		authRoutes.POST("/login/", authHandler.Login)
 		authRoutes.POST("/token/refresh/", authHandler.RefreshToken)
@@ -51,26 +63,20 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	users := protected.Group("/users")
 	users.GET("/", userHandler.ListUsers)
 	users.POST("/", userHandler.CreateUser)
+	users.POST("/add_user/", userHandler.CreateUser) // path used by the frontend form
 	users.GET("/getcurrentuser/", userHandler.GetCurrentUser)
+	users.GET("/username_suggestion/", userHandler.UsernameSuggestion)
 	users.GET("/:username/", userHandler.GetUser)
 	users.PUT("/:username/", userHandler.UpdateUser)
 	users.PATCH("/:username/", userHandler.PartialUpdateUser)
 	users.DELETE("/:username/", userHandler.DeleteUser)
 	users.GET("/:username/check_availability/", userHandler.CheckUsername)
-	users.GET("/:username/skill/", userHandler.ListUserSkills)
-	users.POST("/:username/skill/", userHandler.AddUserSkill)
-	users.DELETE("/:username/skill/:id/", userHandler.DeleteUserSkill)
-	users.GET("/:username/get_facilities/", userHandler.ListUserFacilities)
-	users.PUT("/:username/add_facility/", userHandler.AddUserFacility)
-	users.DELETE("/:username/delete_facility/", userHandler.DeleteUserFacility)
-	users.DELETE("/:username/clear_home_facility/", userHandler.ClearHomeFacility)
 	users.PATCH("/:username/profile_picture/", userHandler.UpdateProfilePicture)
 	users.DELETE("/:username/profile_picture/", userHandler.DeleteProfilePicture)
 	users.GET("/:username/pnconfig/", userHandler.GetPNConfig)
 	users.PATCH("/:username/pnconfig/", userHandler.UpdatePNConfig)
 
 	protected.PUT("/password_change/", authHandler.UpdatePassword)
-	protected.GET("/skill/", userHandler.ListAllSkills)
 
 	// Facilities (a facility = a clinic; see CONTEXT.md "Clinics")
 	facilities := protected.Group("/facility")
@@ -81,23 +87,10 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	facilities.PATCH("/:id/", facilityHandler.PartialUpdateFacility)
 	facilities.DELETE("/:id/", facilityHandler.DeleteFacility)
 	facilities.GET("/:id/users/", facilityHandler.GetFacilityUsers)
-	// Inventory: still stubs (501), to be rebuilt as a module (TODO M5)
-	facilities.GET("/:id/inventory/", facilityHandler.GetInventoryLog)
-	facilities.POST("/:id/inventory/", facilityHandler.CreateInventory)
-	facilities.GET("/:id/min_quantity/", facilityHandler.GetMinQuantity)
-	facilities.POST("/:id/min_quantity/", facilityHandler.SetMinQuantity)
-	facilities.GET("/:id/min_quantity/:inventory_id/", facilityHandler.GetMinQuantityItem)
-	facilities.PATCH("/:id/min_quantity/:inventory_id/", facilityHandler.UpdateMinQuantity)
-	facilities.GET("/:id/inventorysummary/", facilityHandler.GetInventorySummary)
-	facilities.PUT("/:id/inventory/:inventory_id/flag/", facilityHandler.FlagInventoryItem)
-	facilities.DELETE("/:id/inventory/delete_last/", facilityHandler.DeleteLastInventoryLog)
-	// Timetable sections
-	facilities.GET("/:id/sections/", timetableHandler.ListSections)
-	facilities.POST("/:id/sections/", timetableHandler.CreateSection)
+	facilities.GET("/:id/get_users/", facilityHandler.GetFacilityUsers) // path used by the frontend
 
 	protected.GET("/getallfacilities/", facilityHandler.ListAllFacilities)
 	protected.GET("/getallfacilities/:id/", facilityHandler.GetAnyFacility)
-	protected.GET("/items/", facilityHandler.GetItems)
 
 	// Geographic reference data (Portuguese districts/municipalities)
 	protected.GET("/state/", facilityHandler.ListStates)
@@ -114,8 +107,18 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 
 	db := database.GetDB()
 
+	// Every request: the account is still active, and has its own password
+	auth.AccountChecker = func(id uint) (auth.AccountState, error) {
+		var u models.User
+		err := db.Select("is_active", "must_change_password").Take(&u, id).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return auth.AccountState{}, nil // deleted account
+		}
+		return auth.AccountState{Active: u.IsActive, MustChangePassword: u.MustChangePassword}, err
+	}
+
 	// Patients (module)
-	patient.RegisterRoutes(protected.Group("/patient"), db)
+	patients := patient.RegisterRoutes(protected.Group("/patient"), db)
 
 	// In-app + e-mail notifications (module); referrals publish events to it
 	notifications := notification.NewService(notification.NewGormRepository(db),
@@ -133,8 +136,8 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	if err != nil {
 		log.Fatalf("attachments: %v", err)
 	}
-	attachment.RegisterRoutes(protected, attachment.NewService(
-		attachment.NewGormRepository(db), uploads, referrals, cfg.Upload.MaxSize))
+	files := attachment.NewService(attachment.NewGormRepository(db), uploads, referrals, cfg.Upload.MaxSize)
+	attachment.RegisterRoutes(protected, files)
 
 	// Staff time log (clock in/out)
 	timelog := protected.Group("/timelog")
@@ -144,17 +147,23 @@ func SetupRoutes(router *gin.RouterGroup, jwtManager *auth.JWTManager, cfg *conf
 	timelog.GET("/status", timeLogHandler.GetCurrentStatus)
 	timelog.GET("/user/:id", timeLogHandler.GetUserLogs)
 
-	// Timetable
-	timetable := protected.Group("/timetable")
-	timetable.GET("/:id", timetableHandler.GetTimetable)
-	timetable.POST("/:id/slot", timetableHandler.CreateSlot)
-	timetable.PUT("/slot/:id", timetableHandler.UpdateSlot)
-	timetable.DELETE("/slot/:id", timetableHandler.DeleteSlot)
+	// Clinic consumables (stock, use, restock, low-stock alerts)
+	stock := inventory.RegisterRoutes(protected, db)
 
-	sections := protected.Group("/sections")
-	sections.GET("/:id", timetableHandler.GetSection)
-	sections.PUT("/:id", timetableHandler.UpdateSection)
-	sections.DELETE("/:id", timetableHandler.DeleteSection)
+	// Time board: divisions, physio shifts, patients per physio per hour
+	board := schedule.RegisterRoutes(protected, db, stock) // attended sessions use consumables
+	referrals.WithCovers(board)                            // cover physios see the referrals they cover
+
+	// Patient timeline: referrals, messages, files and sessions in one list
+	timeline.RegisterRoutes(protected, timeline.Services{
+		Patients: patients, Referrals: referrals, Files: files, Board: board,
+	})
+
+	// Suggestions about the app (everyone sends, admins read)
+	feedback.RegisterRoutes(protected, db)
+
+	// Skills, clinic and employment status of staff
+	staff.RegisterRoutes(protected, staff.NewService(staff.NewGormRepository(db)))
 
 	// Admin-only CSV exports
 	admin := protected.Group("")

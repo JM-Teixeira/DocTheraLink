@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
-import { Pencil, Phone, Stethoscope } from "lucide-react";
+import { AlertTriangle, Pencil, Phone, Stethoscope } from "lucide-react";
 import { navigate } from "raviger";
 import { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -9,20 +8,29 @@ import { Button } from "@/components/ui/button";
 
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
+import PatientConsents from "@/components/Patient/PatientConsents";
+import PatientTimeline from "@/components/Patient/PatientTimeline";
 import { usePatient } from "@/components/Patient/api";
-import { genderKey } from "@/components/Patient/patientFormUtils";
+import { formatId, genderKey } from "@/components/Patient/patientFormUtils";
 import ReferralCard from "@/components/Referral/ReferralCard";
+import TreatmentPlanCard from "@/components/Referral/TreatmentPlan";
 import ReferralRoutes from "@/components/Referral/api";
 import { canCreateReferral } from "@/components/Referral/referralUtils";
 
 import useAuthUser from "@/hooks/useAuthUser";
+import useDateFormat from "@/hooks/useDateFormat";
 
 import { ageFromDob, initials } from "@/Utils/person";
 import query from "@/Utils/request/query";
-import { canSeeReferrals, canWritePatients } from "@/Utils/roles";
+import {
+  canSeeReferrals,
+  canWritePatients,
+  isCoordinator,
+} from "@/Utils/roles";
 
 export default function PatientDetail({ id }: { id: string }) {
   const { t } = useTranslation();
+  const { fmt } = useDateFormat();
   const user = useAuthUser();
   const { data: patient, isLoading, isError } = usePatient(id);
 
@@ -32,7 +40,8 @@ export default function PatientDetail({ id }: { id: string }) {
     queryFn: query(ReferralRoutes.list, {
       queryParams: { patient: id, limit: 50 },
     }),
-    enabled: canSeeReferrals(user),
+    // coordinators too: they read the treatment plans when covering absences
+    enabled: canSeeReferrals(user) || isCoordinator(user),
   });
 
   if (isLoading) return <Loading />;
@@ -50,15 +59,14 @@ export default function PatientDetail({ id }: { id: string }) {
   const subtitle = [
     age !== null ? t("age_years", { age }) : null,
     patient.gender ? t(genderKey(patient.gender)) : null,
-    patient.date_of_birth
-      ? dayjs(patient.date_of_birth).format("D MMM YYYY")
-      : null,
+    patient.date_of_birth ? fmt(patient.date_of_birth) : null,
   ]
     .filter(Boolean)
     .join(" · ");
 
   return (
     <Page
+      help="patient"
       title={t("patient")}
       backUrl="/patients"
       crumbsReplacements={{ [id]: { name: patient.name ?? "" } }}
@@ -77,6 +85,16 @@ export default function PatientDetail({ id }: { id: string }) {
               <p className="text-sm text-gray-500">
                 {subtitle || t("age_unknown")}
               </p>
+              {!!patient.allergy_list?.length && (
+                <p className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2 py-0.5 text-sm font-medium text-rose-700 ring-1 ring-inset ring-rose-200">
+                  <AlertTriangle className="size-3.5" aria-hidden />
+                  {t("allergic_to", {
+                    list: patient.allergy_list
+                      .map((a) => a.substance)
+                      .join(", "),
+                  })}
+                </p>
+              )}
               {patient.phone_number && (
                 <a
                   href={`tel:${patient.phone_number}`}
@@ -113,28 +131,98 @@ export default function PatientDetail({ id }: { id: string }) {
         <div className="grid gap-6 lg:grid-cols-2">
           <Card title={t("contact")}>
             <Item label={t("phone")} value={patient.phone_number} />
+            <Item label={t("email")} value={patient.email} />
             <Item
-              label={t("emergency_phone")}
-              value={patient.emergency_phone_number}
+              label={t("address")}
+              value={[
+                patient.address,
+                [patient.postal_code, patient.city].filter(Boolean).join(" "),
+              ]
+                .filter(Boolean)
+                .join("\n")}
+              wide
             />
-            <Item label={t("address")} value={patient.address} wide />
+            <Item
+              label={t("emergency_contact")}
+              value={[
+                patient.emergency_contact_name,
+                patient.emergency_contact_relation &&
+                  `(${t(`relation__${patient.emergency_contact_relation}`)})`,
+                patient.emergency_phone_number,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              wide
+            />
             <Item label={t("nationality")} value={patient.nationality} />
+            <Item label={t("nif")} value={formatId(patient.nif)} />
+            <Item
+              label={t("sns_number")}
+              value={formatId(patient.sns_number)}
+            />
+            <Item
+              label={t("health_insurance")}
+              value={[patient.insurer, patient.insurance_number]
+                .filter(Boolean)
+                .join(" · ")}
+            />
           </Card>
           <Card title={t("clinical_background")}>
+            <Item
+              label={t("care_level")}
+              value={`${patient.care_level ?? 1} · ${t(`care_level_help__${patient.care_level ?? 1}`)}`}
+            />
             <Item label={t("blood_group")} value={patient.blood_group} />
-            <Item label={t("allergies")} value={patient.allergies} />
+            <ListItem
+              label={t("allergies")}
+              items={(patient.allergy_list ?? []).map((a) =>
+                [
+                  a.substance,
+                  a.reaction,
+                  a.severity && t(`severity__${a.severity}`),
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+              )}
+              note={patient.allergies}
+            />
+            <ListItem
+              label={t("conditions")}
+              items={(patient.condition_list ?? []).map((c) =>
+                c.since
+                  ? `${c.name} (${t("since_n", { year: c.since })})`
+                  : c.name,
+              )}
+            />
+            <ListItem
+              label={t("medications")}
+              items={(patient.medication_list ?? []).map((m) =>
+                [m.name, m.dose, m.frequency].filter(Boolean).join(" · "),
+              )}
+            />
             <Item
               label={t("medical_history")}
               value={patient.medical_history_details}
               wide
             />
             <Item
-              label={t("ongoing_medication")}
+              label={t("medication_notes")}
               value={patient.ongoing_medication}
               wide
             />
           </Card>
         </div>
+
+        {/* What is done in each session: lets a colleague covering the physio
+            carry on the same way */}
+        {referrals.data?.results
+          .filter((r) => r.status === "accepted" || r.status === "in_progress")
+          .map((r) => (
+            <div key={r.id}>
+              <p className="mb-1 text-xs text-gray-500">{r.diagnosis}</p>
+              <TreatmentPlanCard referralId={r.id} compact />
+            </div>
+          ))}
 
         {canSeeReferrals(user) && (
           <section>
@@ -156,6 +244,10 @@ export default function PatientDetail({ id }: { id: string }) {
             )}
           </section>
         )}
+
+        <PatientConsents patientId={id} canRecord={canWritePatients(user)} />
+
+        <PatientTimeline patientId={id} />
       </div>
     </Page>
   );
@@ -185,7 +277,38 @@ function Item({
         {label}
       </dt>
       <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-900">
-        {value || "—"}
+        {value || "-"}
+      </dd>
+    </div>
+  );
+}
+
+/** A structured list, one per line, with the free-text note below it. */
+function ListItem({
+  label,
+  items,
+  note,
+}: {
+  label: string;
+  items: string[];
+  note?: string | null;
+}) {
+  return (
+    <div className="sm:col-span-2">
+      <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        {label}
+      </dt>
+      <dd className="mt-0.5 text-sm text-gray-900">
+        {items.length ? (
+          <ul className="list-inside list-disc">
+            {items.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        ) : (
+          !note && "-"
+        )}
+        {note && <p className="whitespace-pre-wrap text-gray-700">{note}</p>}
       </dd>
     </div>
   );

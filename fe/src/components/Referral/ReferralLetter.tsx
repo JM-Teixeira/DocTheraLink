@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import { Printer } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -17,6 +16,8 @@ import {
   letterReference,
 } from "@/components/Referral/referralUtils";
 
+import useDateFormat from "@/hooks/useDateFormat";
+
 import { callApi } from "@/Utils/request/query";
 
 /** A4 sheet with the margins printers expect. */
@@ -32,6 +33,7 @@ const PRODUCT_NAME = "Klyniva";
  */
 export default function ReferralLetter({ id }: { id: string }) {
   const { t } = useTranslation();
+  const { fmt: fmtDate } = useDateFormat();
 
   const { data: referral, isLoading } = useQuery({
     queryKey: ["referral", id],
@@ -72,7 +74,7 @@ export default function ReferralLetter({ id }: { id: string }) {
     kind === "discharge" && referral.completed_at
       ? referral.completed_at
       : referral.created_date;
-  const fmt = (d?: string | null) => (d ? dayjs(d).format("D MMM YYYY") : "—");
+  const fmt = (d?: string | null) => fmtDate(d) || "-";
 
   const sheet = (
     <article className="mx-auto w-full max-w-[210mm] bg-white p-10 text-[13px] leading-relaxed text-gray-900 shadow-sm ring-1 ring-gray-200 print:p-0 print:shadow-none print:ring-0">
@@ -112,7 +114,7 @@ export default function ReferralLetter({ id }: { id: string }) {
             {age !== null && ` (${t("age_years", { age })})`}
           </Field>
           <Field label={t("phone_number")}>
-            {referral.patient?.phone_number || "—"}
+            {referral.patient?.phone_number || "-"}
           </Field>
         </dl>
       </LetterSection>
@@ -124,7 +126,7 @@ export default function ReferralLetter({ id }: { id: string }) {
             {referral.icd_code && ` (ICD-10 ${referral.icd_code})`}
           </Field>
           <Field label={t("recommended_sessions")}>
-            {referral.recommended_sessions ?? "—"}
+            {referral.recommended_sessions ?? "-"}
           </Field>
           <Field label={t("referral_reason")} full>
             {referral.reason}
@@ -149,9 +151,9 @@ export default function ReferralLetter({ id }: { id: string }) {
             <Field label={t("completed_on")}>
               {fmt(referral.completed_at)}
             </Field>
-            <Field label={t("physiotherapist")}>{therapist ?? "—"}</Field>
+            <Field label={t("physiotherapist")}>{therapist ?? "-"}</Field>
             <Field label={t("outcome_summary")} full>
-              {referral.outcome_summary || "—"}
+              {referral.outcome_summary || "-"}
             </Field>
           </dl>
         </LetterSection>

@@ -60,6 +60,8 @@ interface FacilityProps {
 type FacilityForm = {
   facility_type?: number;
   name: string;
+  /** 2-4 letters; prefixes the usernames of its people, fixed once set */
+  code: string;
   state: number;
   district: number;
   features: number[];
@@ -73,6 +75,7 @@ type FacilityForm = {
 const initForm: FacilityForm = {
   facility_type: undefined,
   name: "",
+  code: "",
   state: 0,
   district: 0,
   kasp_empanelled: "false",
@@ -112,7 +115,7 @@ const facilityCreateReducer = (state = initialState, action: FormAction) => {
  * @returns number if valid, undefined if empty or invalid
  */
 const convertCoordinate = (value: string): number | undefined => {
-  if (!value || value.trim() === '') {
+  if (!value || value.trim() === "") {
     return undefined;
   }
   const parsed = parseFloat(value);
@@ -162,8 +165,6 @@ export const FacilityCreate = (props: FacilityProps) => {
     prefetch: !!stateId,
   });
 
-
-
   const facilityQuery = useTanStackQueryInstead(routes.getPermittedFacility, {
     pathParams: {
       id: facilityId!,
@@ -174,10 +175,13 @@ export const FacilityCreate = (props: FacilityProps) => {
         setIsLoading(true);
         if (res?.ok && data) {
           const formData = {
-            facility_type: (typeof data.facility_type === 'number'
+            facility_type: (typeof data.facility_type === "number"
               ? data.facility_type
-              : FACILITY_TYPES.find(ft => ft.text === String(data.facility_type))?.id) as number | undefined,
+              : FACILITY_TYPES.find(
+                  (ft) => ft.text === String(data.facility_type),
+                )?.id) as number | undefined,
             name: data.name ? data.name : "",
+            code: data.code ?? "",
             state: data.state ? data.state : 0,
             district: data.district ? data.district : 0,
             features: data.features || [],
@@ -270,6 +274,13 @@ export const FacilityCreate = (props: FacilityProps) => {
           }
           return;
 
+        case "code":
+          if (!/^[a-z]{2,4}$/.test(state.form.code)) {
+            errors[field] = t("clinic_code_invalid");
+            invalidForm = true;
+          }
+          return;
+
         case "pincode":
           if (!validatePincode(state.form[field])) {
             errors[field] = t("invalid_pincode");
@@ -306,16 +317,18 @@ export const FacilityCreate = (props: FacilityProps) => {
     const validated = validateForm();
     if (validated) {
       setIsLoading(true);
-      
+
       // Ensure facility_type is a number, not a string (runtime safety check)
       const rawFacilityType = state.form.facility_type as any;
-      const facilityType: number | undefined = typeof rawFacilityType === 'string'
-        ? FACILITY_TYPES.find(ft => ft.text === rawFacilityType)?.id
-        : rawFacilityType;
-      
+      const facilityType: number | undefined =
+        typeof rawFacilityType === "string"
+          ? FACILITY_TYPES.find((ft) => ft.text === rawFacilityType)?.id
+          : rawFacilityType;
+
       const data: FacilityRequest = {
         facility_type: facilityType,
         name: state.form.name,
+        code: state.form.code,
         district: state.form.district,
         state: state.form.state,
         address: state.form.address,
@@ -327,14 +340,14 @@ export const FacilityCreate = (props: FacilityProps) => {
 
       const { res, data: requestData } = facilityId
         ? await request(routes.updateFacility, {
-          body: data,
-          pathParams: {
-            id: facilityId,
-          },
-        })
+            body: data,
+            pathParams: {
+              id: facilityId,
+            },
+          })
         : await request(routes.createFacility, {
-          body: data,
-        });
+            body: data,
+          });
 
       if (res?.ok && requestData) {
         const id = requestData.id;
@@ -400,6 +413,25 @@ export const FacilityCreate = (props: FacilityProps) => {
                 required
                 label={t("facility_name")}
               />
+              <div>
+                <TextFormField
+                  {...field("code")}
+                  required
+                  label={t("clinic_code")}
+                  placeholder="cm"
+                  maxLength={4}
+                  disabled={!!facilityId && !!facilityQuery.data?.code}
+                  onChange={(e) =>
+                    handleChange({
+                      name: "code",
+                      value: String(e.value ?? "").toLowerCase(),
+                    })
+                  }
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {t("clinic_code_help")}
+                </p>
+              </div>
               <MultiSelectFormField
                 {...field("features")}
                 placeholder={t("features")}

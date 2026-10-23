@@ -1,5 +1,6 @@
 import { Popover, Transition } from "@headlessui/react";
 import { ReactNode, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import CareIcon from "@/CAREUI/icons/CareIcon";
 
@@ -9,7 +10,6 @@ import { classNames } from "@/Utils/utils";
 
 const META_URL = "/build-meta.json";
 const APP_VERSION_KEY = "app-version";
-const APP_UPDATED_KEY = "app-updated";
 
 interface UpdatableAppProps {
   children: ReactNode;
@@ -51,25 +51,10 @@ export const checkForUpdate = async () => {
 
 const UpdatableApp = ({ children, silentlyAutoUpdate }: UpdatableAppProps) => {
   const [newVersion, setNewVersion] = useState<string>();
-  const [appUpdated, setAppUpdated] = useState(false);
 
   useEffect(() => {
-    checkForUpdate()
-      .then(setNewVersion)
-      .then(() => {
-        const appUpdated = localStorage.getItem(APP_UPDATED_KEY);
-        if (appUpdated === "true") {
-          setAppUpdated(true);
-        }
-      });
+    checkForUpdate().then(setNewVersion);
   }, []);
-
-  useEffect(() => {
-    if (!appUpdated) return;
-
-    localStorage.removeItem(APP_UPDATED_KEY);
-    setTimeout(() => setAppUpdated(false), 5000);
-  }, [appUpdated]);
 
   const updateApp = async () => {
     if (!newVersion) return;
@@ -79,7 +64,6 @@ const UpdatableApp = ({ children, silentlyAutoUpdate }: UpdatableAppProps) => {
 
     // A second of delay to appreciate the update animation.
     const updateLocalStorageAndReload = () => {
-      localStorage.setItem(APP_UPDATED_KEY, "true");
       window.location.reload();
       localStorage.setItem(APP_VERSION_KEY, newVersion);
     };
@@ -95,7 +79,6 @@ const UpdatableApp = ({ children, silentlyAutoUpdate }: UpdatableAppProps) => {
     <div className="relative">
       {children}
       {newVersion && <UpdateAppPopup onUpdate={updateApp} />}
-      <AppUpdatedAlert show={appUpdated} />
     </div>
   );
 };
@@ -108,6 +91,7 @@ interface UpdateAppPopupProps {
 
 const UpdateAppPopup = ({ onUpdate }: UpdateAppPopupProps) => {
   const [isShowing, setIsShowing] = useState(false);
+  const { t } = useTranslation();
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
@@ -131,10 +115,8 @@ const UpdateAppPopup = ({ onUpdate }: UpdateAppPopupProps) => {
             )}
           />
           <span className="mr-4 flex flex-col">
-            <p className="font-semibold">Software Update</p>
-            <p className="text-sm font-medium">
-              A new version of Klyniva is available
-            </p>
+            <p className="font-semibold">{t("software_update")}</p>
+            <p className="text-sm font-medium">{t("new_version_available")}</p>
           </span>
           <ButtonV2
             disabled={isUpdating}
@@ -142,30 +124,8 @@ const UpdateAppPopup = ({ onUpdate }: UpdateAppPopupProps) => {
             variant="alert"
             className="bg-alert-500 enabled:hover:bg-alert-400"
           >
-            {isUpdating ? "Updating..." : "Update"}
+            {isUpdating ? t("updating") : t("update")}
           </ButtonV2>
-        </div>
-      </Popover>
-    </AlertTransition>
-  );
-};
-
-interface AppUpdatedAlertProps {
-  show: boolean;
-}
-
-const AppUpdatedAlert = ({ show }: AppUpdatedAlertProps) => {
-  return (
-    <AlertTransition show={show}>
-      <Popover className="rounded-xl bg-primary-500 px-5 py-4 text-white shadow-2xl shadow-primary-500">
-        <div className="flex items-center gap-4">
-          <CareIcon icon="l-thumbs-up" className="text-2xl" />
-          <span className="mr-4 flex flex-col">
-            <p className="font-semibold">Updated successfully</p>
-            <p className="text-sm font-medium">
-              Now using the latest version of CARE
-            </p>
-          </span>
         </div>
       </Popover>
     </AlertTransition>

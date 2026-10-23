@@ -31,5 +31,7 @@ func mount(g *gin.RouterGroup, h *Handler) {
 	g.POST("/:id/reassign/", h.Reassign)
 	g.POST("/:id/reopen/", h.Reopen)
 	g.GET("/:id/notes/", h.ListNotes)
+	g.GET("/:id/plan/", h.GetPlan)
+	g.PUT("/:id/plan/", h.SavePlan)
 	g.POST("/:id/notes/", h.AddNote)
 }

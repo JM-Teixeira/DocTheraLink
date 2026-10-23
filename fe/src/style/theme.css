@@ -1,0 +1,71 @@
+/*
+ * Dark theme and large text (Settings page, hooks/useApplySettings.ts).
+ *
+ * Dark: the whole page is inverted and its colours turned back
+ * (invert + hue-rotate 180deg), so light greys become dark greys while
+ * green stays green, red stays red, and every text keeps its contrast.
+ * Doing it once here means no page, badge or chart needs dark classes of
+ * its own. Photos and pictures are inverted back so they look normal.
+ *
+ * The class is "theme-dark" (not Tailwind's "dark"), so the dark: variants
+ * built into some components never mix with this.
+ */
+
+html.text-large {
+  font-size: 112.5% !important; /* every rem-based size grows */
+}
+
+html.theme-dark {
+  background-color: #fff; /* becomes the dark background once inverted */
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+/* Pictures keep their real colours */
+html.theme-dark img,
+html.theme-dark video,
+html.theme-dark canvas,
+html.theme-dark picture,
+html.theme-dark [data-keep-colors] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Shadows would turn into glows: keep them subtle */
+html.theme-dark .shadow,
+html.theme-dark .shadow-sm,
+html.theme-dark .shadow-md,
+html.theme-dark .shadow-lg,
+html.theme-dark .shadow-xl {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06) !important;
+}
+
+/*
+ * Muted texts: a light-mode grey turns into a dark-mode grey that is too
+ * faint, so before the inversion they get a darker grey (= a lighter grey
+ * once inverted).
+ */
+html.theme-dark .text-gray-300,
+html.theme-dark .text-gray-400,
+html.theme-dark .text-secondary-300,
+html.theme-dark .text-secondary-400 {
+  color: #4b5563 !important;
+}
+html.theme-dark .text-gray-500,
+html.theme-dark .text-gray-600,
+html.theme-dark .text-secondary-500,
+html.theme-dark .text-secondary-600 {
+  color: #374151 !important;
+}
+html.theme-dark input::placeholder,
+html.theme-dark textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+/*
+ * Backdrops behind pop-ups: black would invert to white, so they are white
+ * here and become a dark veil once inverted.
+ */
+html.theme-dark [class*="bg-black/"],
+html.theme-dark .bg-black.bg-opacity-50,
+html.theme-dark .bg-gray-800.bg-opacity-60 {
+  background-color: rgb(255 255 255 / 0.65) !important;
+}

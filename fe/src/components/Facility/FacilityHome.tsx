@@ -283,14 +283,14 @@ export const FacilityHome = ({ facilityId }: Props) => {
                 </DropdownItem>
                 <DropdownItem
                   id="inventory-management"
-                  onClick={() => navigate(`/facility/${facilityId}/inventory`)}
+                  onClick={() => navigate("/inventory")}
                   icon={<CareIcon icon="l-clipboard-alt" className="w-5" />}
                 >
                   {t("inventory_management")}
                 </DropdownItem>
                 <DropdownItem
                   id="view-users"
-                  onClick={() => navigate(`/facility/${facilityId}/users`)}
+                  onClick={() => navigate(`/users?clinic=${facilityId}`)}
                   icon={<CareIcon icon="l-users-alt" className="text-lg" />}
                 >
                   {t("view_users")}

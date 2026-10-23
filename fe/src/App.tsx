@@ -30,7 +30,6 @@ import { Toaster } from "@/components/ui/toaster";
 
 import Loading from "@/components/Common/Loading";
 
-import Integrations from "@/Integrations";
 import PluginEngine from "@/PluginEngine";
 import AuthUserProvider from "@/Providers/AuthUserProvider";
 import HistoryAPIProvider from "@/Providers/HistoryAPIProvider";
@@ -39,7 +38,6 @@ import { FeatureFlagsProvider } from "@/Utils/featureFlags";
 import { handleHttpError } from "@/Utils/request/errorHandler";
 
 import { PubSubProvider } from "./Utils/pubsubContext";
-import { createSampleData } from "./Utils/sampleData";
 
 // Configure React Query client optimized for healthcare data management
 // Healthcare data requires careful caching strategies due to:
@@ -81,18 +79,10 @@ const queryClient = new QueryClient({
  * 
  * Additional components:
  * - Toaster - Global notification system
- * - Integrations - External service integrations (Sentry, Plausible)
  * - ReactQueryDevtools - Development debugging tools
  */
 const App = () => {
   // Initialize sample data for demo purposes
-  React.useEffect(() => {
-    if (import.meta.env.DEV) {
-      createSampleData().then(() => {
-        console.log('Klyniva sample data initialized');
-      });
-    }
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -113,10 +103,6 @@ const App = () => {
                   <Routers.AppRouter />
                 </FeatureFlagsProvider>
               </AuthUserProvider>
-
-              {/* External service integrations for monitoring and analytics */}
-              <Integrations.Sentry disabled={!import.meta.env.PROD} />
-              <Integrations.Plausible />
             </HistoryAPIProvider>
             
             {/* Global toast notification system for user feedback */}

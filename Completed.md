@@ -5,6 +5,500 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-23 · Klyniva 0.19.0 (branch `feat/m4-patients`)
+
+### Ready for the Ubuntu laptop, dark mode readability, cleanup
+- Hosting on one Ubuntu machine: `k8s/overlays/homeserver` (k3s, Traefik,
+  any host name) and `scripts/homeserver.sh` (install, deploy, first-admin,
+  status, backup-now, restore). Secrets are generated once and git-ignored;
+  a nightly CronJob saves a pg_dump to `/var/backups/klyniva` (14 days).
+- `migrate -create-admin` makes the first admin (`admin.user`) with a
+  one-time password on a server without demo data, and does nothing when an
+  admin already exists (integration test).
+- Dark mode: grey text is lighter (readable), and pop-up backdrops are dark
+  instead of white. Checked on screenshots of the inventory "?" pop-up and
+  the patients page.
+- Privacy: removed CARE's Sentry error reporting (it was on in every
+  production build, sending errors to CARE's account) and Plausible
+  analytics, with the `@sentry/browser` package.
+- Cleanup: 1,282 unused translation keys, 15 unused images / favicons /
+  config files from CARE, and unused frontend config keys.
+- Browser test for booking from the waiting list sets the plan's start
+  week (the plan now starts at the free slot it found).
+
+## 2026-10-23 · Klyniva 0.18.0 (branch `feat/m4-patients`)
+
+### Dark mode rebuilt, own password at first sign-in, one help button
+- Dark mode inverts the whole page and turns the colours back (green stays
+  green, contrast kept); pictures keep their colours. The class is
+  `theme-dark`, so the components' own `dark:` styles never mix in. Checked
+  on screenshots of referrals, patients, board and inventory.
+- Accounts made by an admin or coordinator must choose their own password
+  at the first sign-in (`must_change_password`). The server refuses every
+  other call until then (only "who am I" and the password change work);
+  the new password needs 8 characters and must differ from the given one.
+- Referrals use the same "?" by the title as every page; its pop-up has
+  the four-step explanation.
+- Removed 13 leftover test people from the local Climutua data.
+
+## 2026-10-23 · Klyniva 0.17.2 (branch `feat/m4-patients`)
+
+### Review fixes
+- The treatment plan also shows in the patient pop-up of the time board.
+- Dark mode now darkens the pages: Tailwind runs with `important: true`, so
+  the dark rules (`style/theme.css`) are `!important` too; a browser test
+  checks the real colours.
+- The demo administrator is `admin.user` ("Administrador", no personal
+  name); older databases are renamed in place.
+- The "?" sits next to the page title.
+- One help per page: inventory's per-session example is inside its "?";
+  referrals keep only the "how it works" box, which now also explains the
+  page.
+- Admins choose which clinic's time board to see ("Clínica" on the board;
+  sent as `X-Clinic`, honoured only for admins, full rights on that clinic).
+- Tests clean up the people they add, and look people up instead of
+  relying on the first page.
+
+## 2026-10-22 · Klyniva 0.17.1 (branch `feat/m4-patients`)
+
+### Clean-up, documentation, hosting plan (batch 3, part H)
+- Removed 75 frontend files nothing used (CARE leftovers: old form
+  fields, location pickers, user tabs, unused UI kit pieces and hooks) and
+  the old CARE Cypress tests and packages (Playwright is the browser test
+  tool).
+- New README.md (what it does, how to run, accounts, network access,
+  tests, layout) and fe/README.md; CONTEXT updated.
+- docs/HOSTING.md: moving to the Ubuntu laptop (k3s), certificates (local
+  CA, Let's Encrypt with DNS-01), and the order of steps that lets it grow
+  (registry images, migrations, S3 uploads, managed Postgres, replicas).
+  TODO has the concrete hosting items.
+- Fix: list pages asked for more than 100 items got only 20 (now capped at
+  500), which made the People stock filter miss people.
+
+## 2026-10-22 · Klyniva 0.17.0 (branch `feat/m4-patients`)
+
+### Waiting list: free slots (batch 3, part G)
+- Confirmed: the waiting list holds any number of patients (one open entry
+  per patient).
+- For each waiting patient the server looks for the first free hour in the
+  next 14 days that suits them: preferred weekdays, morning / afternoon,
+  the chosen physio or any, and the booking rules (on shift, not absent,
+  room and care credits, patient free).
+- Those entries are highlighted in green with "Vaga disponível: ter 28/10
+  10:00 com Rui Costa"; "Marcar plano" opens the plan on that slot. The
+  board button shows a green count and the coordinator home says how many
+  waiting patients have a free slot.
+- Tests: unit `TestFirstSlot`, API e2e `TestWaitingSlots`, browser.
+
+## 2026-10-22 · Klyniva 0.16.0 (branch `feat/m4-patients`)
+
+### People: stock permission filter and work history (batch 3, part F)
+- People page (coordinators, admins): "Pode alterar stock do piso" and
+  "... da categoria" dropdowns list who may change that stock: their own
+  floor/category rules, "all floors" / "all categories" rules, and the
+  coordinators and admins (who change everything).
+- Each person's page shows their work story in one line: joined on,
+  leaves (from / to), left on. Every status change is now kept
+  (`employment_events`); managers can set the start date (`joined_on`).
+- Tests: unit (`canChangeStock`, `workSteps`, history), API e2e
+  `TestEmploymentHistory`, browser.
+
+## 2026-10-22 · Klyniva 0.15.0 (branch `feat/m4-patients`)
+
+### Page help and "view as" (batch 3, parts D and E)
+- A "?" next to each page title opens what the page is for and what it
+  can do (texts `help__<page>` in the locales; a unit test checks every
+  page has one in both languages). The long inventory explanation moved
+  there.
+- Admins: user menu → "Ver como…" a role of a clinic. A yellow banner shows
+  who you are viewing as, with "Voltar a administrador". The server runs
+  those requests with that role and clinic and refuses anything that
+  changes data, so looking around never acts as someone (auth/viewas.go).
+- Fix found on the way: the people list answered `null` instead of `[]`
+  when nobody matched, which crashed the patients page (e.g. a clinic with
+  no physios).
+
+## 2026-10-22 · Klyniva 0.14.0 (branch `feat/m4-patients`)
+
+### Settings and suggestions (batch 3, part C)
+- Settings page (user menu → Definições): theme light / dark / same as the
+  computer, text size, language, date format, start page after signing in,
+  and the software update check (moved from About). Saved on the account,
+  so they follow the person to any computer.
+- Dark theme: one stylesheet (`style/theme.css`) remaps the light colours
+  under `html.dark`; pages need no changes of their own.
+- Suggestions: anyone sends an idea / problem from Settings and sees its
+  status and the answer; admins get "Sugestões" in the menu (badge with the
+  new ones), filter by status, set where each stands and answer. New module
+  `feedback`.
+- The profile's "Preferências" tab is gone (now in Settings).
+- Tests: unit, API e2e `TestSuggestions`, browser `settings.spec.ts`.
+
+## 2026-10-22 · Klyniva 0.13.0 (branch `feat/m4-patients`)
+
+### Treatment plan per referral (batch 3)
+- On the referral page the physio writes what is done in each session, in
+  order: activity, minutes, sets / repetitions, machine or room, notes
+  ("Ultrassons no ombro · 10 min · Máquina 2", "Massagem · 5 min"), with
+  the total time. Steps can be added, removed and reordered.
+- Every save is a new version with who and when; earlier versions stay
+  visible. Editing: the assigned physio (or whoever covers them), the
+  clinic coordinator and admins, while the referral is accepted or in
+  progress; the doctor reads it.
+- The patient page shows the current plan of each open referral, so a
+  colleague covering a holiday carries on the same way.
+- Tests: unit, API e2e `TestTreatmentPlan`, browser journey.
+
+## 2026-10-22 · Klyniva 0.12.0 (branch `feat/m4-patients`)
+
+### Adding people, clinic codes and the username standard (batch 3, part B)
+- "Adicionar pessoa" crashed ("Error loading plugins"): it was the old CARE
+  form (states, districts, wards). New Klyniva form: name, role, clinic
+  (admins), e-mail, phone, password; it shows the username while typing.
+- Clinics have a code (2-4 letters, unique, fixed once set): demo `de`,
+  Climutua `cm`. New clinics must have one.
+- Usernames are made by the server: `<clinic code>.<first name>.<last
+  surname>` in lower case without accents (`cm.joao.teixeira`); a number
+  on a clash (`cm.joao.teixeira2`), so two João Teixeira never collide;
+  organisation admins have no code (`paula.neves`). Deleted accounts keep
+  their name reserved. Package `internal/usernames` (tested).
+- All demo users renamed to the standard (old databases are renamed in
+  place on start-up); README, CONTEXT and tests updated.
+
+## 2026-10-22 · Klyniva 0.11.1 (branch `feat/m4-patients`)
+
+### Fixes from the review (batch 3, part A)
+- State admins can add stock items: the button is always on and the
+  dialog asks for the clinic (it was disabled under "all clinics").
+- Login page: the Klyniva title no longer moves when switching language
+  (fixed offset instead of centring texts of different lengths).
+- Patients: the diagnosis filter is wide enough for its placeholder.
+- Every page header keeps a gap above the first card (e.g. "Nova clínica").
+- "Export" button translated.
+- People who left cannot sign in (already true) and now also lose an open
+  session at once: the API checks the account is still active (cached
+  30 s, cleared when the status changes).
+- Sidebar: one layout open and closed (icon stays, label fades), so
+  closing is as smooth as opening.
+
+## 2026-10-22 · Klyniva 0.11.0 (branch `feat/m4-patients`)
+
+### Network access from other laptops really works
+- The page asked the API at `localhost:8088`, which on another laptop is
+  that laptop. The local cluster now uses `same-origin`: the app calls the
+  API on the address it was opened from (localhost, the PC name or its IP).
+  The `fe/public/config.js` edit is not needed for this.
+  docker compose uses the same (`FRONTEND_API_URL` overrides it).
+- User menu says "Sobre"; the page keeps the title "Sobre o Klyniva".
+
+### Patient consents, GDPR (TODO)
+- Card on the patient page: health-data processing, sharing progress with
+  the referring doctor, contact by e-mail, contact by SMS, photos/video.
+  Each shows given / withdrawn / not recorded, when, how (signed form,
+  verbal, digital) and by whom.
+- Recording a change adds a record (`patient_consents`, never edited); the
+  newest per kind is the current state; the history is one click away.
+- A warning shows while health-data consent is missing.
+- Tests: unit, API e2e `TestPatientConsents`, component and browser tests.
+
+## 2026-10-22 · Klyniva 0.10.0 (branch `feat/m4-patients`)
+
+### Patient metrics (TODO)
+- Filter the patients by physio (a referral or a session with them) and by
+  diagnosis or ICD code. The diagnosis filter is clinical, so only doctors,
+  physios, coordinators and admins have it (the server refuses it to others).
+- New patients per month for the last 12 months, under the metrics.
+- "Exportar CSV" (coordinators and admins): the filtered list with name,
+  birth date, age, gender, care level, phone, e-mail, postal code, city and
+  registration date; no NIF/SNS or clinical data. UTF-8 with ";" so Excel
+  in Portugal opens it directly; cells that look like formulas are
+  neutralised.
+- Tests: unit (filters, roles, CSV, months), API e2e `TestPatientMetrics`,
+  component and browser tests.
+
+## 2026-10-22 · Klyniva 0.9.1 (branch `feat/m4-patients`)
+
+### Small fixes from use
+- The local cluster showed 0.8.0: it had been deployed before the version
+  bump; deploys now happen after the bump.
+- User menu (click your name): Perfil, Sobre o Klyniva, Terminar sessão.
+- "Procurar atualização" showed two pop-ups; the old "latest version of
+  CARE" one is gone and the update prompt is in Portuguese. The installable
+  app is now called Klyniva (was "Care").
+- Time board header: the waiting list, weekly plan and new shift stay
+  visible; absences, divisions, copy day and repeat week moved into an
+  "Organizar" menu so the header fits on smaller screens.
+
+## 2026-10-22 · Klyniva 0.9.0 (branch `feat/m4-patients`)
+
+### Patient form: lists, connection problems, coverage (TODO)
+- **Structured lists**: allergies (substance, reaction, severity),
+  conditions (with the year they began) and medications (dose, how often)
+  as rows; validated on both sides (30 rows, 120 characters, known
+  severities, sensible years). The old free-text fields stay as notes. The
+  patient page shows "Alergias: ..." under the name.
+- **Connection problems**: saves are retried twice (1 s, 2 s) only when the
+  server cannot have done the work (no connection, 502/503/504), so nothing
+  is registered twice by itself; then the form says so with "Tentar de
+  novo", and an offline notice while the browser has no network. The draft
+  keeps everything meanwhile.
+- **Coverage**: component tests for the form, history, list editor, patient
+  page and list; the patient folder is at about 94 % of lines and CI now
+  fails under 80 % (`npm run test:coverage`).
+- Removed about 1,350 lines of unused code from the old patient spec
+  (`types/`, `constants/`, `validation/patientValidation.ts`).
+
+## 2026-10-22 · Klyniva 0.8.0 (branch `feat/m4-patients`)
+
+### Patient registration extras and patient history (TODO)
+- **Draft auto-save** on the patient form (new and edit): kept on this
+  computer for 24 h, per user, removed on save, cancel, "Descartar
+  rascunho" and sign-out (it holds patient data); a banner says when a
+  draft was restored.
+- **New fields**: e-mail, street / postal code (typed `4000123` becomes
+  `4000-123`) / city, emergency contact name and relationship (fixed list),
+  insurer or subsystem (suggestions: ADSE, Médis, ...) and member number.
+  Validated in the browser and on the server.
+- **Patient history** on the patient page (`timeline` module): the next
+  sessions, then by month the registration, referral steps, thread
+  messages with pain, files and sessions (held, missed with justification,
+  not recorded). Filters by kind; entries open their referral. Each source
+  keeps its access rules, so the front desk sees sessions but no clinical
+  content.
+- Tests: unit (extras, timeline merge/order/endings, drafts), API e2e
+  `TestPatientExtrasAndTimeline`, browser `patients.spec.ts`.
+
+## 2026-10-22 · Klyniva 0.7.0 (branch `feat/m4-patients`)
+
+### Time board: move sessions, reschedule plans, waiting list (TODO)
+- **Move a session** by dragging it to another hour in the physio day, or
+  with "Mudar sessão" (another day, hour or physio); the server applies
+  the booking rules (on shift, room, credits, patient free, not absent).
+- **Reschedule a plan** from a date on to new weekdays/hour/physio,
+  keeping the number of sessions; preview first; the plan keeps its id.
+- **Waiting list**: urgent first, then whoever waits longest; preferred
+  days, period and physio; "Marcar plano" opens the weekly plan with those
+  days and the entry leaves the list once booked; count on the board
+  button and on the coordinator home.
+- Fix: Portuguese counters said "1" for zero ("há 1 dia", "1 pessoa"):
+  i18next uses Brazilian plural rules for `pt`, where 0 is singular; every
+  pt plural now has a zero form, checked by a unit test.
+- Tests: unit (move, reschedule, waiting list), e2e
+  `TestMoveAndReschedule`, `TestWaitingList`, browser drag-and-drop and
+  waiting-list journeys; 43 browser tests.
+
+## 2026-10-22 · Klyniva 0.6.0 (branch `feat/m4-patients`)
+
+### 2026-10-23 · About page, access from other laptops
+- **Sobre o Klyniva** page (`/about`): app and server versions, build
+  date, how version numbers work, and the update check with a plain
+  explanation (it only refreshes the app cached in this browser). The
+  profile links to it; the version left the menu and Preferences.
+- Profile and account screens translated to PT-PT (126 labels).
+- **Network access**: `scripts/lan-access.ps1` (port forward, firewall on
+  private networks only, prints the addresses) and `k8s-local.sh lan`.
+
+### 23:30 · Referral conversation that works (TODO)
+- A *reply* answers one question (refused otherwise); questions show
+  "Respondida" / "Por responder"; the card shows "n por responder" for
+  whoever must answer, and the list has a "Por responder" filter.
+- *Progress* notes can carry pain 0-10, drawn as the patient evolution
+  ("de 6 para 3 em 10"); thread filter Tudo / Progresso / Perguntas.
+- Tests: unit `TestQuestionsAndProgress`, e2e `TestQuestionThread`, browser
+  conversation test; e2e TestTimeBoard picks a day free of old shifts
+  (was flaky after many runs).
+- TODO: proposal to reach the local install from other laptops on the LAN.
+
+### 22:00 · Stock permissions, per-patient holiday moves, misses, version (user request)
+- **Version** 0.6.0 (major.minor.patch, major 0 for now): shown in the
+  menu and in Profile → Preferências (app and server); `GET /api/v1/version/`;
+  `scripts/bump-version.sh` sets backend and frontend, a test checks they agree.
+- **Inventory permissions by floor × category**: items get a floor; the
+  coordinator (or admin) gives a person rules like "Higiene on floors 2
+  and 3" from the people list (key button). Only managers and people
+  whose rule covers an item may use/open/finish/restock/count/edit it;
+  others see the stock read-only. Sessions still use stock automatically.
+- **Inventory**: admins choose the clinic (they saw every clinic mixed);
+  filters single-use vs containers and by floor; floor badge; audit is now
+  just the log (no per-person cards); "How does per-session use work?"
+  explained step by step with an example.
+- **Holiday cover per patient**: the preview lists every session with
+  everyone working that hour and the room they have left (places,
+  credits, after the other moves); each patient can go to a different
+  physio or stay; a "who receives whom" summary. Confirmed: sessions move
+  from the absent physio to the chosen one at the same hour.
+- **Misses**: marking a session missed asks justified or not (+ reason);
+  3 unjustified misses in 90 days flag the patient on the coordinator's
+  home page; the patient pop-up shows the counts.
+- **Clinic → people** opens the people list filtered by clinic
+  (`/users?clinic=`; the old address redirects). **Clinics page** rebuilt
+  like the other lists (search + chips, no advanced-filter panel).
+- **Time board "today"**: bold with a badge in the day view only on the
+  current day; in week/month/year today is marked and "Hoje" pulses it.
+- Browser checks: notifications bell, letter print to PDF, phone screens,
+  accessibility scan (fixed: icon semantics, logo alt, sidebar toggle
+  name, breadcrumbs list, label/chip/profile contrast).
+- Tests: inventory grants and clinic filter, misses, per-patient absence
+  split (unit); e2e `TestStockAccessByFloorAndCategory`,
+  `TestInventoryClinicFilter`, `TestMissedSessionsFlag`, `TestVersion`;
+  browser `features.spec.ts` and `quality.spec.ts`.
+
+## 2026-10-22 · Security review, date preference, tests (branch `feat/m4-patients`)
+
+### 17:00 · Browser tests for the main clinic journeys (TODO §0)
+- `e2e/browser/tests/journeys.spec.ts`: register a patient, then the
+  same NIF is blocked and the same name + birth date warns ("É outra
+  pessoa" registers anyway), and the NIF finds exactly one; a weekly plan
+  (3× a week) booked from the board lands Mon/Wed/Fri at the chosen hour;
+  a holiday recorded in the Ausências dialog moves the session to the
+  cover physio, who reads the per-patient handover in the patient pop-up;
+  single-use items are used, containers opened and finished.
+- Each test makes and removes its own data; the suite runs one test at a
+  time (shared demo users). 15 browser tests, 45/45 over three runs.
+
+### 15:30 · Referral journey in the browser, browser tests in CI (TODO §0)
+- `e2e/browser/tests/referral.spec.ts`: two browsers at once, the doctor
+  refers a new patient to a named physio; the physio accepts, starts,
+  writes a progress note that the doctor then reads, completes with an
+  outcome; the discharge letter shows patient and outcome; another
+  clinic's physio gets 404 and the front desk 403.
+- CI (`End-to-end (docker compose)` job) now runs the Playwright suite
+  after the API tests; the HTML report and traces are uploaded on failure.
+- 11 browser tests, 33/33 passing over three repeated runs locally.
+
+### 14:00 · Security fixes, date format preference, browser e2e (user request)
+- **Security fixes** in legacy handlers (all were open to any signed-in
+  user): creating users with any role (incl. admin), editing any account
+  incl. `user_type` / `is_superuser` (privilege escalation), deleting
+  users, creating/editing/deleting clinics, reading other clinics' people,
+  staff lists, skills and time logs. Now: admins manage everything;
+  coordinators add people to their own clinic with clinic roles only;
+  everyone edits their own profile fields; status, clinic, password and
+  flags only through their own endpoints; other clinics answer 404. Lists
+  capped at 100; no raw database errors or debug prints in responses.
+- "Add person" works again (`POST /users/add_user/` was never routed).
+- **Date format preference** (Profile → Preferências): dd/mm/aaaa,
+  mm/dd/aaaa, aaaa-mm-dd or "21 out 2026", shown and typed that way
+  everywhere (new `DateInput` with a calendar button replaces the browser
+  date fields, which always follow the browser's locale).
+- Dropdown arrows no longer overlap the text (global select padding).
+- No long dashes in the interface ("-" or "·"); Climutua is now
+  "Climutua · Medicina Física e Reabilitação".
+- Fix: a physio's hours on the board could come out of order (CI flake).
+- Tests: access policy unit tests; staff visibility and preferences; e2e
+  `TestNoPrivilegeEscalation`, `TestClinicIsolation`, `TestDatePreference`;
+  component tests for DateInput and FilterChips; new **browser e2e suite**
+  (Playwright, `make e2e-browser`); 120 frontend tests.
+
+## 2026-10-21 — M4 patients (branch `feat/m4-patients`)
+
+### 23:30 · Calmer time board, holiday cover, people & patient filters (user request)
+- **Time board**: floors (divisions get a floor; Climutua has 3), filters
+  by floor / division / physio (remembered per browser), decluttered cells
+  (count + credit bar, details on hover), legend, division view grouped by
+  floor. Click a physio → **their day** with every patient's name per hour.
+- **Holiday cover**: coordinators record an absence (vacation, sick,
+  training, other) with a cover physio; preview shows which sessions move
+  at the same hour and which can't; a **handover document** plus a note per
+  patient. The cover physio sees it on the home page and in the patient
+  pop-up, and can read/post on the absent physio's referrals. Absent
+  physios can't be booked; weekly plans skip their days.
+- **Assign patient**: search by name, NIF or SNS number (IDs shown).
+- **People** (`/users`): new list with one search box (full name too),
+  role and status chips, clinic for admins; non-admins see only their clinic.
+- **Employment status** (active / on leave / left, date, note): "left"
+  keeps the record but blocks sign-in. **Skills** (14 PT-PT physio skills)
+  and **clinic** profile tabs rebuilt (they were calling removed endpoints).
+- **Patients**: filters by care level, age band, gender, clinic (admins),
+  with metrics of the match (total, average age, care level, age and
+  gender spread — `GET /patient/stats/`).
+- **Referrals**: filters by referring doctor, physio and date range.
+- Translations: dates follow the language; breadcrumbs translated and only
+  collapse ("•••") on long paths; "doente" → "utente"; sidebar user card
+  without the arrow.
+- Tests: staff, absence/cover and referral-cover unit tests; Climutua
+  integration (floors, holiday, skills, former staff); e2e
+  `TestPeopleAndEmployment`, `TestPatientFiltersAndStats`,
+  `TestReferralDoctorFilter`, `TestHolidayCover`; frontend filter/query
+  helpers and array query params (105 tests).
+
+### 18:00 · Home page, Climutua demo clinic, inventory kinds, People fix (user request)
+- **Fix**: Clinic → People failed ("Something went wrong"): the
+  `/facility/:id/get_users/` endpoint was a 501 stub; now lists the clinic's
+  users with search and paging.
+- **Home page** at `/` (logo and "Início"), by role: physio's day with
+  patients (pop-up, attended/missed), coordinator's clinic load and needs
+  attention (reorder, containers open too long, referrals waiting), doctor's
+  referrals, front-desk arrivals; notifications; quick actions.
+- **Inventory**: item kinds — single-use (*use*) vs containers (*open*, then
+  *finish*; who/when; discard-after-days alert); per-session use per
+  division (rules); reorder list with target levels and CSV export; audit
+  shows finished too.
+- **Climutua** (PT-PT): 13 staff, 6 divisions, 120 patients with valid NIF,
+  20 conditions with ICD-10, referrals in every state with messages, weekly
+  shifts ±4 weeks, ~37 sessions a day within patient/credit limits, stock
+  with deliveries, openings and automatic session use.
+- Tests: inventory kinds/rules/reorder (unit), Climutua consistency
+  (PostgreSQL: limits, shifts, NIF, idempotent), e2e `TestClinicPeople`,
+  `TestContainersAndReorder`, `TestClimutua`; 89 frontend tests.
+
+### 15:30 · Care levels, weekly plans, calendar views, stock audit (user request)
+- Patients get a **care level 1–5**; it is stored on each appointment as
+  credits. Divisions have a per-physio hourly **credit limit** (default 8)
+  next to the patient limit, checked under the booking lock.
+- Only **coordinators and admins assign patients**; coordinators can read
+  the clinic's referrals (not act on them).
+- **Weekly plans** (`POST /schedule/series/`, dry-run preview): weekdays +
+  hour + start + N sessions; skipped dates are reported with the reason;
+  cancel the rest of a plan. **Repeat week** for N weeks.
+- **Week / month / year views** (`/schedule/range/`, `/schedule/year/`).
+- **Patient pop-up** on the board: basics, care level, allergies, current
+  referral (diagnosis, reason, goals, precautions) and the thread.
+- **Inventory audit** tab, **Open** movements, and **per-session automatic
+  use** wired from the time board (attended → use; undo → give back).
+- Tests: unit (credits, plans, ranges, hook, audit, coordinator read),
+  PostgreSQL (credits, auto-use/undo, audit, plan, year stats), e2e
+  `TestCarePlanAndAutoUse`; 83 frontend tests.
+
+### 13:30 · Time board, working inventory, Coordinator role (user request)
+- **Time board** (`modules/schedule`, `/time-board`): divisions with a
+  per-hour capacity per physio; daily shifts per physio and division (no
+  overlaps, edits cannot strand booked patients); patients assigned to a
+  physio-hour (must be on shift, capacity, patient not double-booked;
+  advisory locks make it safe under concurrency); board by physio (load per
+  hour, day total) and by division (who is where); copy a day's shifts;
+  attended/missed. Demo divisions and two weeks of weekday shifts seeded.
+- **Inventory** (`modules/inventory`, `/inventory` in the sidebar): items per
+  clinic with alert level, use/restock/count with history (row-locked, never
+  below zero), filters for low/out, demo stock seeded.
+- **Coordinator** role + demo user `coordinator` (Marta Ribeiro).
+- "How referrals work" explainer on the referrals page.
+- Removed: CARE inventory pages and 501 stubs, legacy timetable/sections
+  API and models, unrouted Therapy/TimetableGrid WIP, dev sample data.
+- Tests: service rules (unit), concurrency + SQL on PostgreSQL, e2e
+  `TestInventory` and `TestTimeBoard`, frontend helpers (80 tests).
+
+### 11:40 · NIF / SNS number and duplicate-patient detection
+- Backend: `nif` and `sns_number` on patients (NIF check digit validated,
+  both normalised to 9 digits); partial unique indexes per clinic.
+  Registering returns 409 `duplicate_patient` with the matching visible
+  patients: same NIF/SNS always blocks; similar name (accent/case
+  insensitive, same first and last name) + same birth date or phone
+  (last 9 digits) needs `allow_duplicate`. Editing to another patient's
+  NIF/SNS is blocked. Shared `internal/textutil` (fold, words, digits).
+- Frontend: NIF / SNS fields with inline validation, shown on the patient
+  page; "may already be registered" dialog (open existing / register as a
+  different person).
+- Tests: identifiers, name similarity, duplicate rules (unit), SQL
+  pre-filter + unique index + clinic isolation (PostgreSQL), e2e
+  `TestPatientIdentifiersAndDuplicates`, form helpers.
+
+### 11:00 · Local access
+- `make k8s-start` / `scripts/start-klyniva.cmd` start the cluster after a
+  reboot and keep WSL alive; README lists every demo login.
+
+---
+
 ## 2026-10-21 — M1 referral loop (branch `feat/m1-referral-loop`)
 
 ### 10:45 · Printable referral letter / discharge summary — M1 complete

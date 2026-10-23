@@ -8,8 +8,13 @@ import (
 	"klyniva/internal/config"
 	"klyniva/internal/models"
 	"klyniva/internal/modules/attachment"
+	"klyniva/internal/modules/feedback"
+	"klyniva/internal/modules/inventory"
 	"klyniva/internal/modules/notification"
+	"klyniva/internal/modules/patient"
 	"klyniva/internal/modules/referral"
+	"klyniva/internal/modules/schedule"
+	"klyniva/internal/modules/staff"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -109,17 +114,30 @@ func Migrate() error {
 		{"reference data", []any{&models.State{}, &models.District{}, &models.LocalBody{}, &models.Ward{}}},
 		{"clinics", []any{&models.Facility{}}},
 		{"users", []any{&models.User{}, &models.Skill{}, &models.UserSkill{}}},
+		{"employment history", staff.Models()},
 		{"patients", []any{&models.Patient{}}},
-		{"inventory", []any{&models.InventoryItem{}}},
-		{"staff scheduling", []any{&models.TimeLog{}, &models.TimetableSection{}, &models.TimetableSlot{}}},
+		{"patient consents", patient.Models()},
+		{"staff time log", []any{&models.TimeLog{}}},
+		{"inventory", inventory.Models()},
+		{"time board", schedule.Models()},
 		{"referrals", referral.Models()},
 		{"notifications", notification.Models()},
 		{"attachments", attachment.Models()},
+		{"suggestions", feedback.Models()},
 	}
 	for i, p := range phases {
 		log.Printf("Migrating phase %d: %s...", i+1, p.name)
 		if err := DB.AutoMigrate(p.models...); err != nil {
 			return fmt.Errorf("failed to migrate %s: %w", p.name, err)
+		}
+	}
+
+	if err := DB.Exec(models.UniqueClinicCode).Error; err != nil {
+		return fmt.Errorf("failed to create clinic code index: %w", err)
+	}
+	for _, stmt := range patient.UniqueIndexes {
+		if err := DB.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("failed to create patient indexes: %w", err)
 		}
 	}
 
@@ -220,27 +238,8 @@ func SeedData(includeDemoUsers bool) error {
 		}
 	}
 
-	// Seed the consumables catalogue of a physiotherapy clinic
-	const ppe, hygiene, treatment = "PPE", "Hygiene", "Treatment consumables"
-	inventoryItems := []models.InventoryItem{
-		{Name: "Surgical Mask", Category: ppe, Unit: "units"},
-		{Name: "Gloves", Category: ppe, Unit: "pairs"},
-		{Name: "Hand Sanitizer", Category: hygiene, Unit: "bottles"},
-		{Name: "Disinfectant Wipes", Category: hygiene, Unit: "packs"},
-		{Name: "Disposable Couch Roll", Category: hygiene, Unit: "rolls"},
-		{Name: "Towels", Category: hygiene, Unit: "units"},
-		{Name: "Ultrasound Gel", Category: treatment, Unit: "bottles"},
-		{Name: "Massage Oil", Category: treatment, Unit: "bottles"},
-		{Name: "Kinesiology Tape", Category: treatment, Unit: "rolls"},
-		{Name: "Electrode Pads (TENS)", Category: treatment, Unit: "packs"},
-		{Name: "Dry Needling Needles", Category: treatment, Unit: "boxes"},
-		{Name: "Ice / Cold Packs", Category: treatment, Unit: "units"},
-	}
-
-	for _, item := range inventoryItems {
-		if err := DB.FirstOrCreate(&item, models.InventoryItem{Name: item.Name}).Error; err != nil {
-			return fmt.Errorf("failed to seed inventory item %s: %w", item.Name, err)
-		}
+	if err := staff.SeedSkills(DB); err != nil {
+		return fmt.Errorf("skills catalogue: %w", err)
 	}
 
 	if !includeDemoUsers {
@@ -250,6 +249,13 @@ func SeedData(includeDemoUsers bool) error {
 
 	if err := seedDemoClinic(); err != nil {
 		return err
+	}
+	// Second demo clinic with realistic PT-PT data
+	if err := seedClimutua(time.Now()); err != nil {
+		return fmt.Errorf("climutua demo: %w", err)
+	}
+	if err := seedStockAccess(); err != nil {
+		return fmt.Errorf("stock permissions: %w", err)
 	}
 	log.Println("Database seeding completed")
 	return nil
@@ -265,7 +271,7 @@ const demoPasswordHash = "$2a$12$fdWvXHhcyw5Fj5wLFrCeOea3ZupC9XaGGR9pJN06m76epTO
 // development and tests only (release mode refuses demo users).
 // Admin accounts are organisation-wide and get no clinic.
 func seedDemoClinic() error {
-	demo := models.Facility{ID: DemoClinicID, Name: "Klyniva Demo Clinic", Address: "Lisboa"}
+	demo := models.Facility{ID: DemoClinicID, Name: "Klyniva Demo Clinic", Code: demoClinicCode, Address: "Lisboa"}
 	if err := DB.FirstOrCreate(&demo, models.Facility{ID: DemoClinicID}).Error; err != nil {
 		return fmt.Errorf("failed to seed demo clinic: %w", err)
 	}
@@ -276,15 +282,20 @@ func seedDemoClinic() error {
 		inClinic              bool
 	}
 	users := []demoUser{
-		{"stateadmin", "State", "Administrator", models.RoleStateAdmin, false},
-		{"districtadmin", "District", "Administrator", models.RoleDistrictAdmin, false},
-		{"facilitycoordinator", "Clinic", "Coordinator", models.RoleLocalBodyAdmin, false},
-		{"doctor", "John", "Smith", models.RoleDoctor, true},
-		{"physiotherapist", "Sarah", "Johnson", models.RolePhysioTherapist, true},
-		{"physiotherapist2", "Tiago", "Martins", models.RolePhysioTherapist, true},
-		{"nurse", "Mary", "Williams", models.RoleNurse, true},
-		{"receptionist", "Rita", "Lopes", models.RoleReceptionist, true},
-		{"staff", "General", "Staff", models.RoleStaff, true},
+		// The organisation admin is an account, not a person (no name)
+		{"admin.user", "Administrador", "", models.RoleStateAdmin, false},
+		{"jorge.matos", "Jorge", "Matos", models.RoleDistrictAdmin, false},
+		{"luis.pereira", "Luís", "Pereira", models.RoleLocalBodyAdmin, false},
+		{"de.john.smith", "John", "Smith", models.RoleDoctor, true},
+		{"de.sarah.johnson", "Sarah", "Johnson", models.RolePhysioTherapist, true},
+		{"de.tiago.martins", "Tiago", "Martins", models.RolePhysioTherapist, true},
+		{"de.mary.williams", "Mary", "Williams", models.RoleNurse, true},
+		{"de.rita.lopes", "Rita", "Lopes", models.RoleReceptionist, true},
+		{"de.marta.ribeiro", "Marta", "Ribeiro", models.RoleCoordinator, true},
+		{"de.nuno.dias", "Nuno", "Dias", models.RoleStaff, true},
+	}
+	if err := applyNamingStandard(); err != nil {
+		return err
 	}
 	for _, d := range users {
 		u := models.User{
@@ -300,7 +311,7 @@ func seedDemoClinic() error {
 			return fmt.Errorf("failed to seed demo user %s: %w", d.username, err)
 		}
 		// Bring demo users created by older versions up to date
-		updates := map[string]any{"first_name": d.first}
+		updates := map[string]any{"first_name": d.first, "last_name": d.last}
 		if d.inClinic {
 			updates["home_facility_id"] = DemoClinicID
 		}
@@ -308,7 +319,11 @@ func seedDemoClinic() error {
 			return fmt.Errorf("failed to update demo user %s: %w", d.username, err)
 		}
 	}
-	return nil
+	// Demo stock and a time board with divisions and shifts
+	if err := inventory.SeedDemo(DB, DemoClinicID); err != nil {
+		return err
+	}
+	return schedule.SeedDemo(DB, DemoClinicID, time.Now())
 }
 
 // Close closes the database connection

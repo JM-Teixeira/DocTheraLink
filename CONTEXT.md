@@ -5,7 +5,7 @@
 > key decisions change. Work items live in `TODO.md`; finished work in
 > `Completed.md`.
 
-_Last updated: 2026-10-20_
+_Last updated: 2026-10-23_
 
 ## 1. What the product is
 
@@ -29,17 +29,36 @@ therapist talk on a per-referral thread; every status change is logged there.
 ```
 be/                Go backend (Go module name: klyniva)
   cmd/server       HTTP server entrypoint (also: `server -healthcheck`)
-  cmd/migrate      migrations + seeding CLI
+  cmd/migrate      migrations + seeding CLI; `-create-admin` makes the first
+                   admin (admin.user, one-time password) on an empty server
   internal/
     api/routes.go  all route registration (/api/v1)
-    api/handlers/  legacy handlers (users, facilities, time log, timetable;
-                   inventory endpoints are still 501 stubs)
+    api/handlers/  legacy handlers (users, facilities, time log)
     modules/       NEW layered modules — use this pattern for new features
       referral/    model → repository → service → handler → routes (+ tests)
-      patient/     same layout
+      patient/     same layout; clinical lists (clinical.go), CSV export (export.go),
+                   GDPR consents, append-only (consent.go, patient_consents)
       notification/ in-app + e-mail notifications fed by referral events
       attachment/  files on referrals; access follows the referral
       catalog/     embedded ICD-10 subset + referral templates (EN/PT, read-only)
+      inventory/   clinic consumables: unit items (use) and containers (open/finish),
+                   per-division session use, reorder list, audit; items have a
+                   floor; Grant = who may change which stock (floors × categories)
+      schedule/    time board: divisions, shifts, appointments per physio-hour,
+                   weekly plans (series), range/year stats; SessionHook → inventory;
+                   divisions have a floor; absences with cover + handover notes
+                   (CoveredBy → referral.WithCovers lets the cover read referrals)
+                   move one session / reschedule a plan (reschedule.go, same
+                   planner checks); waiting list of patients (waiting.go)
+      timeline/    patient history (GET /patient/:id/timeline/): no tables, reads
+                   patient, referral, attachment and schedule services so each
+                   keeps its own access rules
+      feedback/    suggestions about the app: everyone sends, admins triage and answer
+      staff/       skills catalogue + user skills, home clinic, employment
+                   status (active / on_leave / left → is_active false)
+    api/handlers/access.go  who may see/change users and clinics (legacy handlers; pure, tested)
+    version/       release number (0.minor.patch; also fe/package.json, bump with
+                   scripts/bump-version.sh); public GET /api/v1/version/
     storage/       file Store interface (Local today, S3 later)
     mailer/        SMTP or log-only mailer (no patient data in e-mails)
     clinic/        which clinic a user works in (Resolver) — scope new data with it
@@ -49,7 +68,7 @@ be/                Go backend (Go module name: klyniva)
     integration/   PostgreSQL tests (build tag `integration`, testcontainers)
     e2e/           HTTP tests against a RUNNING stack (build tag `e2e`, E2E_BASE_URL)
     models/        legacy shared GORM models
-  scripts/         init.sql (compose), portugal_data.sql (reference data)
+  scripts/         init.sql (compose)
 fe/                React frontend (started as a fork of CARE; ICU modules removed)
   src/components/Referral/   referral UI module (+ tests)
   src/components/Patient/    Klyniva patient pages (PatientList/Detail/Form,
@@ -60,8 +79,11 @@ fe/                React frontend (started as a fork of CARE; ICU modules remove
   public/locale/{en,pt}.json translations
 k8s/base/          environment-independent manifests (kustomize)
 k8s/overlays/local       k3d cluster (http://localhost:8088, demo data)
+k8s/overlays/homeserver  one Ubuntu machine with k3s (Traefik, any host name,
+                         nightly pg_dump to /var/backups/klyniva)
 k8s/overlays/production  nginx-ingress + cert-manager TLS + HPA template
 scripts/k8s-local.sh     create/deploy/e2e/status/down for the local cluster
+scripts/homeserver.sh    install/deploy/first-admin/status/backup-now/restore on that server
 .github/workflows/ci.yml CI (unit, integration, e2e on compose, image builds)
 docker-compose.yml local stack;  .env.example → .env
 Makefile           make up / test / check / k8s-up / k8s-e2e …
@@ -74,7 +96,7 @@ Makefile           make up / test / check / k8s-up / k8s-e2e …
 | Backend | Go 1.27.3, Gin 1.12, GORM 1.31 + pgx, golang-jwt v5, swaggo |
 | DB | PostgreSQL 18 (compose, k8s, tests) |
 | Frontend | React 18.3, TypeScript 5, Vite 7, Tailwind 3.4, TanStack Query 5, raviger router, i18next, shadcn/ui (Radix), lucide-react |
-| Tests | Go `testing` + testcontainers-go; Vitest 5 + Testing Library + fast-check; Cypress (legacy E2E) |
+| Tests | Go `testing` + testcontainers-go; Vitest + Testing Library + fast-check; Playwright (browser E2E) |
 | Runtime | Docker (distroless backend, nginx frontend — both non-root); Kubernetes manifests |
 | Not used | Redis (config keys exist, no client; removed from compose default and k8s) |
 
@@ -101,11 +123,26 @@ regression test checks column types.
 `authorization_payload` (`*models.TokenClaims`) and `user_id` (uint) in the Gin
 context. Roles are strings on `users.user_type`. Admin = State/District/LocalBody
 admin (organisation-wide, no clinic).
+- Every request checks the account (`auth.AccountChecker`, cached briefly;
+  `auth.ForgetAccount` clears it): a deactivated user gets 401, and an account
+  with `must_change_password` (set when an admin/coordinator creates it) gets
+  403 `password_change_required` on everything except "who am I" and the
+  password change. The frontend shows `Auth/ForcePasswordChange` then.
+- Admin headers: `X-Clinic` = the clinic an admin is working in (time board);
+  `X-View-As-Role` / `X-View-As-Clinic` = "view as" another role, read-only
+  (writes refused), applied through `clinic.WithViewAs`. Ignored for non-admins.
 
 **Roles in use:** `Doctor` (refers), `PhysioTherapist` (treats), `Nurse`,
-`Receptionist` (front desk: registers/edits patients, appointments in M3, **no**
-referrals/clinical notes), `Staff`, read-only variants, admins. Frontend checks
+`Receptionist` (front desk: registers/edits patients, views the time board,
+**no** referrals/clinical notes), `Coordinator` (runs the clinic
+day: plans divisions and physio shifts, assigns patients to physios, audits
+stock; reads — never acts on — the clinic's referrals), `Staff`, read-only variants, admins. Frontend checks
 live in `fe/src/Utils/roles.ts` and mirror the backend.
+
+**Demo clinics:** "Klyniva Demo Clinic" (English, `database.DemoClinicID`) and
+**Climutua** (`database.ClimutuaClinicID`, PT-PT, 120 patients, users `cm.*`,
+`database/seed_climutua.go`; created once, its weekly shifts are kept planned
+four weeks ahead on every start).
 
 **Clinics (decision D2):** single clinic today, built for many. A clinic is a
 row in `facilities`; a user's `home_facility_id` is their clinic. Modules get a
@@ -141,6 +178,12 @@ concurrent accepts have one winner.
 Do not use `components/ui/input.tsx` for controlled inputs (it omits `onChange`).
 Global CSS styles bare `h2/h3` large — give headings explicit text sizes.
 Pure logic goes in `*Utils.ts` with tests; UI permissions mirror the backend.
+Each page has one "?" next to its title: `Page help="<key>"` (+ `helpExtra`
+for richer content). Tailwind runs with `important: true`, so global overrides
+need `!important`. Dark mode is `html.theme-dark` in `style/theme.css`: the page
+is inverted and hue-rotated (pictures turned back), with a few fixes for grey
+text and pop-up backdrops; components' own `dark:` classes are not used.
+No third-party telemetry: CARE's Sentry and Plausible hooks were removed.
 
 ## 5. Running & testing
 
@@ -152,15 +195,19 @@ make check                   # + gofmt/vet, Postgres integration tests, typechec
 make e2e-compose             # e2e API journeys against the compose stack
 
 make k8s-up                  # local Kubernetes (k3d) → http://localhost:8088
+make k8s-start               # after a reboot (or scripts/start-klyniva.cmd on Windows)
 make k8s-e2e                 # same e2e journeys against the cluster
+make e2e-browser             # Playwright browser journeys (e2e/browser) against the cluster
 make k8s-deploy | k8s-status | k8s-down
 ```
 The local cluster's kubeconfig is `~/.kube/klyniva.yaml` (context
 `k3d-klyniva`); the script never touches `~/.kube/config`, which holds real
 cloud clusters — never run kubectl against those from this project.
-Demo users (only when `SEED_DEMO_USERS=true`, never in release): `doctor`,
-`physiotherapist`, `nurse`, `receptionist`, `staff` (all in the demo clinic),
-`stateadmin`, `districtadmin`, `facilitycoordinator` — password `1234@1`.
+Demo users (only when `SEED_DEMO_USERS=true`, never in release) follow the
+username standard `<clinic code>.<first>.<last>` (internal/usernames): demo
+clinic `de.*`, Climutua `cm.*`, admins `admin.user`, `jorge.matos`,
+`luis.pereira`; password `1234@1`. Old names are renamed in place on seed
+(database/usernames_seed.go).
 
 Go toolchain: go.mod pins `toolchain go1.27.3`; with an older local Go use
 `GOTOOLCHAIN=auto`. In this dev environment the repo lives in WSL
@@ -184,10 +231,15 @@ the repo ownership).
   (local: generated `secrets.env`; production: create with kubectl).
 - Backend stays at 1 replica until migrations run as a Job and uploads move
   to shared storage. Production placeholders: `klyniva.com`, GHCR image names.
+- Home server (docs/HOSTING.md): `scripts/homeserver.sh deploy` builds the
+  images, imports them into k3s and applies `k8s/overlays/homeserver`; it
+  writes `secrets.env` (random, git-ignored, keep a copy) and `site.env`
+  (PUBLIC_URL / CORS from the host name and IPs). No demo users there:
+  `first-admin` creates admin.user once. Plain HTTP until TLS is added.
 
 ## 7. Known gaps (details in TODO.md)
 
-Inventory endpoints still return 501 (rebuilt in M5); attachments live on
+Attachments live on
 the backend's PVC (`UPLOAD_PATH`), so S3 is needed before scaling out;
 password reset is a stub; no audit log; no rate limiting; inherited frontend
 code still has many (mostly formatting) lint errors, so CI lints new code via

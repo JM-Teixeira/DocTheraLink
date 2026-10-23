@@ -28,9 +28,9 @@ func TestReferralNotificationsOnPostgres(t *testing.T) {
 	other := models.Facility{Name: "Elsewhere"}
 	db.Create(&other)
 	far := newUser(t, "far-physio", models.RolePhysioTherapist, &other.ID)
-	doctor := userID(t, "doctor")
-	sarah := userID(t, "physiotherapist")
-	tiago := userID(t, "physiotherapist2")
+	doctor := userID(t, "de.john.smith")
+	sarah := userID(t, "de.sarah.johnson")
+	tiago := userID(t, "de.tiago.martins")
 
 	p := models.Patient{Name: "Notified Patient"}
 	db.Create(&p)

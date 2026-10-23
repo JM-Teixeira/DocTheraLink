@@ -9,8 +9,8 @@ export function notificationText(n: AppNotification) {
   return {
     key: `notification__${n.event}`,
     params: {
-      actor: n.actor_name || "—",
-      patient: n.patient_name || "—",
+      actor: n.actor_name || "-",
+      patient: n.patient_name || "-",
     },
   };
 }

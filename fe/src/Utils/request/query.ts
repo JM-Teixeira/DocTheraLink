@@ -1,7 +1,12 @@
 import careConfig from "@careConfig";
 
 import { getResponseBody } from "@/Utils/request/request";
-import { APICallOptions, HTTPError, Route } from "@/Utils/request/types";
+import {
+  APICallOptions,
+  HTTPError,
+  NetworkError,
+  Route,
+} from "@/Utils/request/types";
 import { makeHeaders, makeUrl } from "@/Utils/request/utils";
 
 export async function callApi<TData, TBody>(
@@ -25,7 +30,7 @@ export async function callApi<TData, TBody>(
   try {
     res = await fetch(url, fetchOptions);
   } catch {
-    throw new Error("Network Error");
+    throw new NetworkError(options?.silent ?? false);
   }
 
   const data = await getResponseBody<TData>(res);

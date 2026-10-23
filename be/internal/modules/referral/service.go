@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,6 +35,10 @@ func (a Actor) isAdmin() bool     { return auth.IsAdmin(a.Role) }
 func (a Actor) isDoctor() bool    { return a.Role == models.RoleDoctor }
 func (a Actor) isTherapist() bool { return a.Role == models.RolePhysioTherapist }
 
+// isCoordinator: reads the referrals of their clinic (to plan patients by
+// diagnosis on the time board) but takes no part in them.
+func (a Actor) isCoordinator() bool { return a.Role == models.RoleCoordinator }
+
 // Pagination bounds for List.
 const (
 	defaultLimit = 20
@@ -45,6 +50,7 @@ type Service struct {
 	repo     Repository
 	clinics  clinic.Resolver
 	notifier Notifier
+	covers   CoverChecker // nil: no holiday cover
 	now      func() time.Time
 }
 
@@ -57,6 +63,43 @@ func NewService(repo Repository, clinics clinic.Resolver, now func() time.Time) 
 }
 
 // WithNotifier sets who is told about referral events (default: nobody).
+// CoverChecker tells which physios a physio is covering on a date (holiday
+// cover on the time board).
+type CoverChecker interface {
+	CoveredBy(ctx context.Context, coverID uint, at time.Time) ([]uint, error)
+}
+
+// WithCovers lets cover physios see and post on the referrals of the
+// physios they cover; it returns the service.
+func (s *Service) WithCovers(c CoverChecker) *Service {
+	s.covers = c
+	return s
+}
+
+// covering lists who the actor (a physio) is covering today.
+func (s *Service) covering(ctx context.Context, a Actor) ([]uint, error) {
+	if s.covers == nil || !a.isTherapist() {
+		return nil, nil
+	}
+	return s.covers.CoveredBy(ctx, a.ID, s.now())
+}
+
+// participates: the referral's doctor, therapist, admins, or a physio
+// covering the therapist.
+func (s *Service) participates(ctx context.Context, a Actor, r *Referral) (bool, error) {
+	if isParticipant(a, r) {
+		return true, nil
+	}
+	if r.TherapistID == nil {
+		return false, nil
+	}
+	covered, err := s.covering(ctx, a)
+	if err != nil {
+		return false, err
+	}
+	return slices.Contains(covered, *r.TherapistID), nil
+}
+
 func (s *Service) WithNotifier(n Notifier) *Service {
 	s.notifier = n
 	return s
@@ -143,8 +186,8 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (*Referral, e
 	if err != nil {
 		return nil, err
 	}
-	if isParticipant(actor, r) {
-		return r, nil
+	if ok, err := s.participates(ctx, actor, r); err != nil || ok {
+		return r, err
 	}
 	// Any therapist of the same clinic may see open, unassigned referrals (inbox).
 	if actor.isTherapist() && r.TherapistID == nil && r.Status == StatusPending {
@@ -156,13 +199,25 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (*Referral, e
 			return r, nil
 		}
 	}
+	// Coordinators read the referrals of their own clinic.
+	if actor.isCoordinator() {
+		mine, err := s.clinics.HomeClinic(ctx, actor.ID)
+		if err != nil {
+			return nil, err
+		}
+		if mine != nil && r.FacilityID != nil && *r.FacilityID == *mine {
+			return r, nil
+		}
+	}
 	// Hide existence from users who are not involved.
 	return nil, ErrNotFound
 }
 
 // scoped restricts f to what the actor may see: admins everything, doctors
-// their own referrals, therapists their inbox. Other roles are forbidden.
+// their own referrals, therapists their inbox, coordinators their clinic's
+// (read only). Other roles are forbidden.
 func (s *Service) scoped(ctx context.Context, actor Actor, f ListFilter) (ListFilter, error) {
+	f.Viewer = actor.ID // for the "questions waiting for me" filter
 	switch {
 	case actor.isAdmin():
 		// no scoping
@@ -176,6 +231,18 @@ func (s *Service) scoped(ctx context.Context, actor Actor, f ListFilter) (ListFi
 			return f, err
 		}
 		f.ClinicID = mine
+		if f.AlsoTherapists, err = s.covering(ctx, actor); err != nil {
+			return f, err
+		}
+	case actor.isCoordinator():
+		mine, err := s.clinics.HomeClinic(ctx, actor.ID)
+		if err != nil {
+			return f, err
+		}
+		if mine == nil {
+			return f, ErrForbidden
+		}
+		f.OnlyClinic = mine
 	default:
 		return f, ErrForbidden
 	}
@@ -207,7 +274,23 @@ func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Referr
 	if f.Offset < 0 {
 		f.Offset = 0
 	}
-	return s.repo.List(ctx, f)
+	items, total, err := s.repo.List(ctx, f)
+	if err != nil || len(items) == 0 {
+		return items, total, err
+	}
+	// Questions waiting for this viewer, shown as a badge on each card
+	ids := make([]string, len(items))
+	for i, r := range items {
+		ids[i] = r.ID
+	}
+	open, err := s.repo.OpenQuestions(ctx, ids, actor.ID)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range items {
+		items[i].OpenQuestions = open[items[i].ID]
+	}
+	return items, total, nil
 }
 
 // Accept lets a physiotherapist take a pending referral. Unassigned referrals
@@ -392,14 +475,31 @@ func (s *Service) AddNote(ctx context.Context, actor Actor, id string, req NoteR
 	if err != nil {
 		return nil, err
 	}
-	if !isParticipant(actor, r) {
-		return nil, ErrForbidden
+	if ok, err := s.participates(ctx, actor, r); err != nil || !ok {
+		return nil, firstErr(err, ErrForbidden)
 	}
 	kind := req.Kind
 	if kind == "" {
 		kind = NoteProgress
 	}
 	n := &Note{ReferralID: r.ID, AuthorID: actor.ID, Kind: kind, Body: body}
+	switch kind {
+	case NoteReply:
+		// A reply answers a question of this thread asked by someone else
+		if req.ReplyTo == "" {
+			return nil, &ValidationError{"a reply must say which question it answers"}
+		}
+		q, err := s.repo.GetNote(ctx, r.ID, req.ReplyTo)
+		if err != nil {
+			return nil, firstErr(err, ErrNotFound)
+		}
+		if q.Kind != NoteQuestion || q.AuthorID == actor.ID {
+			return nil, &ValidationError{"only questions asked by the other side can be answered"}
+		}
+		n.ReplyToID = &q.ID
+	case NoteProgress:
+		n.Pain = req.Pain
+	}
 	if err := s.repo.AddNote(ctx, n); err != nil {
 		return nil, err
 	}
@@ -412,7 +512,21 @@ func (s *Service) Notes(ctx context.Context, actor Actor, id string) ([]Note, er
 	if _, err := s.Get(ctx, actor, id); err != nil {
 		return nil, err
 	}
-	return s.repo.ListNotes(ctx, id)
+	notes, err := s.repo.ListNotes(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	// A question is answered once any reply points at it
+	replied := map[string]bool{}
+	for _, n := range notes {
+		if n.ReplyToID != nil {
+			replied[*n.ReplyToID] = true
+		}
+	}
+	for i := range notes {
+		notes[i].Answered = notes[i].Kind == NoteQuestion && replied[notes[i].ID]
+	}
+	return notes, nil
 }
 
 // transition loads the referral, checks it is in status from, applies mutate
@@ -449,4 +563,11 @@ func isParticipant(a Actor, r *Referral) bool {
 
 func isAssignedTherapist(a Actor, r *Referral) bool {
 	return a.isTherapist() && r.TherapistID != nil && *r.TherapistID == a.ID
+}
+
+func firstErr(err, fallback error) error {
+	if err != nil {
+		return err
+	}
+	return fallback
 }

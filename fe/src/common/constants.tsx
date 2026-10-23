@@ -35,6 +35,8 @@ export const USER_TYPE_OPTIONS = [
   { id: "Staff", role: "Staff", readOnly: false },
   // Front desk: registers patients and (M3) manages appointments; no clinical notes
   { id: "Receptionist", role: "Receptionist", readOnly: false },
+  // Runs the clinic day: time board (divisions, shifts, physio load), stock
+  { id: "Coordinator", role: "Coordinator", readOnly: false },
   // { id: "NurseReadOnly", role: "Nurse", readOnly: true },
   { id: "Nurse", role: "Nurse", readOnly: false },
   { id: "PhysioTherapist", role: "PhysioTherapist", readOnly: false },
@@ -1215,6 +1217,7 @@ export const USER_TYPES_MAP = {
   StaffReadOnly: "Staff",
   Staff: "Staff",
   Receptionist: "Receptionist",
+  Coordinator: "Coordinator",
   Doctor: "Doctor",
   Nurse: "Nurse",
   NurseReadOnly: "Nurse",

@@ -141,6 +141,68 @@ func TestClinicIsolation(t *testing.T) {
 	assertErr(t, err, &ValidationError{})
 }
 
+// TestCoordinatorReadsOnly: a coordinator sees the clinic's referrals and
+// their thread (to plan patients) but cannot post or act on them.
+func TestCoordinatorReadsOnly(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newTestService(t)
+	coordinator := Actor{ID: 30, Role: models.RoleCoordinator}
+	farCoordinator := Actor{ID: 31, Role: models.RoleCoordinator}
+	s.clinics = clinic.Static{doctor.ID: clinicA, physio.ID: clinicA, coordinator.ID: clinicA, farCoordinator.ID: clinicB}
+	r := mustCreate(t, s, ptrUint(physio.ID))
+
+	if _, err := s.Get(ctx, coordinator, r.ID); err != nil {
+		t.Fatalf("coordinator get: %v", err)
+	}
+	if _, err := s.Notes(ctx, coordinator, r.ID); err != nil {
+		t.Errorf("coordinator reads the thread: %v", err)
+	}
+	if _, total, err := s.List(ctx, coordinator, ListFilter{}); err != nil || total != 1 {
+		t.Errorf("coordinator list: %d %v", total, err)
+	}
+	if _, err := s.Get(ctx, farCoordinator, r.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("another clinic's coordinator: %v", err)
+	}
+	if _, total, _ := s.List(ctx, farCoordinator, ListFilter{}); total != 0 {
+		t.Errorf("another clinic's list: %d", total)
+	}
+	if _, err := s.AddNote(ctx, coordinator, r.ID, NoteRequest{Body: "hi"}); !errors.Is(err, ErrForbidden) {
+		t.Errorf("coordinator posting: %v", err)
+	}
+	if _, err := s.Cancel(ctx, coordinator, r.ID, "x"); err == nil {
+		t.Error("coordinator must not cancel")
+	}
+}
+
+// covers is a fixed holiday cover: cover → physios covered.
+type covers map[uint][]uint
+
+func (c covers) CoveredBy(_ context.Context, id uint, _ time.Time) ([]uint, error) { return c[id], nil }
+
+// TestHolidayCover: a physio covering a colleague reads and posts on the
+// colleague's referrals while covering; others still cannot.
+func TestHolidayCover(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newTestService(t)
+	r := mustCreate(t, s, ptrUint(physio.ID))
+	if _, err := s.Get(ctx, otherPhysio, r.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("before cover: %v", err)
+	}
+	s.WithCovers(covers{otherPhysio.ID: {physio.ID}})
+	if _, err := s.Get(ctx, otherPhysio, r.ID); err != nil {
+		t.Errorf("cover reads: %v", err)
+	}
+	if _, err := s.AddNote(ctx, otherPhysio, r.ID, NoteRequest{Body: "Sessão 3: boa evolução."}); err != nil {
+		t.Errorf("cover posts: %v", err)
+	}
+	if _, total, _ := s.List(ctx, otherPhysio, ListFilter{}); total != 1 {
+		t.Errorf("cover's inbox includes it: %d", total)
+	}
+	if _, err := s.Get(ctx, farPhysio, r.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("not covering: %v", err)
+	}
+}
+
 func TestReassign(t *testing.T) {
 	ctx := context.Background()
 	handOver := func(to uint) ReassignRequest { return ReassignRequest{TherapistID: to, Reason: "Holiday cover"} }

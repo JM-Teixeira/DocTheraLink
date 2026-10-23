@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
+	"strings"
 
+	"klyniva/internal/auth"
 	"klyniva/internal/config"
 	"klyniva/internal/database"
 	"klyniva/internal/models"
@@ -43,14 +46,24 @@ func (h *FacilityHandler) ListFacilities(c *gin.Context) {
 		return
 	}
 
-	if params.Limit == 0 {
-		params.Limit = 20
-	}
+	params.Limit = pageLimit(params.Limit)
 
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
 	query := db.Model(&models.Facility{}).
 		Preload("State").
 		Preload("District")
+	// Staff see their own clinic; admins all of them
+	if !auth.IsAdmin(a.Role) {
+		if a.Clinic == nil {
+			query = query.Where("1 = 0")
+		} else {
+			query = query.Where("id = ?", *a.Clinic)
+		}
+	}
 
 	if params.Search != "" {
 		query = query.Where("name ILIKE ?", "%"+params.Search+"%")
@@ -86,11 +99,19 @@ func (h *FacilityHandler) ListFacilities(c *gin.Context) {
 // @Param facility body models.FacilityRequest true "Facility data"
 // @Success 201 {object} models.Facility
 // @Router /facility/ [post]
+// Admins only.
 func (h *FacilityHandler) CreateFacility(c *gin.Context) {
+	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !auth.IsAdmin(a.Role) {
+		forbid(c)
+		return
+	}
 	var req models.FacilityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// Log the actual error for debugging
-		println("ERROR: Failed to bind JSON:", err.Error())
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
 			Message: "Invalid request body: " + err.Error(),
@@ -98,14 +119,15 @@ func (h *FacilityHandler) CreateFacility(c *gin.Context) {
 		return
 	}
 
-	// Log what we received
-	println("DEBUG: Received facility request:")
-	println("  Name:", req.Name)
-	println("  FacilityType:", req.FacilityType)
-	println("  Address:", req.Address)
+	code := normalizeCode(req.Code)
+	if err := checkClinicCode(db, code, "", ""); err != nil {
+		clinicCodeFailed(c, err)
+		return
+	}
 
 	facility := models.Facility{
 		Name:              req.Name,
+		Code:              code,
 		FacilityType:      req.FacilityType,
 		Address:           req.Address,
 		MiddlewareAddress: req.MiddlewareAddress,
@@ -118,18 +140,14 @@ func (h *FacilityHandler) CreateFacility(c *gin.Context) {
 		Features:          req.Features,
 	}
 
-	db := database.GetDB()
 	if err := db.Create(&facility).Error; err != nil {
-		// Log the actual database error
-		println("ERROR: Failed to create facility in database:", err.Error())
+		log.Printf("create facility: %v", err)
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
-			Message: "Failed to create facility: " + err.Error(),
+			Message: "Failed to create facility",
 		})
 		return
 	}
-
-	println("SUCCESS: Facility created with ID:", facility.ID)
 
 	// Load relationships
 	db.Preload("State").
@@ -154,6 +172,14 @@ func (h *FacilityHandler) GetFacility(c *gin.Context) {
 
 	var facility models.Facility
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !canSeeClinic(a, id) {
+		notFound(c, "Facility")
+		return
+	}
 	if err := db.Preload("State").
 		Preload("District").
 		Where("id = ?", id).
@@ -191,6 +217,14 @@ func (h *FacilityHandler) UpdateFacility(c *gin.Context) {
 
 	var facility models.Facility
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !canManageClinic(a, id) {
+		forbid(c)
+		return
+	}
 	if err := db.Where("id = ?", id).First(&facility).Error; err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{
 			Error:   "not_found",
@@ -209,6 +243,16 @@ func (h *FacilityHandler) UpdateFacility(c *gin.Context) {
 	}
 
 	// Update facility
+	code := normalizeCode(req.Code)
+	if !auth.IsAdmin(a.Role) && code != facility.Code { // only admins set a code
+		forbid(c)
+		return
+	}
+	if err := checkClinicCode(db, code, facility.ID, facility.Code); err != nil {
+		clinicCodeFailed(c, err)
+		return
+	}
+	facility.Code = code
 	facility.Name = req.Name
 	facility.FacilityType = req.FacilityType
 	facility.Address = req.Address
@@ -253,6 +297,14 @@ func (h *FacilityHandler) PartialUpdateFacility(c *gin.Context) {
 
 	var facility models.Facility
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !canManageClinic(a, id) {
+		forbid(c)
+		return
+	}
 	if err := db.Where("id = ?", id).First(&facility).Error; err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{
 			Error:   "not_found",
@@ -270,7 +322,22 @@ func (h *FacilityHandler) PartialUpdateFacility(c *gin.Context) {
 		return
 	}
 
-	if err := db.Model(&facility).Updates(updateData).Error; err != nil {
+	// Only known clinic fields (never ids, timestamps or soft-delete)
+	fields := clinicUpdate(updateData)
+	if raw, sent := updateData["code"]; sent {
+		code, _ := raw.(string)
+		code = normalizeCode(code)
+		if !auth.IsAdmin(a.Role) && code != facility.Code {
+			forbid(c)
+			return
+		}
+		if err := checkClinicCode(db, code, facility.ID, facility.Code); err != nil {
+			clinicCodeFailed(c, err)
+			return
+		}
+		fields["code"] = code
+	}
+	if err := db.Model(&facility).Updates(fields).Error; err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "bad_request",
 			Message: "Failed to update facility",
@@ -296,10 +363,19 @@ func (h *FacilityHandler) PartialUpdateFacility(c *gin.Context) {
 // @Param id path string true "Facility ID"
 // @Success 200 {object} models.SuccessResponse
 // @Router /facility/{id}/ [delete]
+// Admins only.
 func (h *FacilityHandler) DeleteFacility(c *gin.Context) {
 	id := c.Param("id")
 
 	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !auth.IsAdmin(a.Role) {
+		forbid(c)
+		return
+	}
 	result := db.Where("id = ?", id).Delete(&models.Facility{})
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
@@ -394,47 +470,40 @@ func (h *FacilityHandler) GetState(c *gin.Context) {
 }
 
 // Placeholder implementations for other endpoints
+// GetFacilityUsers lists the active users working in a clinic (their home
+// facility), optionally filtered by ?username=, with limit/offset paging.
 func (h *FacilityHandler) GetFacilityUsers(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{
-		Error:   "not_implemented",
-		Message: "Endpoint not implemented yet",
-	})
-}
-
-func (h *FacilityHandler) GetInventoryLog(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) CreateInventory(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetMinQuantity(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) SetMinQuantity(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetMinQuantityItem(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) UpdateMinQuantity(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) GetInventorySummary(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) FlagInventoryItem(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
-}
-
-func (h *FacilityHandler) DeleteLastInventoryLog(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+	var params models.QueryParams
+	if err := c.ShouldBindQuery(&params); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: "Invalid query parameters"})
+		return
+	}
+	params.Limit = pageLimit(params.Limit)
+	db := database.GetDB()
+	a, ok := currentActor(c, db)
+	if !ok {
+		return
+	}
+	if !canSeeClinic(a, c.Param("id")) {
+		notFound(c, "Facility")
+		return
+	}
+	query := db.Model(&models.User{}).Where("home_facility_id = ? AND is_active", c.Param("id"))
+	if u := strings.TrimSpace(c.Query("username")); u != "" {
+		query = query.Where("username ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ?", "%"+u+"%", "%"+u+"%", "%"+u+"%")
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "internal_error", Message: "Failed to fetch users"})
+		return
+	}
+	var users []models.User
+	if err := query.Preload("HomeFacility").Order("first_name, last_name").
+		Limit(params.Limit).Offset(params.Offset).Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "internal_error", Message: "Failed to fetch users"})
+		return
+	}
+	c.JSON(http.StatusOK, models.PaginatedResponse{Count: int(total), Results: users})
 }
 
 func (h *FacilityHandler) GetDistrictsByState(c *gin.Context) {
@@ -512,10 +581,17 @@ func (h *FacilityHandler) GetWard(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
 }
 
-func (h *FacilityHandler) GetItems(c *gin.Context) {
+func (h *FacilityHandler) DownloadFacility(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
 }
 
-func (h *FacilityHandler) DownloadFacility(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, models.ErrorResponse{Error: "not_implemented", Message: "Endpoint not implemented yet"})
+// clinicCodeFailed answers 400 for a bad code, 500 for anything else.
+func clinicCodeFailed(c *gin.Context, err error) {
+	if codeError(err) {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "validation_error", Message: err.Error(),
+			Details: map[string]string{"code": err.Error()}})
+		return
+	}
+	log.Printf("clinic code: %v", err)
+	c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "internal_error", Message: "Unexpected error"})
 }

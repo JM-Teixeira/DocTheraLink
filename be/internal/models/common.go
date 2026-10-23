@@ -84,33 +84,3 @@ type FileUpload struct {
 	CreatedAt time.Time `json:"created_date"`
 	UpdatedAt time.Time `json:"modified_date"`
 }
-
-// Inventory represents facility inventory items
-type InventoryItem struct {
-	ID          uint    `json:"id" gorm:"primaryKey"`
-	Name        string  `json:"name" gorm:"not null"`
-	Description *string `json:"description"`
-	Category    string  `json:"category"`
-	Unit        string  `json:"unit" gorm:"default:'nos'"`
-
-	CreatedAt time.Time `json:"created_date"`
-	UpdatedAt time.Time `json:"modified_date"`
-}
-
-type InventoryLog struct {
-	ID               string `json:"external_id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	FacilityID       string `json:"-"`
-	ItemID           uint   `json:"-"`
-	QuantityInStock  int    `json:"quantity_in_stock"`
-	QuantityAdded    int    `json:"quantity_added"`
-	QuantityConsumed int    `json:"quantity_consumed"`
-	IsFlagged        bool   `json:"is_flagged" gorm:"default:false"`
-	CreatedByID      uint   `json:"-"`
-
-	Facility  Facility        `json:"-" gorm:"foreignKey:FacilityID"`
-	Item      InventoryItem   `json:"item" gorm:"foreignKey:ItemID"`
-	CreatedBy UserBareMinimum `json:"created_by" gorm:"foreignKey:CreatedByID"`
-
-	CreatedAt time.Time `json:"created_date"`
-	UpdatedAt time.Time `json:"modified_date"`
-}

@@ -6,8 +6,9 @@ import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
 import { userChildProps } from "@/components/Common/UserColumns";
 import Error404 from "@/components/ErrorPages/404";
-import LinkedFacilitiesTab from "@/components/Users/LinkedFacilitiesTab";
-import LinkedSkillsTab from "@/components/Users/LinkedSkillsTab";
+import EmploymentTab from "@/components/Staff/EmploymentTab";
+import SkillsTab from "@/components/Staff/SkillsTab";
+import WorkTimeline from "@/components/Staff/WorkTimeline";
 import UserBanner from "@/components/Users/UserBanner";
 import UserSummaryTab from "@/components/Users/UserSummary";
 import { UserModel } from "@/components/Users/models";
@@ -18,6 +19,7 @@ import * as Notification from "@/Utils/Notifications";
 import { editUserPermissions } from "@/Utils/permissions";
 import routes from "@/Utils/request/api";
 import useTanStackQueryInstead from "@/Utils/request/useQuery";
+import { managesStaff } from "@/Utils/roles";
 import { classNames, formatName, keysOf } from "@/Utils/utils";
 
 export interface UserHomeProps {
@@ -73,13 +75,11 @@ export default function UserHome(props: UserHomeProps) {
     FACILITIES: tabChildProp;
   } = {
     PROFILE: { body: UserSummaryTab },
-    SKILLS: {
-      body: LinkedSkillsTab,
-      hidden: !editPermissions,
-    },
+    SKILLS: { body: SkillsTab },
+    // Clinic and employment status (hired, on leave, left)
     FACILITIES: {
-      body: LinkedFacilitiesTab,
-      hidden: !editPermissions,
+      body: EmploymentTab,
+      hidden: !editPermissions && !managesStaff(authUser, userData),
     },
   };
 
@@ -88,7 +88,7 @@ export default function UserHome(props: UserHomeProps) {
     Object.keys(TABS).includes(tab as keyof typeof TABS);
   const currentTab = isValidTab(normalizedTab) ? normalizedTab : undefined;
 
-  if (!currentTab) {
+  if (!currentTab || TABS[currentTab].hidden) {
     return <Error404 />;
   }
 
@@ -97,6 +97,7 @@ export default function UserHome(props: UserHomeProps) {
   return (
     <>
       <Page
+        help="person"
         title={formatName(userData) || userData.username || t("manage_user")}
         crumbsReplacements={
           loggedInUser
@@ -110,6 +111,7 @@ export default function UserHome(props: UserHomeProps) {
         {
           <>
             <UserBanner userData={userData} />
+            <WorkTimeline username={username} />
             <div className="mt-4 w-full border-b-2 border-secondary-200">
               <div className="overflow-x-auto sm:flex sm:items-baseline">
                 <div className="mt-4 sm:mt-0">
@@ -124,10 +126,10 @@ export default function UserHome(props: UserHomeProps) {
                           <Link
                             key={p}
                             className={classNames(
-                              "min-w-max-content cursor-pointer whitespace-nowrap text-sm font-semibold capitalize",
+                              "min-w-max-content cursor-pointer whitespace-nowrap text-sm font-semibold",
                               currentTab === p
                                 ? "border-b-2 border-primary-500 text-primary-600 hover:border-secondary-300"
-                                : "text-secondary-700 hover:text-secondary-700",
+                                : "text-gray-600 hover:text-gray-900",
                             )}
                             href={`${urlPrefix}/${p.toLocaleLowerCase()}`}
                           >
@@ -144,7 +146,6 @@ export default function UserHome(props: UserHomeProps) {
             <SelectedTab
               userData={userData}
               username={username}
-              {...props}
               refetchUserData={refetchUserDetails}
             />
           </>

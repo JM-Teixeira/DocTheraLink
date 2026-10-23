@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import CareIcon from "@/CAREUI/icons/CareIcon";
 
+import { AboutSummary } from "@/components/About/AboutPage";
 import ButtonV2 from "@/components/Common/ButtonV2";
 import LanguageSelector from "@/components/Common/LanguageSelector";
 import UserColumns from "@/components/Common/UserColumns";
@@ -15,7 +16,6 @@ import {
   UserProfessionalInfoView,
 } from "@/components/Users/UserEditDetails";
 import UserResetPassword from "@/components/Users/UserResetPassword";
-import UserSoftwareUpdate from "@/components/Users/UserSoftwareUpdate";
 import {
   BasicInfoDetails,
   ContactInfoDetails,
@@ -209,9 +209,9 @@ export default function UserSummaryTab({
               childProps={userColumnsData}
             />
             <UserColumns
-              heading={t("software_update")}
-              note={t("check_for_available_update")}
-              Child={UserSoftwareUpdate}
+              heading={t("about_klyniva")}
+              note={t("about_klyniva_note")}
+              Child={AboutSummary}
               childProps={userColumnsData}
             />
           </>

@@ -1,4 +1,5 @@
 import careConfig from "@careConfig";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "raviger";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,12 +15,14 @@ import {
 } from "@/components/Common/Sidebar/SidebarItem";
 import SidebarUserCard from "@/components/Common/Sidebar/SidebarUserCard";
 import NotificationsPanel from "@/components/Notifications/NotificationsPanel";
+import SuggestionRoutes from "@/components/Settings/api";
 
 import useActiveLink from "@/hooks/useActiveLink";
 import useAuthUser from "@/hooks/useAuthUser";
 import { useCareAppNavItems } from "@/hooks/useCareApps";
 
-import { canSeeReferrals } from "@/Utils/roles";
+import query from "@/Utils/request/query";
+import { canSeeReferrals, isAdmin } from "@/Utils/roles";
 import { classNames } from "@/Utils/utils";
 
 export const SIDEBAR_SHRINK_PREFERENCE_KEY = "sidebarShrinkPreference";
@@ -30,6 +33,7 @@ export interface INavItem {
   text: string;
   to?: string;
   icon: IconName;
+  badgeCount?: number;
 }
 
 type StatelessSidebarProps =
@@ -53,8 +57,15 @@ const StatelessSidebar = ({
 }: StatelessSidebarProps) => {
   const { t } = useTranslation();
   const user = useAuthUser();
+  const { data: newSuggestions } = useQuery({
+    queryKey: ["suggestions", "count"],
+    queryFn: query(SuggestionRoutes.count, { silent: true }),
+    enabled: isAdmin(user),
+    refetchInterval: 5 * 60_000,
+  });
   // Only show what the role can open (the backend enforces the same rules)
   const BaseNavItems: INavItem[] = [
+    { text: t("home"), to: "/", icon: "l-home" },
     { text: t("patients"), to: "/patients", icon: "d-patient" },
     ...(canSeeReferrals(user)
       ? [
@@ -65,8 +76,21 @@ const StatelessSidebar = ({
           } as const,
         ]
       : []),
+    { text: t("time_board"), to: "/time-board", icon: "l-schedule" },
+    { text: t("inventory"), to: "/inventory", icon: "l-box" },
     { text: t("clinic"), to: "/facility", icon: "d-hospital" },
     { text: t("users"), to: "/users", icon: "d-people" },
+    // Suggestions from everyone, read by admins (badge: not read yet)
+    ...(isAdmin(user)
+      ? [
+          {
+            text: t("suggestions"),
+            to: "/suggestions",
+            icon: "l-lightbulb-alt",
+            badgeCount: newSuggestions?.new,
+          } as const,
+        ]
+      : []),
   ];
 
   const PluginNavItems = useCareAppNavItems();
@@ -146,6 +170,7 @@ const StatelessSidebar = ({
           } flex items-center justify-between`}
         >
           <img
+            alt={t("home")}
             className="h-8 w-auto self-start transition md:h-10"
             src={shrinked ? LOGO_COLLAPSE : careConfig.mainLogo?.light}
           />
@@ -253,6 +278,7 @@ const ToggleShrink = ({ shrinked, toggle }: ToggleShrinkProps) => {
         <button
           className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 ${shrinked ? "bg-gray-200" : "bg-gray-100"} text-gray-600 hover:bg-primary-200 hover:text-primary-800 ${shrinked ? "mx-auto" : "mr-4"} transition-all ease-in-out`}
           onClick={toggle}
+          aria-label={shrinked ? t("expand_sidebar") : t("collapse_sidebar")}
         >
           <CareIcon
             icon={shrinked ? "l-arrow-bar-right" : "l-layout-sidebar-alt"}

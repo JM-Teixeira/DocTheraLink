@@ -28,6 +28,12 @@ type Repository interface {
 	Transition(ctx context.Context, r *Referral, from Status, note *Note) error
 	AddNote(ctx context.Context, n *Note) error
 	ListNotes(ctx context.Context, referralID string) ([]Note, error)
+	// Plans are the saved versions of a referral's treatment plan, newest first.
+	Plans(ctx context.Context, referralID string) ([]Plan, error)
+	AddPlan(ctx context.Context, p *Plan) error
+	GetNote(ctx context.Context, referralID, id string) (*Note, error)
+	// OpenQuestions counts per referral the unanswered questions others asked the viewer.
+	OpenQuestions(ctx context.Context, referralIDs []string, viewer uint) (map[string]int, error)
 	PatientExists(ctx context.Context, id string) (bool, error)
 	// UserRole returns the user's role and whether the account is active.
 	UserRole(ctx context.Context, id uint) (role string, active bool, err error)
@@ -66,6 +72,40 @@ func (g *GormRepository) Get(ctx context.Context, id string) (*Referral, error) 
 
 // filtered applies the scope and filters of f. The status filter is optional
 // so Counts can group by status over the same set.
+// openQuestionsSQL selects the referrals with a question that someone other
+// than the viewer (?) asked and nobody has answered yet.
+const openQuestionsSQL = `SELECT q.referral_id FROM referral_notes q
+	WHERE q.kind = 'question' AND q.author_id <> ?
+	AND NOT EXISTS (SELECT 1 FROM referral_notes r WHERE r.reply_to_id = q.id)`
+
+// OpenQuestions counts, per referral, the unanswered questions others asked the viewer.
+func (g *GormRepository) OpenQuestions(ctx context.Context, referralIDs []string, viewer uint) (map[string]int, error) {
+	out := map[string]int{}
+	if len(referralIDs) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		ReferralID string
+		N          int
+	}
+	err := g.db.WithContext(ctx).Raw(`SELECT referral_id, COUNT(*) AS n FROM (`+openQuestionsSQL+`) oq
+		WHERE referral_id IN ? GROUP BY referral_id`, viewer, referralIDs).Scan(&rows).Error
+	for _, r := range rows {
+		out[r.ReferralID] = r.N
+	}
+	return out, err
+}
+
+// GetNote returns one note of a referral.
+func (g *GormRepository) GetNote(ctx context.Context, referralID, id string) (*Note, error) {
+	var n Note
+	err := g.db.WithContext(ctx).Where("referral_id = ? AND id = ?", referralID, id).First(&n).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	return &n, err
+}
+
 func filtered(q *gorm.DB, f ListFilter, withStatus bool) *gorm.DB {
 	if withStatus && f.Status != "" {
 		q = q.Where("status = ?", f.Status)
@@ -77,6 +117,9 @@ func filtered(q *gorm.DB, f ListFilter, withStatus bool) *gorm.DB {
 		q = q.Where("doctor_id = ?", f.DoctorID)
 	}
 	switch {
+	case f.TherapistID != 0 && f.InboxForTherapist && f.ClinicID != nil && len(f.AlsoTherapists) > 0:
+		q = q.Where("(therapist_id = ? OR therapist_id IN ? OR (therapist_id IS NULL AND status = ? AND (facility_id IS NULL OR facility_id = ?)))",
+			f.TherapistID, f.AlsoTherapists, StatusPending, *f.ClinicID)
 	case f.TherapistID != 0 && f.InboxForTherapist && f.ClinicID != nil:
 		// A therapist's inbox: everything assigned to them plus open, unassigned
 		// referrals of their clinic (or without a clinic).
@@ -87,9 +130,15 @@ func filtered(q *gorm.DB, f ListFilter, withStatus bool) *gorm.DB {
 	case f.TherapistID != 0:
 		q = q.Where("therapist_id = ?", f.TherapistID)
 	}
+	if f.OnlyClinic != nil {
+		q = q.Where("facility_id = ?", *f.OnlyClinic)
+	}
 	// Optional user-facing filters
 	if f.Priority != "" {
 		q = q.Where("priority = ?", f.Priority)
+	}
+	if f.ByDoctor != 0 {
+		q = q.Where("doctor_id = ?", f.ByDoctor)
 	}
 	if f.AssignedTo != 0 {
 		q = q.Where("therapist_id = ?", f.AssignedTo)
@@ -97,6 +146,9 @@ func filtered(q *gorm.DB, f ListFilter, withStatus bool) *gorm.DB {
 	if term := strings.TrimSpace(f.Search); term != "" {
 		// Subquery keeps column names unambiguous (both tables have status, created_at…)
 		q = q.Where("patient_id IN (SELECT id FROM patients WHERE name ILIKE ?)", "%"+escapeLike(term)+"%")
+	}
+	if f.OpenQuestions && f.Viewer != 0 {
+		q = q.Where("id IN ("+openQuestionsSQL+")", f.Viewer)
 	}
 	if f.From != nil {
 		q = q.Where("created_at >= ?", *f.From)
@@ -160,6 +212,17 @@ func (g *GormRepository) Transition(ctx context.Context, r *Referral, from Statu
 		}
 		return nil
 	})
+}
+
+func (g *GormRepository) Plans(ctx context.Context, referralID string) ([]Plan, error) {
+	var out []Plan
+	err := g.db.WithContext(ctx).Preload("Author").Where("referral_id = ?", referralID).
+		Order("created_at DESC").Find(&out).Error
+	return out, err
+}
+
+func (g *GormRepository) AddPlan(ctx context.Context, p *Plan) error {
+	return g.db.WithContext(ctx).Create(p).Error
 }
 
 func (g *GormRepository) AddNote(ctx context.Context, n *Note) error {

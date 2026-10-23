@@ -78,8 +78,8 @@ func TestReferralLifecycleOnPostgres(t *testing.T) {
 		t.Fatalf("create patient: %v", err)
 	}
 
-	doctor := userID(t, "doctor")
-	physio := userID(t, "physiotherapist")
+	doctor := userID(t, "de.john.smith")
+	physio := userID(t, "de.sarah.johnson")
 	svc := referral.NewService(referral.NewGormRepository(db), clinic.NewGormResolver(db), nil)
 
 	r, err := svc.Create(ctx, doctor, referral.CreateRequest{
@@ -124,8 +124,8 @@ func TestReferralFiltersOnPostgres(t *testing.T) {
 	ctx := context.Background()
 	db := database.GetDB()
 	svc := referral.NewService(referral.NewGormRepository(db), clinic.NewGormResolver(db), nil)
-	doctor := userID(t, "doctor")
-	physio := userID(t, "physiotherapist")
+	doctor := userID(t, "de.john.smith")
+	physio := userID(t, "de.sarah.johnson")
 
 	for _, name := range []string{"Ana Pereira", "Anabela Costa", "Bruno 100% Silva"} {
 		p := models.Patient{Name: name}
@@ -192,14 +192,14 @@ func TestConcurrentAcceptHasOneWinner(t *testing.T) {
 	}
 
 	svc := referral.NewService(referral.NewGormRepository(db), clinic.NewGormResolver(db), nil)
-	r, err := svc.Create(ctx, userID(t, "doctor"), referral.CreateRequest{
+	r, err := svc.Create(ctx, userID(t, "de.john.smith"), referral.CreateRequest{
 		PatientID: patient.ID, Diagnosis: "Frozen shoulder", Reason: "Mobilisation",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	actors := []referral.Actor{userID(t, "physiotherapist"), {ID: second.ID, Role: models.RolePhysioTherapist}}
+	actors := []referral.Actor{userID(t, "de.sarah.johnson"), {ID: second.ID, Role: models.RolePhysioTherapist}}
 	errs := make([]error, len(actors))
 	var wg sync.WaitGroup
 	for i, a := range actors {

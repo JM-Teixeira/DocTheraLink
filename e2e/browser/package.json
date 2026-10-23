@@ -1,0 +1,12 @@
+{
+  "name": "klyniva-browser-e2e",
+  "private": true,
+  "description": "Browser end-to-end tests (Playwright) against a running Klyniva (local k3d or compose).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "1.64.1"
+  }
+}

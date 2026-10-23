@@ -162,8 +162,10 @@ const Login = (props: { forgot?: boolean }) => {
   return (
     <div className="relative flex flex-col-reverse overflow-hidden md:h-screen md:flex-row">
       {!forgotPassword && <BrowserWarning />}
-      <div className="login-hero relative flex flex-auto flex-col justify-between p-6 md:h-full md:w-[calc(50%+130px)] md:flex-none md:p-0 md:px-16 md:pr-[calc(4rem+130px)]">
-        <div></div>
+      <div className="login-hero relative flex flex-auto flex-col p-6 md:h-full md:w-[calc(50%+130px)] md:flex-none md:p-0 md:px-16 md:pr-[calc(4rem+130px)]">
+        {/* Fixed offset (not centred) so the title stays put when the texts
+            below change length with the language */}
+        <div className="hidden md:block md:h-[18vh]" />
         <div className="mt-4 flex flex-col items-start rounded-lg py-4 md:mt-12">
           <div className="mb-4 hidden items-center gap-6 md:flex">
             {(customLogo || stateLogo) && (
@@ -204,7 +206,7 @@ const Login = (props: { forgot?: boolean }) => {
             )}
           </div>
         </div>
-        <div className="mb-6 flex items-center">
+        <div className="mb-6 mt-auto flex items-center">
           <div className="max-w-lg text-xs md:text-sm">
             <div className="mb-2 ml-1 flex items-center gap-4">
               <a href={urls.ohcn} rel="noopener noreferrer" target="_blank">

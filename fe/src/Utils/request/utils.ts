@@ -4,6 +4,8 @@ import { LocalStorageKeys } from "@/common/constants";
 
 import * as Notification from "@/Utils/Notifications";
 import { QueryParams, RequestOptions } from "@/Utils/request/types";
+import { viewAsHeaders } from "@/Utils/viewAs";
+import { workingClinicHeaders } from "@/Utils/workingClinic";
 
 export function makeUrl(
   path: string,
@@ -30,7 +32,9 @@ const makeQueryParams = (query: QueryParams) => {
   const qParams = new URLSearchParams();
 
   Object.entries(query).forEach(([key, value]) => {
-    if (value !== undefined) {
+    if (Array.isArray(value)) {
+      value.forEach((v) => qParams.append(key, `${v}`));
+    } else if (value !== undefined) {
       qParams.set(key, `${value}`);
     }
   });
@@ -60,6 +64,13 @@ export function makeHeaders(noAuth: boolean, additionalHeaders?: HeadersInit) {
   if (authorizationHeader && !noAuth) {
     headers.append("Authorization", authorizationHeader);
   }
+  // An admin viewing the app as a clinic role (read-only), or working on one clinic
+  if (!noAuth)
+    for (const [k, v] of Object.entries({
+      ...workingClinicHeaders(),
+      ...viewAsHeaders(),
+    }))
+      headers.set(k, v);
 
   return headers;
 }

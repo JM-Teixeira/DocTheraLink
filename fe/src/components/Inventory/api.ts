@@ -1,0 +1,89 @@
+import {
+  GrantRule,
+  ItemRequest,
+  MovementRequest,
+  SessionRule,
+  StockAccess,
+  StockGrant,
+  StockItem,
+  StockMovement,
+  StockSummary,
+} from "@/components/Inventory/types";
+
+import { Type } from "@/Utils/request/api";
+
+/** Inventory API (be/internal/modules/inventory/routes.go). */
+const InventoryRoutes = {
+  access: {
+    path: "/api/v1/inventory/access/",
+    method: "GET",
+    TRes: Type<StockAccess>(),
+  },
+  grants: {
+    path: "/api/v1/inventory/grants/",
+    method: "GET",
+    TRes: Type<StockGrant[]>(),
+  },
+  setGrants: {
+    path: "/api/v1/inventory/grants/{userId}/",
+    method: "PUT",
+    TBody: Type<{ rules: GrantRule[] }>(),
+    TRes: Type<StockGrant[]>(),
+  },
+  summary: {
+    path: "/api/v1/inventory/summary/",
+    method: "GET",
+    TRes: Type<StockSummary>(),
+  },
+  audit: {
+    path: "/api/v1/inventory/audit/",
+    method: "GET",
+    TRes: Type<StockMovement[]>(),
+  },
+  reorder: {
+    path: "/api/v1/inventory/reorder/",
+    method: "GET",
+    TRes: Type<StockItem[]>(),
+  },
+  sessionRules: {
+    path: "/api/v1/inventory/items/{id}/session-rules/",
+    method: "PUT",
+    TBody: Type<{ rules: SessionRule[] }>(),
+    TRes: Type<StockItem>(),
+  },
+  list: {
+    path: "/api/v1/inventory/items/",
+    method: "GET",
+    TRes: Type<StockItem[]>(),
+  },
+  create: {
+    path: "/api/v1/inventory/items/",
+    method: "POST",
+    TBody: Type<ItemRequest>(),
+    TRes: Type<StockItem>(),
+  },
+  update: {
+    path: "/api/v1/inventory/items/{id}/",
+    method: "PUT",
+    TBody: Type<ItemRequest>(),
+    TRes: Type<StockItem>(),
+  },
+  archive: {
+    path: "/api/v1/inventory/items/{id}/",
+    method: "DELETE",
+    TRes: Type<void>(),
+  },
+  move: {
+    path: "/api/v1/inventory/items/{id}/movements/",
+    method: "POST",
+    TBody: Type<MovementRequest>(),
+    TRes: Type<StockItem>(),
+  },
+  history: {
+    path: "/api/v1/inventory/items/{id}/movements/",
+    method: "GET",
+    TRes: Type<StockMovement[]>(),
+  },
+} as const;
+
+export default InventoryRoutes;

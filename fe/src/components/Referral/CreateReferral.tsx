@@ -159,7 +159,7 @@ export default function CreateReferral({ patientId }: { patientId?: string }) {
   const valid = patient && form.diagnosis.trim() && form.reason.trim();
 
   return (
-    <Page title={t("new_referral")} backUrl="/referrals">
+    <Page title={t("new_referral")} backUrl="/referrals" help="new_referral">
       <form
         className="mx-auto flex max-w-3xl flex-col gap-6"
         onSubmit={(e) => {

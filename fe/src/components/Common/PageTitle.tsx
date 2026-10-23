@@ -21,6 +21,8 @@ export interface PageTitleProps {
   backUrl?: string;
   hideTitleOnPage?: boolean;
   onBackClick?: () => boolean | void;
+  /** Shown right after the title text (the "?" help button) */
+  titleAddon?: ReactNode;
 }
 
 export default function PageTitle({
@@ -37,6 +39,7 @@ export default function PageTitle({
   backUrl,
   onBackClick,
   hideTitleOnPage,
+  titleAddon,
 }: PageTitleProps) {
   const divRef = useRef<any>();
 
@@ -71,10 +74,11 @@ export default function PageTitle({
             "flex-col justify-start space-y-2 md:flex-row md:justify-between md:space-y-0",
         )}
       >
-        <div className="flex items-center">
+        <div className="flex items-center gap-1">
           {!hideTitleOnPage && (
             <h2 className="ml-0 text-2xl leading-tight">{title}</h2>
           )}
+          {titleAddon}
         </div>
         {componentRight}
       </div>

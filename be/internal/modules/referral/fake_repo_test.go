@@ -2,6 +2,7 @@ package referral
 
 import (
 	"context"
+	"slices"
 	"sync"
 )
 
@@ -10,6 +11,7 @@ type fakeRepo struct {
 	mu        sync.Mutex
 	referrals map[string]Referral
 	notes     []Note
+	plans     []Plan
 	patients  map[string]bool
 	users     map[uint]struct {
 		role   string
@@ -82,17 +84,36 @@ func (f *fakeRepo) List(_ context.Context, flt ListFilter) ([]Referral, int64, e
 		if flt.DoctorID != 0 && r.DoctorID != flt.DoctorID {
 			continue
 		}
+		if flt.OnlyClinic != nil && (r.FacilityID == nil || *r.FacilityID != *flt.OnlyClinic) {
+			continue
+		}
 		if flt.TherapistID != 0 {
-			assigned := r.TherapistID != nil && *r.TherapistID == flt.TherapistID
+			assigned := r.TherapistID != nil && (*r.TherapistID == flt.TherapistID || slices.Contains(flt.AlsoTherapists, *r.TherapistID))
 			open := flt.InboxForTherapist && r.TherapistID == nil && r.Status == StatusPending &&
 				(flt.ClinicID == nil || r.FacilityID == nil || *r.FacilityID == *flt.ClinicID)
 			if !assigned && !open {
 				continue
 			}
 		}
+		if flt.OpenQuestions && !f.hasOpenQuestion(r.ID, flt.Viewer) {
+			continue
+		}
 		out = append(out, r)
 	}
 	return out, int64(len(out)), nil
+}
+
+// hasOpenQuestion: an unanswered question others asked the viewer (lock held).
+func (f *fakeRepo) hasOpenQuestion(referralID string, viewer uint) bool {
+	for _, q := range f.notes {
+		if q.ReferralID != referralID || q.Kind != NoteQuestion || q.AuthorID == viewer {
+			continue
+		}
+		if !slices.ContainsFunc(f.notes, func(r Note) bool { return r.ReplyToID != nil && *r.ReplyToID == q.ID }) {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *fakeRepo) Transition(_ context.Context, r *Referral, from Status, note *Note) error {
@@ -120,6 +141,27 @@ func (f *fakeRepo) AddNote(_ context.Context, n *Note) error {
 	return nil
 }
 
+// Plans newest first (appended in time order).
+func (f *fakeRepo) Plans(_ context.Context, referralID string) ([]Plan, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []Plan
+	for i := len(f.plans) - 1; i >= 0; i-- {
+		if f.plans[i].ReferralID == referralID {
+			out = append(out, f.plans[i])
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) AddPlan(_ context.Context, p *Plan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_ = p.BeforeCreate(nil)
+	f.plans = append(f.plans, *p)
+	return nil
+}
+
 func (f *fakeRepo) ListNotes(_ context.Context, referralID string) ([]Note, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -142,4 +184,34 @@ func (f *fakeRepo) UserRole(_ context.Context, id uint) (string, bool, error) {
 		return "", false, nil
 	}
 	return u.role, u.active, nil
+}
+
+func (f *fakeRepo) GetNote(_ context.Context, referralID, id string) (*Note, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, n := range f.notes {
+		if n.ReferralID == referralID && n.ID == id {
+			c := n
+			return &c, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+func (f *fakeRepo) OpenQuestions(_ context.Context, referralIDs []string, viewer uint) (map[string]int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	replied := map[string]bool{}
+	for _, n := range f.notes {
+		if n.ReplyToID != nil {
+			replied[*n.ReplyToID] = true
+		}
+	}
+	out := map[string]int{}
+	for _, n := range f.notes {
+		if n.Kind == NoteQuestion && n.AuthorID != viewer && !replied[n.ID] && slices.Contains(referralIDs, n.ReferralID) {
+			out[n.ReferralID]++
+		}
+	}
+	return out, nil
 }

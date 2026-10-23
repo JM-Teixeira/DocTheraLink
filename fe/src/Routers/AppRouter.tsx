@@ -1,22 +1,28 @@
 import careConfig from "@careConfig";
-import { Redirect, usePath, useRedirect, useRoutes } from "raviger";
+import { usePath, useRedirect, useRoutes } from "raviger";
 import { useEffect, useState } from "react";
 
 import IconIndex from "@/CAREUI/icons/Index";
 
+import ForcePasswordChange from "@/components/Auth/ForcePasswordChange";
 import {
   DesktopSidebar,
   MobileSidebar,
   SIDEBAR_SHRINK_PREFERENCE_KEY,
   SidebarShrinkContext,
 } from "@/components/Common/Sidebar/Sidebar";
+import { ViewAsBanner } from "@/components/Common/ViewAs";
 import Error404 from "@/components/ErrorPages/404";
 import SessionExpired from "@/components/ErrorPages/SessionExpired";
+import HomePage from "@/components/Home/HomePage";
 
+import useApplySettings from "@/hooks/useApplySettings";
+import useAuthUser from "@/hooks/useAuthUser";
 import { usePluginRoutes } from "@/hooks/useCareApps";
 
 import { BLACKLISTED_PATHS } from "@/common/constants";
 
+import ClinicOpsRoutes from "@/Routers/routes/ClinicOpsRoutes";
 import FacilityRoutes from "@/Routers/routes/FacilityRoutes";
 import PatientRoutes from "@/Routers/routes/PatientRoutes";
 import ReferralRoutes from "@/Routers/routes/ReferralRoutes";
@@ -38,11 +44,12 @@ export type AppRoutes = {
 };
 
 const Routes: AppRoutes = {
-  "/": () => <Redirect to="/patients" />,
+  "/": () => <HomePage />,
 
   ...FacilityRoutes,
   ...PatientRoutes,
   ...ReferralRoutes,
+  ...ClinicOpsRoutes,
   ...UserRoutes,
 
   "/session-expired": () => <SessionExpired />,
@@ -54,11 +61,13 @@ const Routes: AppRoutes = {
 };
 
 export default function AppRouter() {
+  const user = useAuthUser();
   const pluginRoutes = usePluginRoutes();
 
   let routes = Routes;
 
   useRedirect("/user", "/users");
+  useApplySettings(); // theme, text size, language, start page
 
   // Merge in Plugin Routes
   routes = {
@@ -96,6 +105,9 @@ export default function AppRouter() {
     );
   }, [shrinked]);
 
+  // First sign-in: choose a password before anything else
+  if (user.must_change_password) return <ForcePasswordChange />;
+
   return (
     <SidebarShrinkContext.Provider value={{ shrinked, setShrinked }}>
       <div className="flex h-screen overflow-hidden bg-secondary-100 print:overflow-visible">
@@ -109,6 +121,7 @@ export default function AppRouter() {
         </>
 
         <div className="relative flex w-full flex-1 flex-col overflow-hidden bg-gray-100 print:overflow-visible">
+          <ViewAsBanner />
           <div className="relative z-10 flex h-16 shrink-0 bg-white shadow md:hidden">
             <button
               onClick={() => setSidebarOpen(true)}

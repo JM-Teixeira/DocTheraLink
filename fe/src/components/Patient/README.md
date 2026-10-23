@@ -1,219 +1,49 @@
-# Patient Creation Feature
+# Patients
 
-This directory contains the implementation for the centralized patient creation feature in the CARE healthcare management platform.
-
-## Directory Structure
+Registering, editing, listing and viewing patients. The backend is
+`be/internal/modules/patient` (rules, duplicates, identifiers) and
+`be/internal/modules/timeline` (the patient history).
 
 ```
 Patient/
-├── types/                      # TypeScript type definitions
-│   ├── patientCreate.ts       # Core types for patient creation
-│   └── index.ts               # Type exports
-├── validation/                 # Validation schemas and functions
-│   ├── patientValidation.ts   # Zod schemas and validation logic
-│   └── index.ts               # Validation exports
-├── constants/                  # Constants and configuration
-│   ├── patientConstants.ts    # Enums, options, and defaults
-│   └── index.ts               # Constants exports
-└── README.md                   # This file
+├── PatientList.tsx           # list with filters and metrics
+├── PatientMetrics.tsx        # counts by care level, gender, age
+├── PatientForm.tsx           # register / edit (drafts, retry, lists)
+├── ClinicalListEditor.tsx    # rows of allergies, conditions, medications
+├── DuplicatePatientsDialog.tsx
+├── PatientDetail.tsx         # patient page
+├── PatientTimeline.tsx       # history: next sessions, referrals, messages, files
+├── PatientIds.tsx            # NIF / SNS display
+├── patientFormUtils.ts       # form <-> API, validation, drafts (pure, tested)
+├── timelineUtils.ts          # filter / group / label history entries (pure, tested)
+├── patientFilters.ts         # list filters (pure, tested)
+├── models.tsx                # PatientModel (API shape)
+└── api/                      # routes and TanStack Query hooks
 ```
 
-## Type Definitions
+## The form
 
-### Core Types
+- Every field is a string (lists are rows of strings) so inputs stay
+  controlled; `formToPayload` turns empty values into `null` so an edit can
+  clear them.
+- Client validation mirrors the backend (NIF check digit, SNS, phone,
+  e-mail, postal code `0000-000`, condition years); the server stays
+  authoritative and its field errors show next to the input.
+- **Drafts**: the form is saved in `localStorage` half a second after each
+  change, per user and per patient (`draftKey`). They hold patient data, so
+  they expire after 24 h and are removed on save, cancel, "Descartar
+  rascunho" and sign-out (`clearAllDrafts` in `AuthUserProvider`).
+- **Connection problems**: saves are retried twice (1 s, 2 s) only for
+  network errors and 502/503/504 (`Utils/request/retry.ts`), so a request
+  that may have reached the server is never sent twice by itself. After
+  that the form shows a message with "Tentar de novo"; nothing is lost
+  because of the draft.
+- **Duplicates**: the server answers 409 with possible matches; same NIF or
+  SNS blocks, same name + birth date or phone asks for confirmation.
 
-- **Demographics**: Patient personal information (name, DOB, gender, contact info, address)
-- **EmergencyContact**: Emergency contact details
-- **MedicalHistory**: Allergies, medications, and medical conditions
-- **ClinicalNotes**: Reason for visit and initial clinical notes
-- **Administrative**: Facility assignment, status, insurance information
-- **PatientFormState**: Complete form state combining all sections
+## Tests
 
-### Enums
-
-- **PatientStatus**: `LIVE`, `DISCHARGED`
-- **PaymentMethod**: `INSURANCE`, `SELF_PAY`, `GOVERNMENT_SCHEME`
-- **AllergySeverity**: `MILD`, `MODERATE`, `SEVERE`, `LIFE_THREATENING`
-- **ConditionStatus**: `ACTIVE`, `RESOLVED`, `CHRONIC`
-
-## Validation
-
-The validation layer uses **Zod** for runtime type checking and validation.
-
-### Validation Schemas
-
-- `demographicsSchema`: Validates patient demographics
-- `emergencyContactSchema`: Validates emergency contact (optional)
-- `medicalHistorySchema`: Validates medical history
-- `clinicalNotesSchema`: Validates clinical notes
-- `administrativeSchema`: Validates administrative data
-- `patientFormSchema`: Complete form validation
-
-### Validation Rules
-
-#### Name Fields
-- Min length: 2 characters
-- Max length: 50 characters
-- Pattern: Letters, spaces, hyphens, apostrophes only
-
-#### Date of Birth
-- Cannot be in the future
-- Must be after 1900-01-01
-
-#### Phone Numbers
-- Pattern: International format with optional country code
-- Example: `+1234567890`, `(123) 456-7890`
-
-#### Email
-- Standard email format validation
-
-#### Reason for Visit
-- Min length: 10 characters
-- Max length: 1000 characters
-
-#### Discharge Date
-- Required when status is "Discharged"
-- Cannot be before admission date
-
-### Helper Functions
-
-```typescript
-// Validate a single field
-validateField(schema, value) => { isValid, error }
-
-// Validate entire form
-validatePatientForm(data) => { isValid, errors }
-
-// Calculate age from date of birth
-calculateAge(dateOfBirth) => number
-```
-
-## Constants
-
-### Options Arrays
-
-- `PATIENT_STATUS_OPTIONS`: Status dropdown options
-- `PAYMENT_METHOD_OPTIONS`: Payment method options
-- `ALLERGY_SEVERITY_OPTIONS`: Allergy severity levels
-- `CONDITION_STATUS_OPTIONS`: Medical condition status
-- `RELATIONSHIP_OPTIONS`: Emergency contact relationships
-
-### Field Limits
-
-```typescript
-FIELD_LIMITS = {
-  NAME_MIN_LENGTH: 2,
-  NAME_MAX_LENGTH: 50,
-  REASON_FOR_VISIT_MIN_LENGTH: 10,
-  REASON_FOR_VISIT_MAX_LENGTH: 1000,
-  INITIAL_NOTES_MAX_LENGTH: 5000,
-}
-```
-
-### Auto-save Configuration
-
-```typescript
-AUTO_SAVE_CONFIG = {
-  INTERVAL_MS: 30000,              // 30 seconds
-  STORAGE_KEY: "patient_create_draft",
-  VERSION: "1.0",
-  MAX_AGE_MS: 24 * 60 * 60 * 1000, // 24 hours
-}
-```
-
-### Default Form Values
-
-Pre-configured default values for initializing the form state.
-
-## Usage Examples
-
-### Import Types
-
-```typescript
-import type {
-  PatientFormState,
-  Demographics,
-  MedicalHistory,
-} from "@/components/Patient/types";
-```
-
-### Import Validation
-
-```typescript
-import {
-  patientFormSchema,
-  validatePatientForm,
-  calculateAge,
-} from "@/components/Patient/validation";
-```
-
-### Import Constants
-
-```typescript
-import {
-  PATIENT_STATUS_OPTIONS,
-  DEFAULT_FORM_VALUES,
-  AUTO_SAVE_CONFIG,
-} from "@/components/Patient/constants";
-```
-
-### Validate Form Data
-
-```typescript
-const formData: PatientFormState = {
-  demographics: { /* ... */ },
-  medicalHistory: { /* ... */ },
-  clinicalNotes: { /* ... */ },
-  administrative: { /* ... */ },
-};
-
-const { isValid, errors } = validatePatientForm(formData);
-
-if (!isValid) {
-  console.error("Validation errors:", errors);
-}
-```
-
-### Calculate Age
-
-```typescript
-const age = calculateAge("1990-01-15");
-console.log(`Patient age: ${age}`);
-```
-
-## Integration with Existing Code
-
-This feature integrates with:
-
-- **CARE UI Components**: Uses existing form components from `@/CAREUI`
-- **Common Constants**: Extends `GENDER_TYPES` and `BLOOD_GROUPS` from `@/common/constants`
-- **API Client**: Will use `@/lib/ApiClient` for API calls
-- **TanStack Query**: For server state management
-- **i18next**: For internationalization
-
-## Next Steps
-
-The following components will be implemented in subsequent tasks:
-
-1. API integration layer (services and hooks)
-2. Form input components
-3. Form sections (Demographics, Medical History, etc.)
-4. Main PatientForm component
-5. Patient search and duplicate detection
-6. PatientCreatePage route component
-7. Internationalization
-8. Accessibility features
-9. Testing (unit, property-based, E2E)
-
-## Requirements Mapping
-
-This task implements:
-- **Requirement 1.1**: Project structure for patient creation
-- **Requirement 2.1**: Data models for patient demographics
-- **Requirement 3.3**: Form validation schemas
-
-## Related Files
-
-- Design Document: `.kiro/specs/centralized-patient-creation/design.md`
-- Requirements: `.kiro/specs/centralized-patient-creation/requirements.md`
-- Tasks: `.kiro/specs/centralized-patient-creation/tasks.md`
+- Unit: `patientFormUtils.test.ts`, `timelineUtils.test.ts`,
+  `patientFilters.test.ts`, `api/index.test.ts`, component tests
+  `*.test.tsx`; coverage of this folder is checked by `npm run test:coverage`.
+- Browser: `e2e/browser/tests/patients.spec.ts` and the registration journey.

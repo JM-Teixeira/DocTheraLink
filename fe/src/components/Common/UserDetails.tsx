@@ -7,7 +7,7 @@ function UserDetails(props: {
 }) {
   return (
     <div className="mt-2" id={props.id}>
-      <div className="text-sm font-light leading-relaxed text-gray-400">
+      <div className="text-sm font-light leading-relaxed text-gray-600">
         {props.title}
       </div>
       {props.children}

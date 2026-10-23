@@ -1,217 +1,167 @@
+import { useQuery } from "@tanstack/react-query";
+import { Building2, Plus, Search, X } from "lucide-react";
 import { navigate } from "raviger";
-import { useEffect } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import CountBlock from "@/CAREUI/display/Count";
-import CareIcon from "@/CAREUI/icons/CareIcon";
-import { AdvancedFilterButton } from "@/CAREUI/misc/interactive/FiltersSlideover";
+import { Button } from "@/components/ui/button";
 
 import ExportMenu from "@/components/Common/Export";
-import Loading from "@/components/Common/Loading";
+import { FilterChips, FilterPanel } from "@/components/Common/FilterChips";
 import Page from "@/components/Common/Page";
 import { FacilityCard } from "@/components/Facility/FacilityCard";
-import FacilityFilter from "@/components/Facility/FacilityFilter";
 import { FacilityModel } from "@/components/Facility/models";
 
 import useAuthUser from "@/hooks/useAuthUser";
-import useFilters from "@/hooks/useFilters";
-
-import { FACILITY_TYPES } from "@/common/constants";
 
 import routes from "@/Utils/request/api";
-import useTanStackQueryInstead from "@/Utils/request/useQuery";
+import query from "@/Utils/request/query";
+import { isAdmin } from "@/Utils/roles";
 
-import SearchByMultipleFields from "../Common/SearchByMultipleFields";
+import { clinicDistrict, clinicType, filterClinics } from "./facilityFilters";
 
+/**
+ * The clinics: one search box and chips for district and type, like the
+ * other lists. Staff see their own clinic; admins all of them (and add new
+ * ones). There are few clinics, so filtering happens in the browser.
+ */
 export const FacilityList = () => {
-  const {
-    qParams,
-    updateQuery,
-    Pagination,
-    FilterBadges,
-    advancedFilter,
-    resultsPerPage,
-    clearSearch,
-  } = useFilters({
-    limit: 14,
-    cacheBlacklist: ["search"],
-  });
-
-  useEffect(() => {
-    if (!qParams.state && qParams.district) {
-      advancedFilter.removeFilters(["district"]);
-    }
-  }, [advancedFilter, qParams]);
-
-  let manageFacilities: any = null;
-  const { user_type } = useAuthUser();
   const { t } = useTranslation();
+  const user = useAuthUser();
+  const admin = isAdmin(user);
+  const [search, setSearch] = useState("");
+  const [district, setDistrict] = useState("");
+  const [type, setType] = useState("");
 
-  const { data: permittedData, loading: isLoading } = useTanStackQueryInstead(
-    routes.getPermittedFacilities,
-    {
-      query: {
-        limit: resultsPerPage,
-        page: qParams.page || 1,
-        offset: (qParams.page ? qParams.page - 1 : 0) * resultsPerPage,
-        search_text: qParams.search || undefined,
-        state: qParams.state,
-        district: qParams.district,
-        facility_type: qParams.facility_type,
-        kasp_empanelled: qParams.kasp_empanelled,
-      },
-    },
-  );
-
-  const { data: stateData } = useTanStackQueryInstead(routes.getState, {
-    pathParams: {
-      id: qParams.state,
-    },
-    prefetch: qParams.state !== undefined,
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["clinics-all"],
+    queryFn: query(routes.getPermittedFacilities, {
+      queryParams: { limit: 100 },
+    }),
   });
-
-  const { data: districtData } = useTanStackQueryInstead(routes.getDistrict, {
-    pathParams: {
-      id: qParams.district,
-    },
-    prefetch: qParams.district !== undefined,
-  });
-
-
-
-  const findFacilityTypeById = (id: number) => {
-    const facility_type = FACILITY_TYPES.find((type) => type.id == id);
-    return facility_type?.text;
-  };
-
-  const hasFiltersApplied = (qParams: any) => {
-    return (
-      qParams.state ||
-      qParams.district ||
-      qParams.facility_type ||
-      qParams.kasp_empanelled ||
-      qParams?.search
-    );
-  };
-
-  let facilityList: JSX.Element[] = [];
-  if (permittedData && permittedData.results.length) {
-    facilityList = permittedData.results.map((facility: FacilityModel) => (
-      <FacilityCard
-        key={facility.id!}
-        facility={facility}
-        userType={user_type}
-      />
-    ));
-  }
-
-  if (isLoading || !permittedData) {
-    manageFacilities = <Loading />;
-  } else if (permittedData.results && permittedData.results.length) {
-    manageFacilities = (
-      <>
-        <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
-          {facilityList}
-        </div>
-        <Pagination totalCount={permittedData.count} />
-      </>
-    );
-  } else if (permittedData.results && permittedData.results.length === 0) {
-    manageFacilities = hasFiltersApplied(qParams) ? (
-      <div className="w-full rounded-lg bg-white p-3">
-        <div className="mt-4 flex w-full justify-center text-2xl font-bold text-secondary-600">
-          {t("no_facilities")}
-        </div>
-      </div>
-    ) : (
-      <div>
-        <div
-          className="mt-4 cursor-pointer whitespace-nowrap rounded-md border bg-white p-16 text-center text-sm font-semibold shadow hover:bg-secondary-300"
-          onClick={() => navigate("/facility/create")}
-        >
-          <CareIcon icon="l-plus" className="text-3xl" />
-          <div className="mt-2 text-xl">{t("create_facility")}</div>
-          <div className="mt-1 text-xs text-red-700">
-            {t("no_duplicate_facility")}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const all: FacilityModel[] = data?.results ?? [];
+  const districts = [
+    ...new Set(all.map(clinicDistrict).filter(Boolean)),
+  ].sort() as string[];
+  const types = [
+    ...new Set(all.map(clinicType).filter(Boolean)),
+  ].sort() as string[];
+  const shown = filterClinics(all, { search, district, type });
+  const filtered = !!(search.trim() || district || type);
 
   return (
     <Page
+      help="clinics"
       title={t("facilities")}
       breadcrumbs={false}
       hideBack
       options={
-        <div className="flex items-center gap-2 ">
-          <AdvancedFilterButton onClick={() => advancedFilter.setShow(true)} />
-          <div id="export-button">
+        admin && (
+          <div className="flex items-center gap-2">
             <ExportMenu
               exportItems={[
                 {
-                  label: "Facilities",
+                  label: t("facilities"),
                   route: routes.downloadFacility,
-                  filePrefix: "facilities",
+                  filePrefix: "clinicas",
                 },
               ]}
             />
+            <Button
+              variant="primary"
+              onClick={() => navigate("/facility/create")}
+            >
+              <Plus className="mr-1.5 size-4" aria-hidden />
+              {t("create_facility")}
+            </Button>
           </div>
-        </div>
+        )
       }
     >
-      <div className="mt-4 gap-4 lg:gap-16 flex flex-col lg:flex-row lg:items-center">
-        <CountBlock
-          text="Total Facilities"
-          count={permittedData ? permittedData.count : 0}
-          loading={isLoading}
-          icon="d-hospital"
-          className=""
-        />
-        <SearchByMultipleFields
-          id="facility-search"
-          options={[
-            {
-              key: "facility_district_name",
-              label: "Facility or District Name",
-              type: "text" as const,
-              placeholder: "facility_search_placeholder",
-              value: qParams.search || "",
-              shortcutKey: "f",
-            },
-          ]}
-          className="w-full"
-          onSearch={(key, value) => updateQuery({ search: value })}
-          clearSearch={clearSearch}
-        />
-      </div>
+      <FilterPanel>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-60 max-w-md flex-1">
+            <Search
+              className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400"
+              aria-hidden
+            />
+            <input
+              type="search"
+              aria-label={t("search_clinics")}
+              placeholder={t("search_clinics_placeholder")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-10 w-full rounded-lg border border-gray-300 pl-9 pr-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            />
+          </div>
+          {filtered && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setDistrict("");
+                setType("");
+              }}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"
+            >
+              <X className="size-3.5" aria-hidden />
+              {t("clear_filters")}
+            </button>
+          )}
+        </div>
+        {districts.length > 1 && (
+          <FilterChips
+            label={t("district")}
+            allLabel={t("all")}
+            options={districts.map((d) => ({ value: d, label: d }))}
+            value={district ? [district] : []}
+            onChange={(v) => setDistrict(v.at(-1) ?? "")}
+          />
+        )}
+        {types.length > 1 && (
+          <FilterChips
+            label={t("type")}
+            allLabel={t("all")}
+            options={types.map((d) => ({ value: d, label: d }))}
+            value={type ? [type] : []}
+            onChange={(v) => setType(v.at(-1) ?? "")}
+          />
+        )}
+      </FilterPanel>
 
-      <FacilityFilter {...advancedFilter} key={window.location.search} />
-      <FilterBadges
-        badges={({ badge, value, kasp }) => [
-          badge("Facility/District Name", "search"),
-          value(
-            "State",
-            "state",
-            qParams.state && stateData ? stateData.name : "",
-          ),
-          value(
-            "District",
-            "district",
-            qParams.district && districtData ? districtData.name : "",
-          ),
-          value(
-            "Facility type",
-            "facility_type",
-            findFacilityTypeById(qParams.facility_type) || "",
-          ),
-          kasp("Empanelled", "kasp_empanelled"),
-        ]}
-      />
-      <div className="mt-4 pb-4">
-        <div>{manageFacilities}</div>
-      </div>
+      <p className="mb-2 text-sm text-gray-500" aria-live="polite">
+        {t("n_clinics", { count: shown.length })}
+      </p>
+
+      {isError ? (
+        <p className="rounded-lg bg-rose-50 p-4 text-sm text-rose-700">
+          {t("clinics_load_error")}
+        </p>
+      ) : isLoading ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {Array.from({ length: 2 }, (_, i) => (
+            <div
+              key={i}
+              className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white"
+            />
+          ))}
+        </div>
+      ) : shown.length ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {shown.map((f) => (
+            <FacilityCard key={f.id} facility={f} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center rounded-xl border-2 border-dashed border-gray-200 bg-white px-6 py-16 text-center">
+          <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-primary-100">
+            <Building2 className="size-7 text-primary-600" aria-hidden />
+          </div>
+          <p className="font-semibold text-gray-900">
+            {filtered ? t("no_facilities") : t("no_clinics_yet")}
+          </p>
+        </div>
+      )}
     </Page>
   );
 };

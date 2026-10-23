@@ -1,12 +1,18 @@
-import ManageUsers from "@/components/Users/ManageUsers";
-import UserAdd from "@/components/Users/UserAdd";
+import AboutPage from "@/components/About/AboutPage";
+import SettingsPage from "@/components/Settings/SettingsPage";
+import SuggestionsAdmin from "@/components/Settings/SuggestionsAdmin";
+import AddPerson from "@/components/Staff/AddPerson";
+import StaffList from "@/components/Staff/StaffList";
 import UserHome from "@/components/Users/UserHome";
 
 import { AppRoutes } from "@/Routers/AppRouter";
 
 const UserRoutes: AppRoutes = {
-  "/users": () => <ManageUsers />,
-  "/users/add": () => <UserAdd />,
+  "/about": () => <AboutPage />,
+  "/settings": () => <SettingsPage />,
+  "/suggestions": () => <SuggestionsAdmin />,
+  "/users": () => <StaffList />,
+  "/users/add": () => <AddPerson />,
   "/users/:username": ({ username }) => (
     <UserHome username={username} tab={"profile"} />
   ),

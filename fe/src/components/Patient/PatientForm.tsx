@@ -1,13 +1,17 @@
+import { History, WifiOff } from "lucide-react";
 import { navigate } from "raviger";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 
+import DateInput from "@/components/Common/DateInput";
 import Loading from "@/components/Common/Loading";
 import Page from "@/components/Common/Page";
+import ClinicalListEditor from "@/components/Patient/ClinicalListEditor";
+import DuplicatePatientsDialog from "@/components/Patient/DuplicatePatientsDialog";
 import {
   useCreatePatient,
   usePatchPatient,
@@ -17,20 +21,54 @@ import { PatientModel } from "@/components/Patient/models";
 import {
   BLOOD_GROUP_OPTIONS,
   EMPTY_PATIENT_FORM,
+  EMPTY_ROWS,
   GENDERS,
+  ListField,
   PatientFormErrors,
   PatientFormState,
+  PossibleDuplicate,
+  RELATIONS,
+  SEVERITIES,
+  TextField,
+  draftKey,
+  duplicatesFromError,
   formToPayload,
+  formatPostalCode,
   patientToForm,
+  readDraft,
+  sameForm,
   serverErrorsToForm,
   validatePatientForm,
+  writeDraft,
 } from "@/components/Patient/patientFormUtils";
+import {
+  CARE_LEVELS,
+  CARE_LEVEL_STYLES,
+} from "@/components/TimeBoard/boardUtils";
+
+import useAuthUser from "@/hooks/useAuthUser";
+import useDateFormat from "@/hooks/useDateFormat";
+import useOnline from "@/hooks/useOnline";
 
 import * as Notification from "@/Utils/Notifications";
+import { isTransient } from "@/Utils/request/retry";
 import { HTTPError } from "@/Utils/request/types";
 
 const inputClass =
   "mt-1 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500";
+// Suggestions only: any insurer can be typed
+const COMMON_INSURERS = [
+  "ADSE",
+  "SAD-GNR",
+  "SAD-PSP",
+  "ADM",
+  "Médis",
+  "Multicare",
+  "AdvanceCare",
+  "Allianz",
+  "Fidelidade",
+];
+
 const textareaClass =
   "mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500";
 
@@ -38,30 +76,93 @@ const textareaClass =
 export default function PatientForm({ patientId }: { patientId?: string }) {
   const { t } = useTranslation();
   const editing = !!patientId;
+  const { fmtTime } = useDateFormat();
+  const user = useAuthUser();
   const [form, setForm] = useState<PatientFormState>(EMPTY_PATIENT_FORM);
   const [errors, setErrors] = useState<PatientFormErrors>({});
+  const [dupes, setDupes] = useState<{
+    blocking: boolean;
+    matches: PossibleDuplicate[];
+  } | null>(null);
+
+  // Draft auto-save: `base` is what the server has (empty for a new
+  // patient); the form is saved locally while it differs from it.
+  const key = draftKey(user.id ?? user.username, patientId);
+  const [base, setBase] = useState<PatientFormState>(EMPTY_PATIENT_FORM);
+  const [ready, setReady] = useState(false);
+  const [restoredAt, setRestoredAt] = useState<string | null>(null);
+  const closing = useRef(false); // saved or cancelled: stop auto-saving
 
   const existing = usePatient(patientId ?? "", { enabled: editing });
   useEffect(() => {
-    if (existing.data) setForm(patientToForm(existing.data));
-  }, [existing.data]);
+    if (ready || (editing && !existing.data)) return;
+    const fromServer = existing.data
+      ? patientToForm(existing.data)
+      : EMPTY_PATIENT_FORM;
+    const draft = readDraft(localStorage, key);
+    setBase(fromServer);
+    if (draft && !sameForm(draft.form, fromServer)) {
+      setForm(draft.form);
+      setRestoredAt(draft.saved_at);
+    } else setForm(fromServer);
+    setReady(true);
+  }, [ready, editing, existing.data, key]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const timer = setTimeout(
+      () => !closing.current && writeDraft(localStorage, key, form, base),
+      500,
+    );
+    return () => clearTimeout(timer);
+  }, [ready, key, form, base]);
+
+  const dropDraft = () => writeDraft(localStorage, key, base, base);
 
   const create = useCreatePatient();
   const patch = usePatchPatient();
   const saving = create.isPending || patch.isPending;
+  // Connection problems: the mutations retry by themselves; after that the
+  // user can try again (the draft keeps everything meanwhile).
+  const online = useOnline();
+  const [unreachable, setUnreachable] = useState(false);
+  const lastAllowDuplicate = useRef(false);
+  const retrying =
+    (create.isPending && create.failureCount > 0) ||
+    (patch.isPending && patch.failureCount > 0);
 
-  const set = (k: keyof PatientFormState) => (v: string) => {
+  const setList =
+    <K extends ListField>(k: K) =>
+    (rows: PatientFormState[K]) => {
+      setForm((f) => ({ ...f, [k]: rows }));
+      setErrors((e) => ({ ...e, [k]: undefined }));
+    };
+  const set = (k: TextField) => (v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
   const onSaved = (p: PatientModel) => {
+    closing.current = true;
+    dropDraft();
     Notification.Success({
       msg: editing ? t("patient_updated") : t("patient_created"),
     });
     navigate(`/patients/${p.id}`);
   };
   const onError = (err: Error) => {
+    if (isTransient(err)) {
+      setUnreachable(true);
+      return;
+    }
+    const found =
+      err instanceof HTTPError
+        ? duplicatesFromError(err.status, err.cause)
+        : null;
+    if (found) {
+      setDupes(found);
+      return;
+    }
     const fieldErrors =
       err instanceof HTTPError ? serverErrorsToForm(err.cause) : {};
     setErrors(fieldErrors);
@@ -69,23 +170,32 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
       Notification.Error({ msg: t("patient_save_failed") });
   };
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = (allowDuplicate = false) => {
     const v = validatePatientForm(form);
     setErrors(v);
     if (Object.keys(v).length) return;
+    setUnreachable(false);
+    lastAllowDuplicate.current = allowDuplicate;
     const body = formToPayload(form) as Partial<PatientModel>;
     if (editing)
       patch.mutate(
         { id: patientId, data: body },
         { onSuccess: onSaved, onError },
       );
-    else create.mutate(body, { onSuccess: onSaved, onError });
+    else
+      create.mutate(
+        allowDuplicate ? { ...body, allow_duplicate: true } : body,
+        { onSuccess: onSaved, onError },
+      );
+  };
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    save();
   };
 
-  if (editing && existing.isLoading) return <Loading />;
+  if (editing && (existing.isLoading || !ready)) return <Loading />;
 
-  const fieldProps = (k: keyof PatientFormState) => ({
+  const fieldProps = (k: TextField) => ({
     id: k,
     value: form[k],
     "aria-invalid": !!errors[k],
@@ -99,6 +209,7 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
 
   return (
     <Page
+      help="patient_form"
       title={editing ? t("edit_patient") : t("new_patient")}
       backUrl={editing ? `/patients/${patientId}` : "/patients"}
       crumbsReplacements={
@@ -110,6 +221,30 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
         noValidate
         className="mx-auto flex max-w-3xl flex-col gap-6"
       >
+        {restoredAt && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200"
+          >
+            <span className="flex items-center gap-2">
+              <History className="size-4" aria-hidden />
+              {t("draft_restored", { time: fmtTime(restoredAt) })}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setForm(base);
+                setErrors({});
+                setRestoredAt(null);
+                dropDraft();
+              }}
+            >
+              {t("discard_draft")}
+            </Button>
+          </div>
+        )}
         <Section title={t("identity")}>
           <Field
             label={`${t("full_name")} *`}
@@ -128,14 +263,36 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
             id="date_of_birth"
             error={errors.date_of_birth}
           >
-            <input
-              {...fieldProps("date_of_birth")}
-              type="date"
-              className={inputClass}
+            <DateInput
+              id="date_of_birth"
+              value={form.date_of_birth}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={set("date_of_birth")}
             />
           </Field>
           <Field label={t("nationality")} id="nationality">
             <input {...fieldProps("nationality")} className={inputClass} />
+          </Field>
+          <Field label={t("nif")} id="nif" error={errors.nif}>
+            <input
+              {...fieldProps("nif")}
+              inputMode="numeric"
+              maxLength={11}
+              placeholder={t("nif_placeholder")}
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            label={t("sns_number")}
+            id="sns_number"
+            error={errors.sns_number}
+          >
+            <input
+              {...fieldProps("sns_number")}
+              inputMode="numeric"
+              maxLength={11}
+              className={inputClass}
+            />
           </Field>
           <fieldset className="sm:col-span-2">
             <legend className="text-sm font-medium text-gray-700">
@@ -165,6 +322,45 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
               ))}
             </div>
           </fieldset>
+          <fieldset className="sm:col-span-2">
+            <legend className="text-sm font-medium text-gray-700">
+              {t("care_level")}
+            </legend>
+            <p className="text-xs text-gray-500">{t("care_level_form_help")}</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-5">
+              {CARE_LEVELS.map((lvl) => (
+                <label
+                  key={lvl}
+                  className={cn(
+                    "cursor-pointer rounded-lg p-2 text-xs ring-1 ring-inset transition",
+                    form.care_level === String(lvl)
+                      ? "bg-primary-50 ring-2 ring-primary-500"
+                      : "bg-white ring-gray-200 hover:bg-gray-50",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="care_level"
+                    value={lvl}
+                    checked={form.care_level === String(lvl)}
+                    onChange={() => set("care_level")(String(lvl))}
+                    className="sr-only"
+                  />
+                  <span
+                    className={cn(
+                      "mb-1 inline-block rounded px-1.5 font-semibold",
+                      CARE_LEVEL_STYLES[lvl],
+                    )}
+                  >
+                    {lvl}
+                  </span>
+                  <span className="block text-gray-600">
+                    {t(`care_level_help__${lvl}`)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </Section>
 
         <Section title={t("contact")}>
@@ -180,6 +376,69 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
               className={inputClass}
             />
           </Field>
+          <Field label={t("email")} id="email" error={errors.email}>
+            <input
+              {...fieldProps("email")}
+              type="email"
+              autoComplete="off"
+              className={inputClass}
+            />
+          </Field>
+          <Field label={t("street_address")} id="address" wide>
+            <input
+              {...fieldProps("address")}
+              placeholder={t("street_address_placeholder")}
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            label={t("postal_code")}
+            id="postal_code"
+            error={errors.postal_code}
+          >
+            <input
+              {...fieldProps("postal_code")}
+              inputMode="numeric"
+              maxLength={9}
+              placeholder="0000-000"
+              onBlur={() =>
+                set("postal_code")(formatPostalCode(form.postal_code))
+              }
+              className={inputClass}
+            />
+          </Field>
+          <Field label={t("city")} id="city">
+            <input {...fieldProps("city")} className={inputClass} />
+          </Field>
+        </Section>
+
+        <Section title={t("emergency_contact")}>
+          <Field
+            label={t("emergency_contact_name")}
+            id="emergency_contact_name"
+          >
+            <input
+              {...fieldProps("emergency_contact_name")}
+              autoComplete="off"
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            label={t("emergency_contact_relation")}
+            id="emergency_contact_relation"
+          >
+            <select
+              {...fieldProps("emergency_contact_relation")}
+              className={inputClass}
+            >
+              <option value="">-</option>
+              {RELATIONS.map((r) => (
+                <option key={r} value={r}>
+                  {t(`relation__${r}`)}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field
             label={t("emergency_phone")}
             id="emergency_phone_number"
@@ -191,12 +450,24 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
               className={inputClass}
             />
           </Field>
-          <Field label={t("address")} id="address" wide>
-            <textarea
-              {...fieldProps("address")}
-              rows={2}
-              className={textareaClass}
+        </Section>
+
+        <Section title={t("health_insurance")}>
+          <Field label={t("insurer")} id="insurer">
+            <input
+              {...fieldProps("insurer")}
+              list="insurers"
+              placeholder={t("insurer_placeholder")}
+              className={inputClass}
             />
+            <datalist id="insurers">
+              {COMMON_INSURERS.map((i) => (
+                <option key={i} value={i} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label={t("insurance_number")} id="insurance_number">
+            <input {...fieldProps("insurance_number")} className={inputClass} />
           </Field>
         </Section>
 
@@ -211,7 +482,55 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
               ))}
             </select>
           </Field>
-          <Field label={t("allergies")} id="allergies">
+          <ClinicalListEditor
+            id="allergy_list"
+            title={t("allergies")}
+            rows={form.allergy_list}
+            empty={EMPTY_ROWS.allergy_list}
+            onChange={setList("allergy_list")}
+            addLabel={t("add_allergy")}
+            error={errors.allergy_list}
+            columns={[
+              { cell: "substance", label: t("allergy_substance"), wide: true },
+              { cell: "reaction", label: t("allergy_reaction") },
+              {
+                cell: "severity",
+                label: t("allergy_severity"),
+                options: SEVERITIES.map((s) => ({
+                  value: s,
+                  label: t(`severity__${s}`),
+                })),
+              },
+            ]}
+          />
+          <ClinicalListEditor
+            id="condition_list"
+            title={t("conditions")}
+            rows={form.condition_list}
+            empty={EMPTY_ROWS.condition_list}
+            onChange={setList("condition_list")}
+            addLabel={t("add_condition")}
+            error={errors.condition_list}
+            columns={[
+              { cell: "name", label: t("condition_name"), wide: true },
+              { cell: "since", label: t("since_year"), year: true },
+            ]}
+          />
+          <ClinicalListEditor
+            id="medication_list"
+            title={t("medications")}
+            rows={form.medication_list}
+            empty={EMPTY_ROWS.medication_list}
+            onChange={setList("medication_list")}
+            addLabel={t("add_medication")}
+            error={errors.medication_list}
+            columns={[
+              { cell: "name", label: t("medication_name"), wide: true },
+              { cell: "dose", label: t("medication_dose") },
+              { cell: "frequency", label: t("medication_frequency") },
+            ]}
+          />
+          <Field label={t("allergy_notes")} id="allergies" wide>
             <input {...fieldProps("allergies")} className={inputClass} />
           </Field>
           <Field label={t("medical_history")} id="medical_history_details" wide>
@@ -221,7 +540,7 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
               className={textareaClass}
             />
           </Field>
-          <Field label={t("ongoing_medication")} id="ongoing_medication" wide>
+          <Field label={t("medication_notes")} id="ongoing_medication" wide>
             <textarea
               {...fieldProps("ongoing_medication")}
               rows={2}
@@ -230,21 +549,63 @@ export default function PatientForm({ patientId }: { patientId?: string }) {
           </Field>
         </Section>
 
-        <div className="flex justify-end gap-2">
+        {(unreachable || !online) && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-800 ring-1 ring-inset ring-rose-200"
+          >
+            <span className="flex items-center gap-2">
+              <WifiOff className="size-4 shrink-0" aria-hidden />
+              {online ? t("save_unreachable") : t("save_offline")}
+            </span>
+            {unreachable && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={saving}
+                onClick={() => save(lastAllowDuplicate.current)}
+              >
+                {t("try_again")}
+              </Button>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <p className="mr-auto text-xs text-gray-500">{t("draft_hint")}</p>
           <Button
             type="button"
             variant="outline"
-            onClick={() =>
-              navigate(editing ? `/patients/${patientId}` : "/patients")
-            }
+            onClick={() => {
+              closing.current = true; // cancelling throws the draft away
+              dropDraft();
+              navigate(editing ? `/patients/${patientId}` : "/patients");
+            }}
           >
             {t("cancel")}
           </Button>
           <Button type="submit" variant="primary" disabled={saving}>
-            {editing ? t("save_changes") : t("register_patient")}
+            {retrying
+              ? t("saving_retrying")
+              : editing
+                ? t("save_changes")
+                : t("register_patient")}
           </Button>
         </div>
       </form>
+      <DuplicatePatientsDialog
+        open={!!dupes}
+        blocking={dupes?.blocking ?? false}
+        matches={dupes?.matches ?? []}
+        pending={saving}
+        onOpenPatient={(id) => navigate(`/patients/${id}`)}
+        onConfirmDifferent={() => {
+          setDupes(null);
+          save(true);
+        }}
+        onClose={() => setDupes(null)}
+      />
     </Page>
   );
 }

@@ -153,7 +153,7 @@ func EmailFor(kind referral.EventKind, to Person, link string) mailer.Message {
 	pt, en := emailLines(kind)
 	body := strings.Join([]string{
 		"Olá " + to.FirstName + ",", "", pt, "Abrir: " + link, "",
-		"—", "", "Hello " + to.FirstName + ",", "", en, "Open: " + link, "",
+		"-", "", "Hello " + to.FirstName + ",", "", en, "Open: " + link, "",
 		"Klyniva",
 	}, "\n")
 	return mailer.Message{To: to.Email, Subject: "Klyniva: " + en, Body: body}

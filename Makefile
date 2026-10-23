@@ -4,7 +4,7 @@
 COMPOSE := docker compose
 
 .PHONY: help up down logs build test test-be test-be-integration test-fe check k8s-render \
-	k8s-up k8s-deploy k8s-e2e k8s-status k8s-down e2e-compose
+	k8s-up k8s-start k8s-deploy k8s-e2e k8s-status k8s-down e2e-compose e2e-browser
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -43,6 +43,9 @@ check: ## Everything CI runs (except image builds)
 k8s-up: ## Local Kubernetes (k3d): create cluster, build, deploy → http://localhost:8088
 	bash scripts/k8s-local.sh up
 
+k8s-start: ## Start the existing local cluster after a reboot and print the logins
+	bash scripts/k8s-local.sh start
+
 k8s-deploy: ## Rebuild images and roll out to the local cluster
 	bash scripts/k8s-local.sh deploy
 
@@ -57,6 +60,9 @@ k8s-down: ## Delete the local cluster (and its data)
 
 e2e-compose: ## End-to-end API tests against the docker compose stack
 	cd be && E2E_BASE_URL=http://localhost:4000 go test -tags e2e -count=1 -v ./internal/e2e/
+
+e2e-browser: ## Browser end-to-end tests (Playwright) against the local cluster (E2E_WEB_URL to override)
+	cd e2e/browser && npm ci --silent && npx playwright install chromium && E2E_WEB_URL=${E2E_WEB_URL:-http://localhost:8088} npx playwright test
 
 k8s-render: ## Render the production overlay (kustomize)
 	kubectl kustomize k8s/overlays/production

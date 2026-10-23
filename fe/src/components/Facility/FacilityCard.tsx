@@ -54,7 +54,7 @@ export const FacilityCard = (props: {
       </div>
       <div className="flex gap-2">
         <Button variant="outline" asChild>
-          <Link href={`/facility/${facility.id}/users`}>
+          <Link href={`/users?clinic=${facility.id}`}>
             <Users className="mr-1.5 size-4" aria-hidden />
             {t("staff")}
           </Link>

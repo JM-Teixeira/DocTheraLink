@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"klyniva/internal/auth"
 	"klyniva/internal/models"
@@ -29,7 +30,17 @@ func actorFrom(c *gin.Context) (Actor, bool) {
 // writeError maps service errors onto HTTP status codes.
 func writeError(c *gin.Context, err error) {
 	var verr *ValidationError
+	var dup *DuplicateError
 	switch {
+	case errors.As(err, &dup):
+		matches := dup.Matches
+		if matches == nil {
+			matches = []Duplicate{}
+		}
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "duplicate_patient", "message": dup.Error(),
+			"blocking": dup.Blocking() || len(matches) == 0, "duplicates": matches,
+		})
 	case errors.As(err, &verr):
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error: "validation_error", Message: verr.Error(),
@@ -70,6 +81,55 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, models.PaginatedResponse{Count: int(total), Results: items})
+}
+
+// Stats handles GET /patient/stats/ (same filters as the list).
+func (h *Handler) Stats(c *gin.Context) {
+	actor, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var q ListQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: err.Error()})
+		return
+	}
+	st, err := h.svc.Stats(c.Request.Context(), actor, q)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, st)
+}
+
+// Export godoc
+// @Summary Patients matching the list filters as a CSV file (coordinators and admins)
+// @Tags patients
+// @Security BearerAuth
+// @Produce text/csv
+// @Router /patient/export/ [get]
+func (h *Handler) Export(c *gin.Context) {
+	actor, ok := actorFrom(c)
+	if !ok {
+		return
+	}
+	var q ListQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "bad_request", Message: err.Error()})
+		return
+	}
+	items, err := h.svc.Export(c.Request.Context(), actor, q)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	name := "utentes-" + time.Now().Format("2006-01-02") + ".csv"
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", "attachment; filename=\""+name+"\"")
+	c.Header("Cache-Control", "no-store")
+	if err := WriteCSV(c.Writer, items, c.Query("lang"), time.Now()); err != nil {
+		log.Printf("patient: export: %v", err)
+	}
 }
 
 // Create godoc

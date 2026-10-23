@@ -2,6 +2,7 @@ import { RefObject, useContext, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 
+import PageHelp from "@/components/Common/PageHelp";
 import PageTitle, { PageTitleProps } from "@/components/Common/PageTitle";
 import { SidebarShrinkContext } from "@/components/Common/Sidebar/Sidebar";
 
@@ -18,6 +19,10 @@ interface PageProps extends PageTitleProps {
    **/
   collapseSidebar?: boolean;
   hideTitleOnPage?: boolean;
+  /** Topic of the "?" help pop-up next to the title (locale help__<topic>) */
+  help?: string;
+  /** More help content shown in the same pop-up (e.g. a worked example) */
+  helpExtra?: React.ReactNode;
 }
 
 export default function Page(props: PageProps) {
@@ -40,7 +45,7 @@ export default function Page(props: PageProps) {
 
   return (
     <div className={cn(padding, props.className)} ref={props.ref}>
-      <div className="flex flex-col justify-between gap-2 px-3 md:flex-row md:items-center md:gap-6 md:px-0">
+      <div className="mb-4 flex flex-col justify-between gap-2 px-3 md:flex-row md:items-center md:gap-6 md:px-0">
         <PageTitle
           changePageMetadata={props.changePageMetadata}
           title={props.title}
@@ -53,6 +58,13 @@ export default function Page(props: PageProps) {
           onBackClick={props.onBackClick}
           isInsidePage={true}
           hideTitleOnPage={props.hideTitleOnPage}
+          titleAddon={
+            props.help && (
+              <PageHelp topic={props.help} title={props.title}>
+                {props.helpExtra}
+              </PageHelp>
+            )
+          }
         />
         {props.options}
       </div>

@@ -69,6 +69,21 @@ export interface PatientModel {
   facility?: string;
   phone_number?: string;
   emergency_phone_number?: string;
+  emergency_contact_name?: string | null;
+  emergency_contact_relation?: string | null;
+  email?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  insurer?: string | null;
+  insurance_number?: string | null;
+  /** Structured lists (the free-text fields stay as notes). */
+  allergy_list?:
+    | { substance: string; reaction?: string; severity?: string }[]
+    | null;
+  medication_list?:
+    | { name: string; dose?: string; frequency?: string }[]
+    | null;
+  condition_list?: { name: string; since?: number }[] | null;
   allergies?: string;
   medical_history?: Array<{ disease: string | number; details: string }>;
   facility_object?: {
@@ -108,6 +123,12 @@ export interface PatientModel {
   district?: number;
   state?: number;
   nationality?: string;
+  nif?: string | null;
+  sns_number?: string | null;
+  /** 1–5: how much of a physio's hour the patient needs (time-board credits). */
+  care_level?: number;
+  /** Create only: confirm a name-based possible duplicate is another person. */
+  allow_duplicate?: boolean;
   passport_no?: string;
   ration_card_category?: (typeof RATION_CARD_CATEGORY)[number] | null;
   date_of_test?: string;

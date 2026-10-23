@@ -5,20 +5,14 @@ import {
   IFacilityNotificationRequest,
   IFacilityNotificationResponse,
   IUserFacilityRequest,
-  InventoryItemsModel,
-  InventoryLogResponse,
-  InventorySummaryResponse,
   LocalBodyModel,
   MinimumQuantityItemResponse,
   StateModel,
   WardModel,
 } from "@/components/Facility/models";
-import {
-  DupPatientModel,
-} from "@/components/Facility/models";
+import { DupPatientModel } from "@/components/Facility/models";
 import { DailyRoundsModel, PatientModel } from "@/components/Patient/models";
-import {
-} from "@/components/Patient/models";
+import "@/components/Patient/models";
 import {
   SkillModel,
   SkillObjectModel,
@@ -401,62 +395,6 @@ const routes = {
     TRes: Type<PaginatedResponse<WardModel>>(),
   },
 
-  //inventory
-  getItems: {
-    path: "/api/v1/items/",
-    method: "GET",
-    TRes: Type<PaginatedResponse<InventoryItemsModel>>(),
-  },
-  createInventory: {
-    path: "/api/v1/facility/{facilityId}/inventory/",
-    method: "POST",
-    TRes: Type<InventoryLogResponse>(),
-  },
-  getInventoryLog: {
-    path: "/api/v1/facility/{facilityId}/inventory/",
-    method: "GET",
-    TRes: Type<PaginatedResponse<InventoryLogResponse>>(),
-  },
-  setMinQuantity: {
-    path: "/api/v1/facility/{facilityId}/min_quantity/",
-    method: "POST",
-    TRes: Type<MinimumQuantityItemResponse>(),
-  },
-  getMinQuantity: {
-    path: "/api/v1/facility/{facilityId}/min_quantity/",
-    method: "GET",
-    TRes: Type<PaginatedResponse<InventorySummaryResponse>>(),
-  },
-  getMinQuantityItem: {
-    path: "/api/v1/facility/{facilityId}/min_quantity/{inventoryId}/",
-    method: "GET",
-    TRes: Type<MinimumQuantityItemResponse>(),
-  },
-  updateMinQuantity: {
-    path: "/api/v1/facility/{facilityId}/min_quantity/{inventoryId}/",
-    method: "PATCH",
-    TRes: Type<PaginatedResponse<MinimumQuantityItemResponse>>(),
-  },
-  getInventorySummary: {
-    path: "/api/v1/facility/{facility_external_id}/inventorysummary/",
-    method: "GET",
-    TRes: Type<PaginatedResponse<InventorySummaryResponse>>(),
-  },
-  getItemName: {
-    path: "/api/v1/items/",
-    method: "GET",
-  },
-  flagInventoryItem: {
-    path: "/api/v1/facility/{facility_external_id}/inventory/{external_id}/flag/",
-    method: "PUT",
-    TRes: Type<PaginatedResponse<InventoryLogResponse>>(),
-  },
-  deleteLastInventoryLog: {
-    path: "/api/v1/facility/{facility_external_id}/inventory/delete_last/?item={id}",
-    method: "DELETE",
-    TRes: Type<Record<string, never>>(),
-  },
-
   //Profile
   checkUsername: {
     path: "/api/v1/users/{username}/check_availability/",
@@ -473,7 +411,6 @@ const routes = {
     path: "/api/v1/users/",
     method: "PUT",
   },
-
 
   // Assets endpoints
 
@@ -515,97 +452,6 @@ const routes = {
       path: "/api/v1/timelog/status",
       method: "GET",
       TRes: Type<{ clocked_in: boolean; time_log: any | null }>(),
-    },
-  },
-
-  // Timetable Endpoints
-  timetable: {
-    listSections: {
-      path: "/api/v1/facility/{id}/sections/",
-      method: "GET",
-      TRes: Type<any[]>(),
-    },
-
-    createSection: {
-      path: "/api/v1/facility/{id}/sections/",
-      method: "POST",
-      TBody: Type<{
-        name: string;
-        max_capacity?: number;
-        is_active?: boolean;
-        description?: string;
-      }>(),
-      TRes: Type<any>(),
-    },
-
-    getSection: {
-      path: "/api/v1/sections/{id}",
-      method: "GET",
-      TRes: Type<any>(),
-    },
-
-    updateSection: {
-      path: "/api/v1/sections/{id}",
-      method: "PUT",
-      TBody: Type<{
-        name: string;
-        max_capacity?: number;
-        is_active?: boolean;
-        description?: string;
-      }>(),
-      TRes: Type<any>(),
-    },
-
-    deleteSection: {
-      path: "/api/v1/sections/{id}",
-      method: "DELETE",
-      TRes: Type<Record<string, never>>(),
-    },
-
-    getTimetable: {
-      path: "/api/v1/timetable/{id}",
-      method: "GET",
-      TRes: Type<any[]>(),
-    },
-
-    createSlot: {
-      path: "/api/v1/timetable/{id}/slot",
-      method: "POST",
-      TBody: Type<{
-        section_id: string;
-        user_id: number;
-        day_of_week: number;
-        start_time: string;
-        end_time: string;
-        is_recurring?: boolean;
-        valid_from?: string;
-        valid_until?: string;
-        notes?: string;
-      }>(),
-      TRes: Type<any>(),
-    },
-
-    updateSlot: {
-      path: "/api/v1/timetable/slot/{id}",
-      method: "PUT",
-      TBody: Type<{
-        section_id: string;
-        user_id: number;
-        day_of_week: number;
-        start_time: string;
-        end_time: string;
-        is_recurring?: boolean;
-        valid_from?: string;
-        valid_until?: string;
-        notes?: string;
-      }>(),
-      TRes: Type<any>(),
-    },
-
-    deleteSlot: {
-      path: "/api/v1/timetable/slot/{id}",
-      method: "DELETE",
-      TRes: Type<Record<string, never>>(),
     },
   },
 } as const;

@@ -54,6 +54,17 @@ export type UserModel = UserBareMinimum & {
   doctor_medical_council_registration?: string;
   weekly_working_hours?: string | null;
   user_flags?: FeatureFlag[];
+  employment_status?: "active" | "on_leave" | "left";
+  employment_since?: string | null;
+  employment_note?: string;
+  date_format?: "dmy" | "mdy" | "ymd" | "long" | "";
+  /** First sign-in of an account made by someone else */
+  must_change_password?: boolean;
+  /** Settings page ("" = default) */
+  theme?: string;
+  text_size?: string;
+  start_page?: string;
+  language?: string;
 };
 
 export type UserBaseModel = {

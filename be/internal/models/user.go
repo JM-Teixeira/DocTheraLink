@@ -15,6 +15,7 @@ const (
 	RoleStaffReadOnly         UserRole = "StaffReadOnly"
 	RoleStaff                 UserRole = "Staff"
 	RoleReceptionist          UserRole = "Receptionist" // front desk: patients and appointments, no clinical notes
+	RoleCoordinator           UserRole = "Coordinator"  // runs the clinic day: time board, divisions, physio load, stock
 	RoleNurse                 UserRole = "Nurse"
 	RolePhysioTherapist       UserRole = "PhysioTherapist"
 	RoleDoctor                UserRole = "Doctor"
@@ -65,6 +66,26 @@ type User struct {
 	StateID        *uint   `json:"state"`
 	HomeFacilityID *string `json:"home_facility"`
 
+	// Employment: active, on_leave or left (kept as a record; "left" users
+	// cannot sign in).
+	EmploymentStatus string     `json:"employment_status" gorm:"size:12;not null;default:active"`
+	EmploymentSince  *time.Time `json:"employment_since" gorm:"type:date"`
+	// When the person started at the clinic (nil = when the account was made)
+	JoinedOn       *time.Time `json:"joined_on" gorm:"type:date"`
+	EmploymentNote string     `json:"employment_note" gorm:"size:300"`
+
+	// How the person wants dates shown: dmy, mdy, ymd or long ("" = dmy).
+	DateFormat string `json:"date_format" gorm:"size:8"`
+	// Set for accounts made by someone else: the person picks their own
+	// password at the first sign-in before using anything else
+	MustChangePassword bool `json:"must_change_password" gorm:"not null;default:false"`
+	// Settings page: theme light/dark/system, text size normal/large, the
+	// page opened after sign-in and the language ("" = defaults)
+	Theme     string `json:"theme" gorm:"size:8"`
+	TextSize  string `json:"text_size" gorm:"size:8"`
+	StartPage string `json:"start_page" gorm:"size:20"`
+	Language  string `json:"language" gorm:"size:5"`
+
 	// Relationships
 	LocalBody    *LocalBody  `json:"local_body_object" gorm:"foreignKey:LocalBodyID"`
 	District     *District   `json:"district_object" gorm:"foreignKey:DistrictID"`
@@ -108,6 +129,9 @@ type UserBareMinimum struct {
 	UserType          UserRole   `json:"user_type"`
 	LastLogin         *time.Time `json:"last_login"`
 	ProfilePictureURL *string    `json:"read_profile_picture_url"`
+	EmploymentStatus  string     `json:"employment_status"`
+	EmploymentSince   *time.Time `json:"employment_since"`
+	ClinicName        string     `json:"clinic_name,omitempty"`
 }
 
 // LoginRequest represents login credentials

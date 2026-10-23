@@ -3,6 +3,7 @@ import { navigate } from "raviger";
 import { useCallback, useEffect } from "react";
 
 import Loading from "@/components/Common/Loading";
+import { clearAllDrafts } from "@/components/Patient/patientFormUtils";
 
 import { AuthUserContext } from "@/hooks/useAuthUser";
 
@@ -60,6 +61,7 @@ export default function AuthUserProvider({ children, unauthorized }: Props) {
   const signOut = useCallback(async () => {
     localStorage.removeItem(LocalStorageKeys.accessToken);
     localStorage.removeItem(LocalStorageKeys.refreshToken);
+    clearAllDrafts(localStorage); // unsaved patient forms hold patient data
 
     await refetch();
 
