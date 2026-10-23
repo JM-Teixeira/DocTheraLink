@@ -23,22 +23,37 @@ The open items are tracked in [TODO.md](../TODO.md) under "Hosting".
 - **The browser calls the API on its own address** (`same-origin`), so one
   image works behind any host name.
 
-## 1. The Ubuntu laptop as a server
+## 1. The Ubuntu laptop as a server (ready: k8s/overlays/homeserver)
 
-1. Ubuntu Server (or Desktop with the lid-close action set to "do nothing"),
-   fixed IP from the router (DHCP reservation), automatic security updates
-   (`unattended-upgrades`), SSH with keys only.
-2. Install **k3s** (single node, includes Traefik ingress and local storage):
-   `curl -sfL https://get.k3s.io | sh -`.
-3. Create `k8s/overlays/homeserver` (copy of `production` with the laptop's
-   host name, 2 backend replicas off for now, storage on the local disk).
-4. Create the secret, `kubectl apply -k k8s/overlays/homeserver`.
-5. Database: the PostgreSQL StatefulSet with a nightly `pg_dump` CronJob to a
-   second disk or a NAS, and a restore test once a month.
-6. Reachability: on the clinic/home network by name (`klyniva.local` via the
-   router's DNS or mDNS). From outside only through a VPN (Tailscale or
-   WireGuard), never by opening the port on the router.
-7. Power: a small UPS; k3s and the app start by themselves after a power cut.
+What is ready in the repository:
+
+- `k8s/overlays/homeserver`: k3s with its own ingress (Traefik), one
+  backend replica (uploads on the local disk), no demo data, any host name,
+  a nightly database backup to `/var/backups/klyniva` (14 days kept).
+- `scripts/homeserver.sh`: `install`, `deploy`, `status`,
+  `first-admin`, `backup-now`, `restore`.
+
+Steps on the laptop (Ubuntu, Docker installed, repository cloned):
+
+1. Router: give the laptop a fixed IP (DHCP reservation). Laptop: lid-close
+   action "do nothing", automatic security updates, SSH with keys only.
+2. `scripts/homeserver.sh install` (k3s, once).
+3. `scripts/homeserver.sh deploy` (builds the images on the laptop, starts
+   everything; run again after each `git pull` to update).
+4. `scripts/homeserver.sh first-admin` prints `admin.user` and a one-time
+   password; sign in and choose your own. Then create the clinic (with its
+   code) and its people; each person chooses their password at their first
+   sign-in.
+5. Keep a copy of `k8s/overlays/homeserver/secrets.env` and copy
+   `/var/backups/klyniva` to another disk or a NAS regularly; try
+   `scripts/homeserver.sh restore <file>` on a test day.
+6. Open `http://<laptop-name>.local` (or its IP) from the clinic computers.
+   From outside the clinic only through a VPN (Tailscale / WireGuard), never
+   by opening ports on the router.
+7. A small UPS; k3s and Klyniva start by themselves after a power cut.
+
+Still open before real patient data: HTTPS (section 2), and the GDPR items
+in TODO.md (processing record, retention, export / erasure).
 
 ## 2. Certificates (HTTPS)
 

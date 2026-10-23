@@ -30,7 +30,6 @@ import { Toaster } from "@/components/ui/toaster";
 
 import Loading from "@/components/Common/Loading";
 
-import Integrations from "@/Integrations";
 import PluginEngine from "@/PluginEngine";
 import AuthUserProvider from "@/Providers/AuthUserProvider";
 import HistoryAPIProvider from "@/Providers/HistoryAPIProvider";
@@ -80,7 +79,6 @@ const queryClient = new QueryClient({
  * 
  * Additional components:
  * - Toaster - Global notification system
- * - Integrations - External service integrations (Sentry, Plausible)
  * - ReactQueryDevtools - Development debugging tools
  */
 const App = () => {
@@ -105,10 +103,6 @@ const App = () => {
                   <Routers.AppRouter />
                 </FeatureFlagsProvider>
               </AuthUserProvider>
-
-              {/* External service integrations for monitoring and analytics */}
-              <Integrations.Sentry disabled={!import.meta.env.PROD} />
-              <Integrations.Plausible />
             </HistoryAPIProvider>
             
             {/* Global toast notification system for user feedback */}

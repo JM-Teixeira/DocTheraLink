@@ -28,9 +28,11 @@ board, waiting list, absences, stock, people) in one place. Portuguese
   free-slot alerts, missed sessions.
 - **Clinic:** stock with per-floor / per-category permissions, people with
   roles and work history, clinics with codes.
-- **For everyone:** settings (theme, text size, language, start page),
-  suggestions to the admins, "?" help on every page; admins can view the app
-  as any role (read-only).
+- **For everyone:** settings (light / dark theme, text size, language, start
+  page), suggestions to the admins, "?" help on every page; admins can view
+  the app as any role (read-only).
+- **Accounts:** people added by an admin or coordinator choose their own
+  password at the first sign-in; people who left the clinic cannot sign in.
 
 ## Open the local app (Windows + WSL)
 
@@ -144,11 +146,31 @@ fe/                     React app
   src/Utils, src/hooks  shared helpers (requests, dates, settings, view-as)
   public/locale         translations (en.json, pt.json)
 e2e/browser             Playwright journeys
-k8s/                    Kubernetes manifests (kustomize base + overlays: local, production)
-scripts/                local cluster, LAN access, version bump
+k8s/                    Kubernetes manifests (kustomize base + overlays: local, homeserver, production)
+scripts/                local cluster, LAN access, home server, version bump
 ```
 
 ## Deployment
+
+### On an Ubuntu laptop or small server (k3s)
+
+On the server, in a clone of this repository (Docker installed):
+
+```bash
+scripts/homeserver.sh install       # once: k3s
+scripts/homeserver.sh deploy        # build and start; run again after each git pull
+scripts/homeserver.sh first-admin   # once: prints admin.user's one-time password
+scripts/homeserver.sh status        # pods and the address to open (http://<host>.local)
+```
+
+It uses `k8s/overlays/homeserver`: random secrets in
+`k8s/overlays/homeserver/secrets.env` (keep a copy), no demo data, a nightly
+database backup to `/var/backups/klyniva` (14 days; `backup-now`,
+`restore FILE`). Plain HTTP for now: fine for trying it on a home network,
+not for real patient data. The remaining steps (fixed IP, HTTPS, VPN, UPS,
+GDPR) are in [docs/HOSTING.md](docs/HOSTING.md).
+
+### Other targets
 
 - **Production Kubernetes:** see the header of
   `k8s/overlays/production/kustomization.yaml`, and docs/HOSTING.md for a

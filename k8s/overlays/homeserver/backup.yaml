@@ -1,0 +1,64 @@
+# Nightly database backup to the server's disk (/var/backups/klyniva),
+# keeping 14 days. Copy that folder to a second disk or a NAS as well, and
+# test a restore now and then (scripts/homeserver.sh restore <file>).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+spec:
+  schedule: "30 2 * * *" # 02:30 every night
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: postgres-backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pg-dump
+              image: postgres:18-alpine
+              envFrom:
+                - configMapRef: { name: klyniva-config }
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef: { name: klyniva-secrets, key: DB_PASSWORD }
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  f=/backups/klyniva-$(date +%Y%m%d-%H%M).sql.gz
+                  pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME" | gzip > "$f.part"
+                  mv "$f.part" "$f"
+                  find /backups -name 'klyniva-*.sql.gz' -mtime +14 -delete
+                  echo "saved $f"
+              volumeMounts:
+                - { name: backups, mountPath: /backups }
+          volumes:
+            - name: backups
+              hostPath:
+                path: /var/backups/klyniva
+                type: DirectoryOrCreate
+---
+# The base only lets the backend reach PostgreSQL; the backup job may too.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-from-backup
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgres-backup
+      ports:
+        - port: 5432

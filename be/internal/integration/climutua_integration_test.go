@@ -26,7 +26,7 @@ func TestClimutuaSeed(t *testing.T) {
 		}
 		return n
 	}
-	if n := count("de.nuno.dias", "users", "home_facility_id = ? AND employment_status = 'active'", cid); n != 13 {
+	if n := count("staff", "users", "home_facility_id = ? AND employment_status = 'active'", cid); n != 13 {
 		t.Errorf("staff: %d", n)
 	}
 	if n := count("patients", "patients", "facility_id = ?", cid); n != database.ClimutuaPatients {

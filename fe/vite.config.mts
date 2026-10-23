@@ -253,9 +253,9 @@ export default defineConfig(({ mode }) => {
     preview: {
       headers: {
         "Content-Security-Policy-Report-Only": `default-src 'self';\
-        script-src 'self' blob: 'nonce-f51b9742' https://plausible.10bedicu.in;\
+        script-src 'self' blob:;\
         style-src 'self' 'unsafe-inline';\
-        connect-src 'self' https://plausible.10bedicu.in;\
+        connect-src 'self';\
         img-src 'self' https://cdn.ohc.network ${cdnUrls};\
         object-src 'self' ${cdnUrls};`,
       },

@@ -118,6 +118,10 @@ test("waiting list: add a patient, book their plan, they leave the list", async 
     await expect(plan).toContainText(name);
     await plan.getByLabel("Fisioterapeuta").selectOption({ label: `${tiago.first_name} ${tiago.last_name}` });
     await plan.getByLabel("Hora").selectOption({ label: "09:00" });
+    // The plan starts at the first free slot it found; book the test week instead
+    const from = plan.getByRole("textbox", { name: /^A partir de/ });
+    await from.fill(monday.split("-").reverse().join("/"));
+    await from.press("Enter");
     await plan.getByLabel("Sessões").fill("2");
     await plan.getByRole("button", { name: "Pré-visualizar" }).click();
     await plan.getByRole("button", { name: /^Marcar 2 sessões$/ }).click();

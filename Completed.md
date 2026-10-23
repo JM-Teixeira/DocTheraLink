@@ -5,6 +5,27 @@ UTC+01:00). Commits are on branch `chore/project-foundation` unless noted.
 
 ---
 
+## 2026-10-23 · Klyniva 0.19.0 (branch `feat/m4-patients`)
+
+### Ready for the Ubuntu laptop, dark mode readability, cleanup
+- Hosting on one Ubuntu machine: `k8s/overlays/homeserver` (k3s, Traefik,
+  any host name) and `scripts/homeserver.sh` (install, deploy, first-admin,
+  status, backup-now, restore). Secrets are generated once and git-ignored;
+  a nightly CronJob saves a pg_dump to `/var/backups/klyniva` (14 days).
+- `migrate -create-admin` makes the first admin (`admin.user`) with a
+  one-time password on a server without demo data, and does nothing when an
+  admin already exists (integration test).
+- Dark mode: grey text is lighter (readable), and pop-up backdrops are dark
+  instead of white. Checked on screenshots of the inventory "?" pop-up and
+  the patients page.
+- Privacy: removed CARE's Sentry error reporting (it was on in every
+  production build, sending errors to CARE's account) and Plausible
+  analytics, with the `@sentry/browser` package.
+- Cleanup: 1,282 unused translation keys, 15 unused images / favicons /
+  config files from CARE, and unused frontend config keys.
+- Browser test for booking from the waiting list sets the plan's start
+  week (the plan now starts at the free slot it found).
+
 ## 2026-10-23 · Klyniva 0.18.0 (branch `feat/m4-patients`)
 
 ### Dark mode rebuilt, own password at first sign-in, one help button

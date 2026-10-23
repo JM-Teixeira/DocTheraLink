@@ -36,7 +36,8 @@ Repo / docs
 
 Hosting (plan and reasons: docs/HOSTING.md)
 - [x] Notes: how to keep it modular and ready to scale (docs/HOSTING.md).
-- [ ] P1 Ubuntu laptop as the server: k3s, overlay `k8s/overlays/homeserver`, fixed IP, nightly pg_dump + restore test, VPN for outside access, UPS.
+- [x] Ubuntu laptop as the server: k3s, overlay `k8s/overlays/homeserver`, `scripts/homeserver.sh` (install, deploy, first-admin, status, backup-now, restore), nightly pg_dump kept 14 days (2026-10-23).
+- [ ] P1 On the laptop itself (owner): fixed IP on the router, first restore test, copy of backups and `secrets.env` to a second disk, VPN (Tailscale / WireGuard) for outside access, UPS.
 - [ ] P1 TLS certificates: local CA (mkcert / step-ca) + cert-manager on the network; Let's Encrypt (DNS-01) once there is a public domain; then HSTS and httpOnly refresh cookie.
 - [ ] P2 Images from CI to GHCR tagged by commit; the server pulls fixed tags.
 - [ ] P2 Before more than one backend replica: versioned migrations (k8s Job) and uploads on S3 / MinIO.
@@ -83,7 +84,10 @@ Open testing work:
 - [ ] **Token storage**: move refresh token to an httpOnly cookie; revocation on logout/password change.
 - [ ] **Headers**: `Cache-Control: no-store` on API responses; tighten nginx CSP.
 - [x] **Access-control review of legacy handlers** (2026-10-22): user create/edit/delete, facility create/edit/delete, user and clinic reads, time logs, skills — see Completed.
-- [ ] Same review for the remaining legacy reads (`/getallfacilities/`, geography) and a password-change policy (length, reuse).
+- [x] Own password at the first sign-in; new passwords need 8+ characters and must differ from the old one (2026-10-23).
+- [x] No third-party telemetry: CARE's Sentry DSN (on in every production build) and Plausible removed (2026-10-23).
+- [ ] Same review for the remaining legacy reads (`/getallfacilities/`, geography); password reuse history.
+- [ ] Google Maps on the clinic form still uses CARE's API key by default: set our own `REACT_GMAPS_API_KEY` or drop the map.
 - [ ] Encrypted backups; TLS to managed Postgres (`DB_SSLMODE=verify-full`).
 - [ ] Dependency & image scanning in CI (govulncheck, npm audit, Trivy). The IDE scan
       flags critical CVEs in the local `nginx:1.29-alpine` base image — pin a patched
@@ -98,7 +102,7 @@ Open testing work:
 - [ ] P2 Remove remaining ICU-era constants/types (`common/constants.tsx`, `Patient/models.tsx` daily-round types, COVID fields on the patient model).
 - [ ] P2 Swagger/OpenAPI regeneration (`make -C be swagger`) and frontend types from it.
 - [ ] P2 Legacy models use `UserBareMinimum` relations without a table name (GORM may create `user_bare_minimums`); audit.
-- [ ] P3 Fold `be/scripts/portugal_data.sql` (full district list) into seeding or delete it.
+- [ ] P3 CARE plugin system (`careApps`, `fe/scripts/setup-care-apps.js`, `PluginEngine`) is unused: remove it.
 
 ## 3. Deployment & operations (P2/P3)
 
@@ -108,7 +112,7 @@ Open testing work:
 - [ ] P2 Uploads to S3-compatible storage (needed for >1 backend replica) — add an S3 implementation of `internal/storage.Store`.
 - [ ] P2 Virus scanning of uploaded attachments (ClamAV sidecar) before they are downloadable.
 - [ ] P3 Managed PostgreSQL or CloudNativePG with PITR backups.
-- [ ] P3 Observability: Prometheus metrics, OpenTelemetry traces, Sentry DSN wiring.
+- [ ] P3 Observability: Prometheus metrics, OpenTelemetry traces; error reports only to a service we control (self-hosted), never with patient data.
 - [ ] P3 Redis only if needed for rate limiting/sessions (removed from k8s for now).
 - [ ] P3 GitHub repo rename `DocTheraLink` → `klyniva` (product-owner action in GitHub settings).
 

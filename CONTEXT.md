@@ -5,7 +5,7 @@
 > key decisions change. Work items live in `TODO.md`; finished work in
 > `Completed.md`.
 
-_Last updated: 2026-10-20_
+_Last updated: 2026-10-23_
 
 ## 1. What the product is
 
@@ -29,7 +29,8 @@ therapist talk on a per-referral thread; every status change is logged there.
 ```
 be/                Go backend (Go module name: klyniva)
   cmd/server       HTTP server entrypoint (also: `server -healthcheck`)
-  cmd/migrate      migrations + seeding CLI
+  cmd/migrate      migrations + seeding CLI; `-create-admin` makes the first
+                   admin (admin.user, one-time password) on an empty server
   internal/
     api/routes.go  all route registration (/api/v1)
     api/handlers/  legacy handlers (users, facilities, time log)
@@ -67,7 +68,7 @@ be/                Go backend (Go module name: klyniva)
     integration/   PostgreSQL tests (build tag `integration`, testcontainers)
     e2e/           HTTP tests against a RUNNING stack (build tag `e2e`, E2E_BASE_URL)
     models/        legacy shared GORM models
-  scripts/         init.sql (compose), portugal_data.sql (reference data)
+  scripts/         init.sql (compose)
 fe/                React frontend (started as a fork of CARE; ICU modules removed)
   src/components/Referral/   referral UI module (+ tests)
   src/components/Patient/    Klyniva patient pages (PatientList/Detail/Form,
@@ -78,8 +79,11 @@ fe/                React frontend (started as a fork of CARE; ICU modules remove
   public/locale/{en,pt}.json translations
 k8s/base/          environment-independent manifests (kustomize)
 k8s/overlays/local       k3d cluster (http://localhost:8088, demo data)
+k8s/overlays/homeserver  one Ubuntu machine with k3s (Traefik, any host name,
+                         nightly pg_dump to /var/backups/klyniva)
 k8s/overlays/production  nginx-ingress + cert-manager TLS + HPA template
 scripts/k8s-local.sh     create/deploy/e2e/status/down for the local cluster
+scripts/homeserver.sh    install/deploy/first-admin/status/backup-now/restore on that server
 .github/workflows/ci.yml CI (unit, integration, e2e on compose, image builds)
 docker-compose.yml local stack;  .env.example → .env
 Makefile           make up / test / check / k8s-up / k8s-e2e …
@@ -119,6 +123,14 @@ regression test checks column types.
 `authorization_payload` (`*models.TokenClaims`) and `user_id` (uint) in the Gin
 context. Roles are strings on `users.user_type`. Admin = State/District/LocalBody
 admin (organisation-wide, no clinic).
+- Every request checks the account (`auth.AccountChecker`, cached briefly;
+  `auth.ForgetAccount` clears it): a deactivated user gets 401, and an account
+  with `must_change_password` (set when an admin/coordinator creates it) gets
+  403 `password_change_required` on everything except "who am I" and the
+  password change. The frontend shows `Auth/ForcePasswordChange` then.
+- Admin headers: `X-Clinic` = the clinic an admin is working in (time board);
+  `X-View-As-Role` / `X-View-As-Clinic` = "view as" another role, read-only
+  (writes refused), applied through `clinic.WithViewAs`. Ignored for non-admins.
 
 **Roles in use:** `Doctor` (refers), `PhysioTherapist` (treats), `Nurse`,
 `Receptionist` (front desk: registers/edits patients, views the time board,
@@ -166,6 +178,12 @@ concurrent accepts have one winner.
 Do not use `components/ui/input.tsx` for controlled inputs (it omits `onChange`).
 Global CSS styles bare `h2/h3` large — give headings explicit text sizes.
 Pure logic goes in `*Utils.ts` with tests; UI permissions mirror the backend.
+Each page has one "?" next to its title: `Page help="<key>"` (+ `helpExtra`
+for richer content). Tailwind runs with `important: true`, so global overrides
+need `!important`. Dark mode is `html.theme-dark` in `style/theme.css`: the page
+is inverted and hue-rotated (pictures turned back), with a few fixes for grey
+text and pop-up backdrops; components' own `dark:` classes are not used.
+No third-party telemetry: CARE's Sentry and Plausible hooks were removed.
 
 ## 5. Running & testing
 
@@ -213,6 +231,11 @@ the repo ownership).
   (local: generated `secrets.env`; production: create with kubectl).
 - Backend stays at 1 replica until migrations run as a Job and uploads move
   to shared storage. Production placeholders: `klyniva.com`, GHCR image names.
+- Home server (docs/HOSTING.md): `scripts/homeserver.sh deploy` builds the
+  images, imports them into k3s and applies `k8s/overlays/homeserver`; it
+  writes `secrets.env` (random, git-ignored, keep a copy) and `site.env`
+  (PUBLIC_URL / CORS from the host name and IPs). No demo users there:
+  `first-admin` creates admin.user once. Plain HTTP until TLS is added.
 
 ## 7. Known gaps (details in TODO.md)
 

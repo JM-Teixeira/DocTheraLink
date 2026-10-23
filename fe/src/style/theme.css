@@ -37,3 +37,35 @@ html.theme-dark .shadow-lg,
 html.theme-dark .shadow-xl {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.06) !important;
 }
+
+/*
+ * Muted texts: a light-mode grey turns into a dark-mode grey that is too
+ * faint, so before the inversion they get a darker grey (= a lighter grey
+ * once inverted).
+ */
+html.theme-dark .text-gray-300,
+html.theme-dark .text-gray-400,
+html.theme-dark .text-secondary-300,
+html.theme-dark .text-secondary-400 {
+  color: #4b5563 !important;
+}
+html.theme-dark .text-gray-500,
+html.theme-dark .text-gray-600,
+html.theme-dark .text-secondary-500,
+html.theme-dark .text-secondary-600 {
+  color: #374151 !important;
+}
+html.theme-dark input::placeholder,
+html.theme-dark textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+/*
+ * Backdrops behind pop-ups: black would invert to white, so they are white
+ * here and become a dark veil once inverted.
+ */
+html.theme-dark [class*="bg-black/"],
+html.theme-dark .bg-black.bg-opacity-50,
+html.theme-dark .bg-gray-800.bg-opacity-60 {
+  background-color: rgb(255 255 255 / 0.65) !important;
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 func main() {
 	var (
 		seed = flag.Bool("seed", false, "Run database seeding after migration")
+		// A new server without demo data has no account: this makes admin.user
+		createAdmin = flag.Bool("create-admin", false, "Create the first admin (admin.user) if there is none and print its one-time password")
 	)
 	flag.Parse()
 
@@ -37,5 +40,18 @@ func main() {
 			log.Fatalf("Failed to seed database: %v", err)
 		}
 		log.Println("Database seeding completed successfully")
+	}
+
+	if *createAdmin {
+		password, created, err := database.CreateFirstAdmin()
+		if err != nil {
+			log.Fatalf("Failed to create the first admin: %v", err)
+		}
+		if !created {
+			log.Println("An admin already exists; nothing created")
+		} else {
+			fmt.Printf("\nFirst admin: %s\nOne-time password: %s\n(change it at the first sign-in)\n",
+				database.FirstAdminUsername, password)
+		}
 	}
 }
